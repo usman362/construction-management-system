@@ -143,6 +143,11 @@ class Project extends Model
         return $this->hasMany(PerDiemRate::class);
     }
 
+    public function projectBillableRates(): HasMany
+    {
+        return $this->hasMany(ProjectBillableRate::class);
+    }
+
     public function getProfitAttribute()
     {
         return $this->estimate - $this->current_budget;

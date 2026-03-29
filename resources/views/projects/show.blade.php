@@ -131,6 +131,17 @@
             </button>
         </div>
 
+        {{-- Quick Links Bar --}}
+        <div class="flex flex-wrap gap-2 px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <a href="{{ route('projects.budget.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Budget Lines</a>
+            <a href="{{ route('projects.change-orders.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Change Orders</a>
+            <a href="{{ route('projects.estimates.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Estimates</a>
+            <a href="{{ route('projects.commitments.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Commitments</a>
+            <a href="{{ route('projects.manhour-budgets.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Manhour Budgets</a>
+            <a href="{{ route('projects.billable-rates.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition text-gray-700 font-medium">Billable Rates</a>
+            <a href="{{ route('projects.daily-logs.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Daily Logs</a>
+        </div>
+
         <!-- Tab Content -->
         <div class="p-6">
             <!-- Overview Tab -->
@@ -338,23 +349,23 @@
             <!-- Reports Tab -->
             <div x-show="activeTab === 'reports'" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <a href="#" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
+                    <a href="{{ route('projects.reports.cost-report', $project) }}" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
                         <h3 class="font-semibold text-blue-900">Cost Report</h3>
                         <p class="text-sm text-blue-700 mt-1">View detailed cost analysis</p>
                     </a>
-                    <a href="#" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
+                    <a href="{{ route('projects.reports.forecast', $project) }}" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
                         <h3 class="font-semibold text-blue-900">Forecast</h3>
                         <p class="text-sm text-blue-700 mt-1">Project forecast and projections</p>
                     </a>
-                    <a href="#" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
+                    <a href="{{ route('projects.reports.manhours', $project) }}" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
                         <h3 class="font-semibold text-blue-900">Manhours</h3>
                         <p class="text-sm text-blue-700 mt-1">Labor hours and productivity</p>
                     </a>
-                    <a href="#" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
+                    <a href="{{ route('projects.reports.profit-loss', $project) }}" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
                         <h3 class="font-semibold text-blue-900">P&L</h3>
                         <p class="text-sm text-blue-700 mt-1">Profit and loss statement</p>
                     </a>
-                    <a href="#" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
+                    <a href="{{ route('projects.reports.productivity', $project) }}" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition">
                         <h3 class="font-semibold text-blue-900">Productivity</h3>
                         <p class="text-sm text-blue-700 mt-1">Productivity metrics and analysis</p>
                     </a>

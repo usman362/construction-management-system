@@ -8,20 +8,77 @@
     <div class="meta-value">{{ now()->format('M j, Y') }}</div>
 @endsection
 
+@section('extra-styles')
+<style>
+    .cost-type-header {
+        background: #e8edf3;
+        font-weight: bold;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .cost-type-header td {
+        padding: 6px 8px;
+        color: #1e3a5f;
+        border-bottom: 2px solid #1e3a5f;
+    }
+    .cost-type-subtotal td {
+        background: #f0f4f8;
+        font-weight: bold;
+        border-top: 1px solid #ccc;
+    }
+    .sub-line td {
+        padding-left: 20px;
+        font-size: 9px;
+    }
+    .grand-total td {
+        background: #1e3a5f;
+        color: #fff;
+        font-weight: bold;
+        font-size: 11px;
+        padding: 8px;
+    }
+    .over-budget {
+        color: #dc2626;
+        font-weight: bold;
+    }
+    .under-budget {
+        color: #16a34a;
+    }
+    .manhour-table {
+        margin-top: 15px;
+    }
+    .manhour-table th {
+        background: #374151;
+        color: #fff;
+        font-size: 9px;
+        padding: 5px 8px;
+    }
+    .manhour-table td {
+        font-size: 9px;
+        padding: 4px 8px;
+    }
+</style>
+@endsection
+
 @section('content')
     {{-- Summary Grid --}}
     <div class="summary-grid">
         <div class="summary-item">
-            <div class="label">Total Budget</div>
+            <div class="label">Original Budget</div>
             <div class="value">${{ number_format(collect($costCodeData)->sum('budget'), 2) }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">Approved COs</div>
+            <div class="value">${{ number_format($changeOrders->sum('amount'), 2) }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">Revised Budget</div>
+            <div class="value">${{ number_format(collect($costCodeData)->sum('budget') + $changeOrders->sum('amount'), 2) }}</div>
         </div>
         <div class="summary-item">
             <div class="label">Total Committed</div>
             <div class="value">${{ number_format(collect($costCodeData)->sum('committed'), 2) }}</div>
-        </div>
-        <div class="summary-item">
-            <div class="label">Total Invoiced</div>
-            <div class="value">${{ number_format(collect($costCodeData)->sum('invoiced'), 2) }}</div>
         </div>
         <div class="summary-item {{ collect($costCodeData)->sum('balance') >= 0 ? 'positive' : 'negative' }}">
             <div class="label">Remaining Balance</div>
@@ -29,39 +86,56 @@
         </div>
     </div>
 
-    {{-- Cost Breakdown Table --}}
-    <div class="section-title">Cost Breakdown by Code</div>
+    {{-- Cost Breakdown by Cost Type --}}
+    <div class="section-title">Cost Breakdown by Cost Code</div>
     <table>
         <thead>
             <tr>
-                <th>Cost Code</th>
-                <th>Description</th>
-                <th class="text-right">Budget</th>
-                <th class="text-right">Committed</th>
-                <th class="text-right">Invoiced</th>
-                <th class="text-right">Balance</th>
-                <th class="text-center">% Complete</th>
+                <th style="width: 10%">Cost Code</th>
+                <th style="width: 22%">Description</th>
+                <th class="text-right" style="width: 12%">Original Budget</th>
+                <th class="text-right" style="width: 12%">Revised Budget</th>
+                <th class="text-right" style="width: 12%">Committed</th>
+                <th class="text-right" style="width: 10%">Invoiced</th>
+                <th class="text-right" style="width: 12%">Balance</th>
+                <th class="text-center" style="width: 10%">% Complete</th>
             </tr>
         </thead>
         <tbody>
+            @php
+                $totalBudget = 0;
+                $totalCommitted = 0;
+                $totalInvoiced = 0;
+                $totalBalance = 0;
+            @endphp
+
             @foreach($costCodeData as $data)
             <tr>
                 <td><strong>{{ $data['code'] }}</strong></td>
                 <td>{{ $data['name'] }}</td>
                 <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
+                <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
                 <td class="text-right">${{ number_format($data['committed'], 2) }}</td>
                 <td class="text-right">${{ number_format($data['invoiced'], 2) }}</td>
-                <td class="text-right" style="color: {{ $data['balance'] >= 0 ? '#16a34a' : '#dc2626' }}">${{ number_format($data['balance'], 2) }}</td>
+                <td class="text-right {{ $data['balance'] >= 0 ? 'under-budget' : 'over-budget' }}">${{ number_format($data['balance'], 2) }}</td>
                 <td class="text-center">{{ $data['percentage_complete'] }}%</td>
             </tr>
+            @php
+                $totalBudget += $data['budget'];
+                $totalCommitted += $data['committed'];
+                $totalInvoiced += $data['invoiced'];
+                $totalBalance += $data['balance'];
+            @endphp
             @endforeach
-            <tr class="totals-row">
-                <td colspan="2"><strong>TOTAL</strong></td>
-                <td class="text-right">${{ number_format(collect($costCodeData)->sum('budget'), 2) }}</td>
-                <td class="text-right">${{ number_format(collect($costCodeData)->sum('committed'), 2) }}</td>
-                <td class="text-right">${{ number_format(collect($costCodeData)->sum('invoiced'), 2) }}</td>
-                <td class="text-right">${{ number_format(collect($costCodeData)->sum('balance'), 2) }}</td>
-                <td class="text-center">—</td>
+
+            <tr class="grand-total">
+                <td colspan="2">GRAND TOTAL</td>
+                <td class="text-right">${{ number_format($totalBudget, 2) }}</td>
+                <td class="text-right">${{ number_format($totalBudget + $changeOrders->sum('amount'), 2) }}</td>
+                <td class="text-right">${{ number_format($totalCommitted, 2) }}</td>
+                <td class="text-right">${{ number_format($totalInvoiced, 2) }}</td>
+                <td class="text-right">${{ number_format($totalBalance, 2) }}</td>
+                <td class="text-center">{{ $totalBudget > 0 ? round(($totalCommitted / $totalBudget) * 100, 1) : 0 }}%</td>
             </tr>
         </tbody>
     </table>
@@ -72,10 +146,10 @@
     <table>
         <thead>
             <tr>
-                <th>CO #</th>
-                <th>Description</th>
-                <th class="text-right">Amount</th>
-                <th class="text-center">Status</th>
+                <th style="width: 12%">CO #</th>
+                <th style="width: 50%">Description</th>
+                <th class="text-right" style="width: 18%">Amount</th>
+                <th class="text-center" style="width: 20%">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -89,7 +163,7 @@
             @endforeach
             <tr class="totals-row">
                 <td colspan="2"><strong>Total Change Orders</strong></td>
-                <td class="text-right">${{ number_format($changeOrders->sum('amount'), 2) }}</td>
+                <td class="text-right"><strong>${{ number_format($changeOrders->sum('amount'), 2) }}</strong></td>
                 <td></td>
             </tr>
         </tbody>
@@ -104,11 +178,23 @@
             <div class="value">{{ number_format($manhourData['budget_hours'], 1) }}</div>
         </div>
         <div class="summary-item">
+            <div class="label">Regular Hours</div>
+            <div class="value">{{ number_format($manhourData['total_regular_hours'] ?? 0, 1) }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">OT Hours</div>
+            <div class="value">{{ number_format($manhourData['total_ot_hours'] ?? 0, 1) }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">DT Hours</div>
+            <div class="value">{{ number_format($manhourData['total_dt_hours'] ?? 0, 1) }}</div>
+        </div>
+        <div class="summary-item">
             <div class="label">Total Hours</div>
             <div class="value">{{ number_format($manhourData['total_hours'], 1) }}</div>
         </div>
         <div class="summary-item {{ $manhourData['hours_variance'] >= 0 ? 'positive' : 'negative' }}">
-            <div class="label">Variance</div>
+            <div class="label">Hours Variance</div>
             <div class="value">{{ number_format($manhourData['hours_variance'], 1) }} hrs</div>
         </div>
     </div>

@@ -23,6 +23,8 @@ class Timesheet extends Model
         'total_cost',
         'billable_rate',
         'billable_amount',
+        'rate_type',
+        'project_billable_rate_id',
         'status',
         'approved_by',
         'approved_at',
@@ -71,5 +73,10 @@ class Timesheet extends Model
     public function costAllocations(): HasMany
     {
         return $this->hasMany(TimesheetCostAllocation::class);
+    }
+
+    public function projectBillableRate(): BelongsTo
+    {
+        return $this->belongsTo(ProjectBillableRate::class);
     }
 }

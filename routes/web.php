@@ -24,6 +24,8 @@ use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CostCodeController;
+use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\ProjectBillableRateController;
 
 // ─── Guest (Auth) Routes ─────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -73,6 +75,13 @@ Route::middleware('auth')->group(function () {
         Route::post('manhour-budgets', [ManhourBudgetController::class, 'store'])->name('manhour-budgets.store');
         Route::put('manhour-budgets/{manhourBudget}', [ManhourBudgetController::class, 'update'])->name('manhour-budgets.update');
 
+        // Project Billable Rates
+        Route::get('billable-rates', [ProjectBillableRateController::class, 'index'])->name('billable-rates.index');
+        Route::post('billable-rates', [ProjectBillableRateController::class, 'store'])->name('billable-rates.store');
+        Route::get('billable-rates/{projectBillableRate}/edit', [ProjectBillableRateController::class, 'edit'])->name('billable-rates.edit');
+        Route::put('billable-rates/{projectBillableRate}', [ProjectBillableRateController::class, 'update'])->name('billable-rates.update');
+        Route::delete('billable-rates/{projectBillableRate}', [ProjectBillableRateController::class, 'destroy'])->name('billable-rates.destroy');
+
         // Daily Logs
         Route::resource('daily-logs', DailyLogController::class)->except(['edit', 'update']);
 
@@ -119,6 +128,15 @@ Route::middleware('auth')->group(function () {
     // Costing
     Route::resource('cost-codes', CostCodeController::class);
     Route::resource('clients', ClientController::class);
+
+    // Purchase Orders
+    Route::resource('purchase-orders', PurchaseOrderController::class);
+    Route::post('purchase-orders/{purchaseOrder}/issue', [PurchaseOrderController::class, 'issue'])->name('purchase-orders.issue');
+    Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
+    Route::post('purchase-orders/{purchaseOrder}/items', [PurchaseOrderController::class, 'addItem'])->name('purchase-orders.add-item');
+    Route::delete('purchase-orders/{purchaseOrder}/items/{purchaseOrderItem}', [PurchaseOrderController::class, 'removeItem'])->name('purchase-orders.remove-item');
+    Route::get('purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'downloadPdf'])->name('purchase-orders.pdf');
+    Route::post('purchase-orders/{purchaseOrder}/commit', [PurchaseOrderController::class, 'commitToProject'])->name('purchase-orders.commit');
 
     // Vendors & Procurement
     Route::resource('vendors', VendorController::class);

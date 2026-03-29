@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Timesheet;
 use App\Models\Employee;
 use App\Models\Project;
+use App\Models\ProjectBillableRate;
 use App\Models\Crew;
 use App\Models\Shift;
 use Illuminate\Http\Request;
@@ -114,6 +115,7 @@ class TimesheetController extends Controller
                 'double_time_hours' => $timesheet->double_time_hours,
                 'total_hours' => $timesheet->total_hours,
                 'cost' => $timesheet->total_cost,
+                'rate_type' => $timesheet->rate_type ?? 'standard',
                 'status' => $timesheet->status,
             ];
         })->toArray();
@@ -144,7 +146,7 @@ class TimesheetController extends Controller
         $reg = (float) $validated['regular_hours'];
         $ot = (float) ($validated['overtime_hours'] ?? 0);
         $dt = (float) ($validated['double_time_hours'] ?? 0);
-        $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt);
+        $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt, (int) $validated['project_id'], $validated['date']);
 
         $timesheet = Timesheet::create([
             'employee_id' => $validated['employee_id'],
@@ -161,6 +163,8 @@ class TimesheetController extends Controller
             'total_cost' => $totals['total_cost'],
             'billable_rate' => $totals['billable_rate'],
             'billable_amount' => $totals['billable_amount'],
+            'rate_type' => $totals['rate_type'],
+            'project_billable_rate_id' => $totals['project_billable_rate_id'],
             'status' => 'draft',
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -223,7 +227,7 @@ class TimesheetController extends Controller
         $reg = (float) $validated['regular_hours'];
         $ot = (float) ($validated['overtime_hours'] ?? 0);
         $dt = (float) ($validated['double_time_hours'] ?? 0);
-        $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt);
+        $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt, (int) $validated['project_id'], $validated['date']);
 
         $timesheet->update([
             'employee_id' => $validated['employee_id'],
@@ -240,6 +244,8 @@ class TimesheetController extends Controller
             'total_cost' => $totals['total_cost'],
             'billable_rate' => $totals['billable_rate'],
             'billable_amount' => $totals['billable_amount'],
+            'rate_type' => $totals['rate_type'],
+            'project_billable_rate_id' => $totals['project_billable_rate_id'],
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -332,7 +338,7 @@ class TimesheetController extends Controller
             $reg = (float) $entry['regular_hours'];
             $ot = (float) ($entry['overtime_hours'] ?? 0);
             $dt = (float) ($entry['double_time_hours'] ?? 0);
-            $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt);
+            $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt, (int) $validated['project_id'], $validated['date']);
 
             $timesheet = Timesheet::create([
                 'employee_id' => $entry['employee_id'],
@@ -349,6 +355,8 @@ class TimesheetController extends Controller
                 'total_cost' => $totals['total_cost'],
                 'billable_rate' => $totals['billable_rate'],
                 'billable_amount' => $totals['billable_amount'],
+                'rate_type' => $totals['rate_type'],
+                'project_billable_rate_id' => $totals['project_billable_rate_id'],
                 'status' => 'draft',
             ]);
 
@@ -364,11 +372,76 @@ class TimesheetController extends Controller
     }
 
     /**
-     * @return array{total_hours: float, total_cost: float, regular_rate: string|float, overtime_rate: string|float, billable_rate: string|float, billable_amount: float}
+     * Find the best matching ProjectBillableRate for a given project, employee, and date.
+     * Priority: employee-specific rate > craft-specific rate > null (use standard)
      */
-    private function computeLaborTotals(Employee $employee, float $regularHours, float $overtimeHours, float $doubleTimeHours): array
+    private function findProjectBillableRate(int $projectId, Employee $employee, string $date): ?ProjectBillableRate
+    {
+        // First try employee-specific rate for this project
+        $rate = ProjectBillableRate::forProject($projectId)
+            ->forEmployee($employee->id)
+            ->effectiveOn($date)
+            ->orderByDesc('effective_date')
+            ->first();
+
+        if ($rate) {
+            return $rate;
+        }
+
+        // Then try craft-specific rate for this project
+        if ($employee->craft_id) {
+            $rate = ProjectBillableRate::forProject($projectId)
+                ->forCraft($employee->craft_id)
+                ->whereNull('employee_id')
+                ->effectiveOn($date)
+                ->orderByDesc('effective_date')
+                ->first();
+
+            if ($rate) {
+                return $rate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{total_hours: float, total_cost: float, regular_rate: string|float, overtime_rate: string|float, billable_rate: string|float, billable_amount: float, rate_type: string, project_billable_rate_id: int|null}
+     */
+    private function computeLaborTotals(Employee $employee, float $regularHours, float $overtimeHours, float $doubleTimeHours, int $projectId = 0, string $date = ''): array
     {
         $totalHours = $regularHours + $overtimeHours + $doubleTimeHours;
+
+        // Check for project-based loaded billable rate
+        $projectRate = null;
+        if ($projectId && $date) {
+            $projectRate = $this->findProjectBillableRate($projectId, $employee, $date);
+        }
+
+        if ($projectRate) {
+            // Use loaded billable rates from project configuration
+            $stRate = (float) $projectRate->straight_time_rate;
+            $otRate = (float) $projectRate->overtime_rate;
+            $dtRate = (float) $projectRate->double_time_rate;
+
+            $regularCost = $regularHours * $stRate;
+            $otCost = $overtimeHours * $otRate;
+            $dtCost = $doubleTimeHours * $dtRate;
+            $totalCost = $regularCost + $otCost + $dtCost;
+
+            return [
+                'total_hours' => $totalHours,
+                'total_cost' => $totalCost,
+                'regular_rate' => $stRate,
+                'overtime_rate' => $otRate,
+                'billable_rate' => $stRate,
+                'billable_amount' => $totalCost,
+                'rate_type' => 'loaded',
+                'project_billable_rate_id' => $projectRate->id,
+            ];
+        }
+
+        // Fallback: use employee's standard rates
         $regularCost = $regularHours * (float) $employee->hourly_rate;
         $otCost = $overtimeHours * (float) $employee->overtime_rate;
         $dtCost = $doubleTimeHours * ((float) $employee->hourly_rate * 2);
@@ -381,6 +454,8 @@ class TimesheetController extends Controller
             'overtime_rate' => $employee->overtime_rate,
             'billable_rate' => $employee->billable_rate,
             'billable_amount' => $totalCost,
+            'rate_type' => 'standard',
+            'project_billable_rate_id' => null,
         ];
     }
 }
