@@ -24,7 +24,6 @@ use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CostCodeController;
-use App\Http\Controllers\DeployController;
 
 // ─── Guest (Auth) Routes ─────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -140,22 +139,60 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/timesheets', [ReportController::class, 'timesheetReport'])->name('reports.timesheets');
 });
 
-// ─── Deploy Routes (Public - No Auth/Token) ────────────────────────
-Route::prefix('deploy')->group(function () {
-    Route::get('/', [DeployController::class, 'index'])->name('deploy.index');
-    Route::post('migrate', [DeployController::class, 'migrate'])->name('deploy.migrate');
-    Route::post('migrate-fresh', [DeployController::class, 'migrateFresh'])->name('deploy.migrate-fresh');
-    Route::post('migrate-seed', [DeployController::class, 'migrateWithSeed'])->name('deploy.migrate-seed');
-    Route::post('seed', [DeployController::class, 'seed'])->name('deploy.seed');
-    Route::post('rollback', [DeployController::class, 'migrateRollback'])->name('deploy.rollback');
-    Route::post('clear-cache', [DeployController::class, 'clearCache'])->name('deploy.clear-cache');
-    Route::post('optimize', [DeployController::class, 'optimizeCache'])->name('deploy.optimize');
-    Route::post('storage-link', [DeployController::class, 'storageLink'])->name('deploy.storage-link');
-    Route::post('key-generate', [DeployController::class, 'keyGenerate'])->name('deploy.key-generate');
-    Route::post('migration-status', [DeployController::class, 'migrationStatus'])->name('deploy.migration-status');
-    Route::post('db-check', [DeployController::class, 'dbCheck'])->name('deploy.db-check');
-    Route::post('full-deploy', [DeployController::class, 'fullDeploy'])->name('deploy.full-deploy');
-    Route::post('git-pull', [DeployController::class, 'gitPull'])->name('deploy.git-pull');
-    Route::post('git-status', [DeployController::class, 'gitStatus'])->name('deploy.git-status');
-    Route::post('composer-install', [DeployController::class, 'composerInstall'])->name('deploy.composer-install');
+
+// ── Deploy Helper Routes (public, no auth) ──────────────────────────────
+Route::get('/deploy/git-pull', function () {
+    $output = [];
+    exec('cd ' . base_path() . ' && git pull 2>&1', $output, $returnCode);
+    return response()->json([
+        'success' => $returnCode === 0,
+        'output' => implode("\n", $output),
+    ]);
+});
+
+Route::get('/deploy/migrate', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        return response()->json([
+            'success' => true,
+            'output' => $output,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+});
+
+Route::get('/deploy/seed/{seeder?}', function (?string $seeder = null) {
+    try {
+        $params = ['--force' => true];
+        if ($seeder) {
+            $params['--class'] = $seeder;
+        }
+        \Illuminate\Support\Facades\Artisan::call('db:seed', $params);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        return response()->json([
+            'success' => true,
+            'output' => $output,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+});
+
+Route::get('/deploy/cache-clear', function () {
+    \Illuminate\Support\Facades\Artisan::call('cache:clear');
+    \Illuminate\Support\Facades\Artisan::call('config:clear');
+    \Illuminate\Support\Facades\Artisan::call('route:clear');
+    \Illuminate\Support\Facades\Artisan::call('view:clear');
+    return response()->json([
+        'success' => true,
+        'output' => 'All caches cleared.',
+    ]);
 });
