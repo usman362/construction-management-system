@@ -8,7 +8,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Long random string (e.g. php -r "echo bin2hex(random_bytes(32));").
-    | Required for POST /system/deploy/* when not empty.
+    | Required for GET /system/deploy/* when not empty.
     |
     */
     'token' => env('DEPLOY_TOKEN'),

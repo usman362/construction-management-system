@@ -142,13 +142,14 @@ Route::middleware('auth')->group(function () {
 });
 
 /*
-| Remote deploy (no SSH): POST with DEPLOY_TOKEN via ?token=, body token, or X-Deploy-Token header.
+| Remote deploy (no SSH): GET with DEPLOY_TOKEN via ?token= or X-Deploy-Token header.
 | Set DEPLOY_TOKEN in .env. Optional: DEPLOY_ALLOWED_IPS=comma,separated,ips
+| Warning: GET is convenient but URLs may appear in logs; use a strong token and HTTPS.
 */
 Route::middleware([VerifyDeployToken::class, 'throttle:10,1'])
     ->prefix('system/deploy')
     ->group(function () {
-        Route::post('git-pull', [SystemDeployController::class, 'gitPull'])->name('deploy.git-pull');
-        Route::post('migrate', [SystemDeployController::class, 'migrate'])->name('deploy.migrate');
-        Route::post('seed', [SystemDeployController::class, 'seed'])->name('deploy.seed');
+        Route::get('git-pull', [SystemDeployController::class, 'gitPull'])->name('deploy.git-pull');
+        Route::get('migrate', [SystemDeployController::class, 'migrate'])->name('deploy.migrate');
+        Route::get('seed', [SystemDeployController::class, 'seed'])->name('deploy.seed');
     });
