@@ -24,8 +24,7 @@ use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CostCodeController;
-use App\Http\Controllers\SystemDeployController;
-use App\Http\Middleware\VerifyDeployToken;
+use App\Http\Controllers\DeployController;
 
 // ─── Guest (Auth) Routes ─────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -141,15 +140,19 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/timesheets', [ReportController::class, 'timesheetReport'])->name('reports.timesheets');
 });
 
-/*
-| Remote deploy (no SSH): GET with DEPLOY_TOKEN via ?token= or X-Deploy-Token header.
-| Set DEPLOY_TOKEN in .env. Optional: DEPLOY_ALLOWED_IPS=comma,separated,ips
-| Warning: GET is convenient but URLs may appear in logs; use a strong token and HTTPS.
-*/
-Route::middleware([VerifyDeployToken::class, 'throttle:10,1'])
-    ->prefix('system/deploy')
-    ->group(function () {
-        Route::get('git-pull', [SystemDeployController::class, 'gitPull'])->name('deploy.git-pull');
-        Route::get('migrate', [SystemDeployController::class, 'migrate'])->name('deploy.migrate');
-        Route::get('seed', [SystemDeployController::class, 'seed'])->name('deploy.seed');
-    });
+// ─── Deploy Routes (Public - No Auth/Token) ────────────────────────
+Route::prefix('deploy')->group(function () {
+    Route::get('/', [DeployController::class, 'index'])->name('deploy.index');
+    Route::post('migrate', [DeployController::class, 'migrate'])->name('deploy.migrate');
+    Route::post('migrate-fresh', [DeployController::class, 'migrateFresh'])->name('deploy.migrate-fresh');
+    Route::post('migrate-seed', [DeployController::class, 'migrateWithSeed'])->name('deploy.migrate-seed');
+    Route::post('seed', [DeployController::class, 'seed'])->name('deploy.seed');
+    Route::post('rollback', [DeployController::class, 'migrateRollback'])->name('deploy.rollback');
+    Route::post('clear-cache', [DeployController::class, 'clearCache'])->name('deploy.clear-cache');
+    Route::post('optimize', [DeployController::class, 'optimizeCache'])->name('deploy.optimize');
+    Route::post('storage-link', [DeployController::class, 'storageLink'])->name('deploy.storage-link');
+    Route::post('key-generate', [DeployController::class, 'keyGenerate'])->name('deploy.key-generate');
+    Route::post('migration-status', [DeployController::class, 'migrationStatus'])->name('deploy.migration-status');
+    Route::post('db-check', [DeployController::class, 'dbCheck'])->name('deploy.db-check');
+    Route::post('full-deploy', [DeployController::class, 'fullDeploy'])->name('deploy.full-deploy');
+});
