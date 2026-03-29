@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Timesheet extends Model
+{
+    protected $fillable = [
+        'employee_id',
+        'project_id',
+        'crew_id',
+        'date',
+        'shift_id',
+        'regular_hours',
+        'overtime_hours',
+        'double_time_hours',
+        'total_hours',
+        'regular_rate',
+        'overtime_rate',
+        'total_cost',
+        'billable_rate',
+        'billable_amount',
+        'status',
+        'approved_by',
+        'approved_at',
+        'notes',
+    ];
+
+    protected $casts = [
+        'date' => 'date',
+        'regular_hours' => 'decimal:2',
+        'overtime_hours' => 'decimal:2',
+        'double_time_hours' => 'decimal:2',
+        'total_hours' => 'decimal:2',
+        'regular_rate' => 'decimal:2',
+        'overtime_rate' => 'decimal:2',
+        'total_cost' => 'decimal:2',
+        'billable_rate' => 'decimal:2',
+        'billable_amount' => 'decimal:2',
+        'approved_at' => 'datetime',
+    ];
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function crew(): BelongsTo
+    {
+        return $this->belongsTo(Crew::class);
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function costAllocations(): HasMany
+    {
+        return $this->hasMany(TimesheetCostAllocation::class);
+    }
+}
