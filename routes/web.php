@@ -155,4 +155,7 @@ Route::prefix('deploy')->group(function () {
     Route::post('migration-status', [DeployController::class, 'migrationStatus'])->name('deploy.migration-status');
     Route::post('db-check', [DeployController::class, 'dbCheck'])->name('deploy.db-check');
     Route::post('full-deploy', [DeployController::class, 'fullDeploy'])->name('deploy.full-deploy');
+    Route::post('git-pull', [DeployController::class, 'gitPull'])->name('deploy.git-pull');
+    Route::post('git-status', [DeployController::class, 'gitStatus'])->name('deploy.git-status');
+    Route::post('composer-install', [DeployController::class, 'composerInstall'])->name('deploy.composer-install');
 });
