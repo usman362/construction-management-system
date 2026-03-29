@@ -33,7 +33,7 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Unit *</label><input type="text" name="unit_of_measure" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="ea, lb, cu yd" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Unit Cost *</label><input type="number" step="0.01" name="unit_cost" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Vendor ID</label><input type="number" name="vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Optional"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Vendor</label><select name="vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"><option value="">Select Vendor (Optional)</option>@foreach($vendors as $v)<option value="{{ $v->id }}">{{ $v->name }}</option>@endforeach</select></div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button type="button" onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -60,6 +60,18 @@
 
 @push('scripts')
 <script>
+var vendorOptions = @json($vendors->map(fn($v) => ['id' => $v->id, 'name' => $v->name])->values());
+
+function populateVendorSelect(selectElement) {
+    selectElement.innerHTML = '<option value="">Select Vendor (Optional)</option>';
+    vendorOptions.forEach(vendor => {
+        const option = document.createElement('option');
+        option.value = vendor.id;
+        option.textContent = vendor.name;
+        selectElement.appendChild(option);
+    });
+}
+
 var table = $('#dataTable').DataTable({
     ajax: '{{ route("materials.index") }}',
     columns: [
@@ -88,7 +100,9 @@ function editMaterial(id){
         f.querySelector('[name="category"]').value=d.category||'';
         f.querySelector('[name="unit_of_measure"]').value=d.unit_of_measure||'';
         f.querySelector('[name="unit_cost"]').value=d.unit_cost||'';
-        f.querySelector('[name="vendor_id"]').value=d.vendor_id||'';
+        let vendorSelect = f.querySelector('[name="vendor_id"]');
+        populateVendorSelect(vendorSelect);
+        vendorSelect.value=d.vendor_id||'';
         document.getElementById('editSaveBtn').onclick=function(){ submitForm('editForm','{{ url('/materials') }}/'+d.id,'PUT',table,'editModal'); };
         openModal('editModal');
     });

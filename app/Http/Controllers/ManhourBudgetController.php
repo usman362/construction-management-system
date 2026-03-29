@@ -76,7 +76,7 @@ class ManhourBudgetController extends Controller
         ]);
     }
 
-    public function update(Request $request, ManhourBudget $manhourBudget): RedirectResponse
+    public function update(Request $request, Project $project, ManhourBudget $manhourBudget): RedirectResponse
     {
         $validated = $request->validate([
             'cost_code_id' => 'required|exists:cost_codes,id',
@@ -91,9 +91,8 @@ class ManhourBudgetController extends Controller
             ->with('success', 'Manhour budget updated successfully.');
     }
 
-    public function destroy(ManhourBudget $manhourBudget): RedirectResponse
+    public function destroy(Project $project, ManhourBudget $manhourBudget): RedirectResponse
     {
-        $project = $manhourBudget->project;
         $manhourBudget->delete();
 
         return redirect()->route('projects.manhour-budgets.index', $project)

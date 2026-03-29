@@ -10,6 +10,7 @@ use App\Models\ChangeOrder;
 use App\Models\Timesheet;
 use App\Models\ManhourBudget;
 use App\Models\BillingInvoice;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -417,5 +418,216 @@ class ReportController extends Controller
         }
 
         return $query->get();
+    }
+
+    // ──────────────────────────────────────────
+    // PDF Export Methods
+    // ──────────────────────────────────────────
+
+    public function costReportPdf(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
+        $costCodeData = [];
+
+        foreach ($budgetLines as $line) {
+            $code = $line->costCode?->code ?? 'Unassigned';
+            if (!isset($costCodeData[$code])) {
+                $costCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0, 'percentage_complete' => 0];
+            }
+            $committed = $line->commitments->sum('amount');
+            $invoiced = $line->invoices->sum('amount');
+            $budget = $line->amount;
+            $costCodeData[$code]['budget'] += $budget;
+            $costCodeData[$code]['committed'] += $committed;
+            $costCodeData[$code]['invoiced'] += $invoiced;
+            $costCodeData[$code]['balance'] += $budget - $committed;
+            $costCodeData[$code]['percentage_complete'] = $costCodeData[$code]['budget'] > 0
+                ? round(($costCodeData[$code]['committed'] / $costCodeData[$code]['budget']) * 100, 2) : 0;
+        }
+
+        $changeOrders = $project->changeOrders()->where('status', 'approved')->get();
+        $manhourData = $this->getManHourData($project, $validated);
+
+        $pdf = Pdf::loadView('pdf.cost-report', compact('project', 'costCodeData', 'changeOrders', 'manhourData'));
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->download("cost-report-{$project->project_number}.pdf");
+    }
+
+    public function forecastPdf(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
+        $originalBudgetTotal = $budgetLines->sum('amount');
+        $approvedCoTotal = $project->changeOrders()->where('status', 'approved')->sum('amount');
+        $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
+
+        $costCodeData = [];
+        foreach ($budgetLines as $line) {
+            $code = $line->costCode?->code ?? 'Unassigned';
+            if (!isset($costCodeData[$code])) {
+                $costCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'original_budget' => 0, 'forecast_budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
+            }
+            $committed = $line->commitments->sum('amount');
+            $invoiced = $line->invoices->sum('amount');
+            $costCodeData[$code]['original_budget'] += $line->amount;
+            $costCodeData[$code]['forecast_budget'] += $line->amount;
+            $costCodeData[$code]['committed'] += $committed;
+            $costCodeData[$code]['invoiced'] += $invoiced;
+            $costCodeData[$code]['balance'] += $line->amount - $committed;
+        }
+
+        $manhourData = $this->getManHourForecastData($project, $validated);
+        $pdf = Pdf::loadView('pdf.forecast', compact('project', 'costCodeData', 'originalBudgetTotal', 'forecastBudgetTotal', 'manhourData'));
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->download("forecast-{$project->project_number}.pdf");
+    }
+
+    public function manhourReportPdf(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $query = Timesheet::where('project_id', $project->id)->where('status', 'approved')->with(['employee.craft']);
+        if ($validated['date_from'] ?? null) $query->where('date', '>=', $validated['date_from']);
+        if ($validated['date_to'] ?? null) $query->where('date', '<=', $validated['date_to']);
+
+        $timesheets = $query->get()->groupBy('employee_id');
+        $manhourData = [];
+
+        foreach ($timesheets as $employeeId => $employeeTimesheets) {
+            $employee = $employeeTimesheets->first()->employee;
+            $regularHours = $employeeTimesheets->sum('regular_hours');
+            $otHours = $employeeTimesheets->sum('ot_hours');
+            $dtHours = $employeeTimesheets->sum('dt_hours');
+            $manhourData[] = [
+                'employee_name' => $employee->first_name . ' ' . $employee->last_name,
+                'craft' => $employee->craft?->name ?? 'N/A',
+                'regular_hours' => $regularHours,
+                'ot_hours' => $otHours,
+                'dt_hours' => $dtHours,
+                'total_hours' => $regularHours + $otHours + $dtHours,
+                'labor_cost' => $employeeTimesheets->sum('total_cost'),
+            ];
+        }
+
+        $pdf = Pdf::loadView('pdf.manhours', compact('project', 'manhourData'));
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->download("manhour-report-{$project->project_number}.pdf");
+    }
+
+    public function profitLossPdf(Request $request, Project $project)
+    {
+        $billingInvoices = BillingInvoice::where('project_id', $project->id)->where('status', 'paid')->get();
+        $totalRevenue = $billingInvoices->sum('total_amount');
+        $commitments = $project->commitments()->get();
+        $invoices = $project->invoices()->get();
+        $totalCosts = $commitments->sum('amount') + $invoices->sum('amount');
+        $margin = $totalRevenue - $totalCosts;
+        $marginPercentage = $totalRevenue > 0 ? round(($margin / $totalRevenue) * 100, 2) : 0;
+
+        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
+        $byCodeData = [];
+        foreach ($budgetLines as $line) {
+            $code = $line->costCode?->code ?? 'Unassigned';
+            if (!isset($byCodeData[$code])) {
+                $byCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'cost' => 0];
+            }
+            $byCodeData[$code]['cost'] += $line->commitments->sum('amount') + $line->invoices->sum('amount');
+        }
+
+        $pdf = Pdf::loadView('pdf.profit-loss', compact('project', 'totalRevenue', 'totalCosts', 'margin', 'marginPercentage', 'byCodeData'));
+
+        return $pdf->download("profit-loss-{$project->project_number}.pdf");
+    }
+
+    public function productivityReportPdf(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $manhourBudgets = $project->manhourBudgets()->get();
+        $timesheets = $this->getTimesheetsForPeriod($project, $validated);
+        $productivityData = [];
+
+        foreach ($manhourBudgets as $budget) {
+            $earnedHours = $budget->estimated_hours;
+            $actualHours = $timesheets->where('cost_code_id', $budget->cost_code_id)->sum('total_hours');
+            $productivity = $actualHours > 0 ? round(($earnedHours / $actualHours) * 100, 2) : 0;
+            $productivityData[] = [
+                'cost_code' => $budget->costCode?->code ?? 'Unassigned',
+                'earned_hours' => $earnedHours,
+                'actual_hours' => $actualHours,
+                'productivity' => $productivity,
+                'variance' => $earnedHours - $actualHours,
+            ];
+        }
+
+        $pdf = Pdf::loadView('pdf.productivity', compact('project', 'productivityData'));
+
+        return $pdf->download("productivity-{$project->project_number}.pdf");
+    }
+
+    public function timesheetReportPdf(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_id' => 'nullable|exists:employees,id',
+            'project_id' => 'nullable|exists:projects,id',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+            'group_by' => 'nullable|in:employee,project',
+        ]);
+
+        $groupBy = $validated['group_by'] ?? 'employee';
+        $query = Timesheet::where('status', 'approved')->with(['employee', 'project']);
+
+        if ($validated['employee_id'] ?? null) $query->where('employee_id', $validated['employee_id']);
+        if ($validated['project_id'] ?? null) $query->where('project_id', $validated['project_id']);
+        if ($validated['date_from'] ?? null) $query->where('date', '>=', $validated['date_from']);
+        if ($validated['date_to'] ?? null) $query->where('date', '<=', $validated['date_to']);
+
+        $timesheets = $query->get();
+
+        if ($groupBy === 'employee') {
+            $groupedData = $timesheets->groupBy('employee_id')->map(function ($group) {
+                return [
+                    'name' => $group->first()->employee->first_name . ' ' . $group->first()->employee->last_name,
+                    'type' => 'employee',
+                    'total_hours' => $group->sum('total_hours'),
+                    'total_cost' => $group->sum('total_cost'),
+                    'entries' => $group->map(fn ($t) => ['date' => $t->date, 'project' => $t->project->name, 'hours' => $t->total_hours, 'cost' => $t->total_cost]),
+                ];
+            });
+        } else {
+            $groupedData = $timesheets->groupBy('project_id')->map(function ($group) {
+                return [
+                    'name' => $group->first()->project->name,
+                    'type' => 'project',
+                    'total_hours' => $group->sum('total_hours'),
+                    'total_cost' => $group->sum('total_cost'),
+                    'entries' => $group->map(fn ($t) => ['date' => $t->date, 'employee' => $t->employee->first_name . ' ' . $t->employee->last_name, 'hours' => $t->total_hours, 'cost' => $t->total_cost]),
+                ];
+            });
+        }
+
+        $pdf = Pdf::loadView('pdf.timesheet-report', compact('groupedData', 'groupBy'));
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->download('timesheet-report.pdf');
     }
 }

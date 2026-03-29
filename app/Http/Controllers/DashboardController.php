@@ -24,10 +24,12 @@ class DashboardController extends Controller
             ->get();
 
         return view('dashboard', [
-            'activeProjectsCount' => $activeProjectsCount,
-            'totalEmployees' => $totalEmployees,
-            'pendingTimesheets' => $pendingTimesheets,
-            'openChangeOrders' => $openChangeOrders,
+            'stats' => [
+                'activeProjects' => $activeProjectsCount,
+                'totalEmployees' => $totalEmployees,
+                'pendingTimesheets' => $pendingTimesheets,
+                'openChangeOrders' => $openChangeOrders,
+            ],
             'recentProjects' => $recentProjects,
         ]);
     }

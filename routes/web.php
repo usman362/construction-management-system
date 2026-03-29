@@ -82,6 +82,13 @@ Route::middleware('auth')->group(function () {
         Route::get('reports/manhours', [ReportController::class, 'manhourReport'])->name('reports.manhours');
         Route::get('reports/profit-loss', [ReportController::class, 'profitLoss'])->name('reports.profit-loss');
         Route::get('reports/productivity', [ReportController::class, 'productivityReport'])->name('reports.productivity');
+
+        // PDF Report Downloads
+        Route::get('reports/cost-report/pdf', [ReportController::class, 'costReportPdf'])->name('reports.cost-report.pdf');
+        Route::get('reports/forecast/pdf', [ReportController::class, 'forecastPdf'])->name('reports.forecast.pdf');
+        Route::get('reports/manhours/pdf', [ReportController::class, 'manhourReportPdf'])->name('reports.manhours.pdf');
+        Route::get('reports/profit-loss/pdf', [ReportController::class, 'profitLossPdf'])->name('reports.profit-loss.pdf');
+        Route::get('reports/productivity/pdf', [ReportController::class, 'productivityReportPdf'])->name('reports.productivity.pdf');
     });
 
     // Workforce Management
@@ -101,12 +108,11 @@ Route::middleware('auth')->group(function () {
 
     // Payroll
     Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index');
-    Route::get('payroll/create', [PayrollController::class, 'create'])->name('payroll.create');
     Route::post('payroll', [PayrollController::class, 'store'])->name('payroll.store');
     Route::get('payroll/{payrollPeriod}/edit', [PayrollController::class, 'edit'])->name('payroll.edit');
+    Route::get('payroll/{payrollPeriod}', [PayrollController::class, 'show'])->name('payroll.show');
     Route::put('payroll/{payrollPeriod}', [PayrollController::class, 'update'])->name('payroll.update');
     Route::delete('payroll/{payrollPeriod}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
-    Route::get('payroll/{payrollPeriod}', [PayrollController::class, 'show'])->name('payroll.show');
     Route::post('payroll/{payrollPeriod}/generate', [PayrollController::class, 'generate'])->name('payroll.generate');
     Route::post('payroll/{payrollPeriod}/process', [PayrollController::class, 'process'])->name('payroll.process');
 
@@ -134,65 +140,9 @@ Route::middleware('auth')->group(function () {
     Route::post('billing/{billingInvoice}/generate', [BillingController::class, 'generate'])->name('billing.generate');
     Route::post('billing/{billingInvoice}/send', [BillingController::class, 'send'])->name('billing.send');
     Route::post('billing/{billingInvoice}/mark-paid', [BillingController::class, 'markPaid'])->name('billing.mark-paid');
+    Route::get('billing/{billingInvoice}/pdf', [BillingController::class, 'downloadPdf'])->name('billing.pdf');
 
     // Global Reports
     Route::get('reports/timesheets', [ReportController::class, 'timesheetReport'])->name('reports.timesheets');
-});
-
-
-// ── Deploy Helper Routes (public, no auth) ──────────────────────────────
-Route::get('/deploy/git-pull', function () {
-    $output = [];
-    exec('cd ' . base_path() . ' && git pull 2>&1', $output, $returnCode);
-    return response()->json([
-        'success' => $returnCode === 0,
-        'output' => implode("\n", $output),
-    ]);
-});
-
-Route::get('/deploy/migrate', function () {
-    try {
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-        $output = \Illuminate\Support\Facades\Artisan::output();
-        return response()->json([
-            'success' => true,
-            'output' => $output,
-        ]);
-    } catch (\Throwable $e) {
-        return response()->json([
-            'success' => false,
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-});
-
-Route::get('/deploy/seed/{seeder?}', function (?string $seeder = null) {
-    try {
-        $params = ['--force' => true];
-        if ($seeder) {
-            $params['--class'] = $seeder;
-        }
-        \Illuminate\Support\Facades\Artisan::call('db:seed', $params);
-        $output = \Illuminate\Support\Facades\Artisan::output();
-        return response()->json([
-            'success' => true,
-            'output' => $output,
-        ]);
-    } catch (\Throwable $e) {
-        return response()->json([
-            'success' => false,
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-});
-
-Route::get('/deploy/cache-clear', function () {
-    \Illuminate\Support\Facades\Artisan::call('cache:clear');
-    \Illuminate\Support\Facades\Artisan::call('config:clear');
-    \Illuminate\Support\Facades\Artisan::call('route:clear');
-    \Illuminate\Support\Facades\Artisan::call('view:clear');
-    return response()->json([
-        'success' => true,
-        'output' => 'All caches cleared.',
-    ]);
+    Route::get('reports/timesheets/pdf', [ReportController::class, 'timesheetReportPdf'])->name('reports.timesheets.pdf');
 });

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Material;
 use App\Models\MaterialUsage;
+use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +22,9 @@ class MaterialController extends Controller
         if ($request->ajax()) {
             return $this->dataTable($request);
         }
-        return view('materials.index');
+        return view('materials.index', [
+            'vendors' => Vendor::all(),
+        ]);
     }
 
     private function dataTable(Request $request): JsonResponse

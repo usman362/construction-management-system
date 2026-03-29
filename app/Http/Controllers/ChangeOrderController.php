@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ChangeOrder;
+use App\Models\ChangeOrderItem;
+use App\Models\ChangeOrderLabor;
 use App\Models\CostCode;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -114,7 +116,51 @@ class ChangeOrderController extends Controller
         return response()->json(['message' => 'Change order deleted successfully']);
     }
 
-    public function approve(Project $project, ChangeOrder $changeOrder): JsonResponse
+    public function addItem(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
+    {
+        $validated = $request->validate([
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'description' => 'required|string|max:255',
+            'category' => 'nullable|string|max:100',
+            'quantity' => 'required|numeric|min:0',
+            'unit' => 'nullable|string|max:50',
+            'unit_cost' => 'required|numeric|min:0',
+        ]);
+
+        $amount = $validated['quantity'] * $validated['unit_cost'];
+
+        $changeOrder->items()->create([
+            ...$validated,
+            'amount' => $amount,
+        ]);
+
+        return response()->json(['message' => 'Item added to change order']);
+    }
+
+    public function addLabor(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
+    {
+        $validated = $request->validate([
+            'craft_id' => 'nullable|exists:crafts,id',
+            'skill_description' => 'nullable|string|max:255',
+            'num_workers' => 'required|integer|min:1',
+            'rate_per_hour' => 'required|numeric|min:0',
+            'hours_per_day' => 'required|numeric|min:0',
+            'duration_days' => 'required|numeric|min:0',
+            'is_overtime' => 'boolean',
+        ]);
+
+        $cost = $validated['num_workers'] * $validated['rate_per_hour'] *
+                $validated['hours_per_day'] * $validated['duration_days'];
+
+        $changeOrder->laborDetails()->create([
+            ...$validated,
+            'cost' => $cost,
+        ]);
+
+        return response()->json(['message' => 'Labor added to change order']);
+    }
+
+    public function approve(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
     {
         $changeOrder->update([
             'status' => 'approved',

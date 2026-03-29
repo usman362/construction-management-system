@@ -176,8 +176,11 @@
                 </form>
             @endif
 
+            <a href="{{ route('billing.pdf', $billingInvoice) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded inline-block">
+                Download PDF
+            </a>
             <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded">
-                Print / PDF
+                Print
             </button>
 
             <a href="{{ route('billing.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded">

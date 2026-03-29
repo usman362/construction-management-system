@@ -124,30 +124,42 @@
 
 @push('scripts')
 <script>
-var table = $('#dataTable').DataTable({
-    ajax: '{{ route("projects.change-orders.index", $project) }}',
-    columns: [
-        {data:'co_number'},
-        {data:'title', render: d=>d||'—'},
-        {data:'amount', render: d=>'$'+parseFloat(d).toFixed(2)},
-        {data:'status', render: function(d) {
-            const statusColors = {
-                'pending': 'bg-yellow-100 text-yellow-800',
-                'approved': 'bg-green-100 text-green-800',
-                'rejected': 'bg-red-100 text-red-800'
-            };
-            return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium '+statusColors[d]+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</span>';
-        }},
-        {data:'actions', orderable:false, searchable:false, className:'text-right',
-            render: function(id) {
-                return `<div class="flex items-center justify-end gap-1">
-                    <button onclick="viewChangeOrder(${id})" class="p-1 text-gray-400 hover:text-blue-600" title="View"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
-                    <button onclick="editChangeOrder(${id})" class="p-1 text-gray-400 hover:text-amber-600" title="Edit"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-                    <button onclick="confirmDelete('/projects/{{ $project->id }}/change-orders/'+id, table)" class="p-1 text-gray-400 hover:text-red-600" title="Delete"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-                </div>`;
+var table;
+
+$(document).ready(function() {
+    table = $('#dataTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: '{{ route("projects.change-orders.index", $project) }}',
+        columns: [
+            {data:'co_number', name:'co_number'},
+            {data:'title', name:'title', render: d=>d||'—'},
+            {data:'amount', name:'amount', render: d=>'$'+parseFloat(d).toFixed(2), className:'text-right'},
+            {data:'status', name:'status', render: function(d) {
+                const statusColors = {
+                    'pending': 'bg-yellow-100 text-yellow-800',
+                    'approved': 'bg-green-100 text-green-800',
+                    'rejected': 'bg-red-100 text-red-800'
+                };
+                return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium '+statusColors[d]+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</span>';
+            }, className:'text-center'},
+            {data:'actions', orderable:false, searchable:false, className:'text-right',
+                render: function(id) {
+                    return `<div class="flex items-center justify-end gap-1">
+                        <button onclick="viewChangeOrder(${id})" class="p-1 text-gray-400 hover:text-blue-600" title="View"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+                        <button onclick="editChangeOrder(${id})" class="p-1 text-gray-400 hover:text-amber-600" title="Edit"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                        <button onclick="deleteChangeOrder(${id})" class="p-1 text-gray-400 hover:text-red-600" title="Delete"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                    </div>`;
+                }
             }
+        ],
+        order: [[0, 'desc']],
+        pageLength: 15,
+        language: {
+            emptyTable: 'No change orders found.',
+            processing: 'Loading...'
         }
-    ]
+    });
 });
 
 function openCreateModal() {
@@ -155,8 +167,12 @@ function openCreateModal() {
     openModal('createModal');
 }
 
+function deleteChangeOrder(id) {
+    confirmDelete('/projects/{{ $project->id }}/change-orders/' + id, table);
+}
+
 function editChangeOrder(id) {
-    $.get('/projects/{{ $project->id }}/change-orders/'+id+'/edit', function(d) {
+    $.get('/projects/{{ $project->id }}/change-orders/' + id + '/edit', function(d) {
         let f = document.getElementById('editForm');
         f.querySelector('#edit_id').value = d.id;
         f.querySelector('[name="title"]').value = d.title || '';
@@ -164,14 +180,14 @@ function editChangeOrder(id) {
         f.querySelector('[name="amount"]').value = d.amount || '';
         f.querySelector('[name="status"]').value = d.status || '';
         document.getElementById('editSaveBtn').onclick = function() {
-            submitForm('editForm', '/projects/{{ $project->id }}/change-orders/'+d.id, 'PUT', table, 'editModal');
+            submitForm('editForm', '/projects/{{ $project->id }}/change-orders/' + d.id, 'PUT', table, 'editModal');
         };
         openModal('editModal');
     });
 }
 
 function viewChangeOrder(id) {
-    window.location.href = '/projects/{{ $project->id }}/change-orders/'+id;
+    window.location.href = '/projects/{{ $project->id }}/change-orders/' + id;
 }
 </script>
 @endpush

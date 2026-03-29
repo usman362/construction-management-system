@@ -109,8 +109,8 @@
 
 @push('scripts')
 <script>
-let table;
-let currentEditId;
+var table;
+var currentEditId;
 
 function openCreateModal() {
     document.getElementById('createForm').reset();

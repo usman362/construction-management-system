@@ -136,7 +136,7 @@ class EstimateController extends Controller
         return response()->json(['message' => 'Line item updated']);
     }
 
-    public function removeLine(EstimateLine $estimateLine): JsonResponse
+    public function removeLine(Project $project, EstimateLine $estimateLine): JsonResponse
     {
         $estimateLine->delete();
         return response()->json(['message' => 'Line item removed']);

@@ -37,7 +37,7 @@ class BudgetLineController extends Controller
         $filteredRecords = $query->count();
 
         // Order
-        $columns = ['id', 'costCode.code', 'description', 'original_amount', 'current_amount'];
+        $columns = ['id', 'costCode.code', 'description', 'budget_amount', 'revised_amount'];
         $orderCol = $columns[$request->input('order.0.column', 0)] ?? 'id';
         $orderDir = $request->input('order.0.dir', 'asc');
         if ($orderCol === 'costCode.code') {
@@ -60,7 +60,7 @@ class BudgetLineController extends Controller
                     'id' => $line->id,
                     'cost_code' => $line->costCode?->code ?? '—',
                     'description' => $line->description,
-                    'original_amount' => $line->original_amount,
+                    'original_amount' => $line->budget_amount,
                     'current_amount' => $line->current_amount,
                     'actions' => $line->id,
                 ];
@@ -73,10 +73,10 @@ class BudgetLineController extends Controller
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'description' => 'required|string|max:255',
-            'original_amount' => 'required|numeric|min:0',
+            'budget_amount' => 'required|numeric|min:0',
         ]);
 
-        $project->budgetLines()->create($validated + ['current_amount' => $validated['original_amount']]);
+        $project->budgetLines()->create($validated + ['revised_amount' => $validated['budget_amount']]);
         return response()->json(['message' => 'Budget line created successfully']);
     }
 
@@ -95,8 +95,8 @@ class BudgetLineController extends Controller
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'description' => 'required|string|max:255',
-            'original_amount' => 'required|numeric|min:0',
-            'current_amount' => 'required|numeric|min:0',
+            'budget_amount' => 'required|numeric|min:0',
+            'revised_amount' => 'required|numeric|min:0',
         ]);
 
         $budgetLine->update($validated);

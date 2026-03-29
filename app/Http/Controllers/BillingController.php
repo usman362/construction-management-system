@@ -6,6 +6,7 @@ use App\Models\BillingInvoice;
 use App\Models\Project;
 use App\Models\Timesheet;
 use App\Models\Invoice;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -236,5 +237,14 @@ class BillingController extends Controller
         return redirect()
             ->route('billing.show', $billingInvoice)
             ->with('success', 'Invoice marked as paid.');
+    }
+
+    public function downloadPdf(BillingInvoice $billingInvoice)
+    {
+        $billingInvoice->load(['project.client']);
+
+        $pdf = Pdf::loadView('pdf.billing-invoice', compact('billingInvoice'));
+
+        return $pdf->download("invoice-{$billingInvoice->invoice_number}.pdf");
     }
 }

@@ -242,6 +242,9 @@
             <a href="{{ route('reports.cost-report', ['project' => $project->id]) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">
                 Refresh
             </a>
+            <a href="{{ route('reports.cost-report.pdf', ['project' => $project->id]) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
+                Download PDF
+            </a>
             <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded">
                 Print
             </button>
