@@ -16,7 +16,7 @@
 
     <nav class="flex-1 px-3 py-4 space-y-6">
 
-        <!-- Dashboard -->
+        <!-- Dashboard — Everyone -->
         <div>
             <a href="{{ route('dashboard') }}"
                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 {{ request()->routeIs('dashboard') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
@@ -27,7 +27,7 @@
             </a>
         </div>
 
-        <!-- PROJECTS -->
+        <!-- PROJECTS — Everyone -->
         <div>
             <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Projects</p>
             <a href="{{ route('projects.index') }}"
@@ -39,10 +39,12 @@
             </a>
         </div>
 
-        <!-- WORKFORCE -->
+        <!-- WORKFORCE — Admin, PM, Accountant, Field (partial) -->
+        @if(Auth::user()->canAccess('employees') || Auth::user()->canAccess('crews'))
         <div>
             <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Workforce</p>
             <div class="space-y-0.5">
+                @if(Auth::user()->canAccess('employees'))
                 <a href="{{ route('employees.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('employees.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -50,6 +52,8 @@
                     </svg>
                     <span>Employees</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('crafts'))
                 <a href="{{ route('crafts.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('crafts.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -57,6 +61,8 @@
                     </svg>
                     <span>Crafts</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('crews'))
                 <a href="{{ route('crews.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('crews.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -64,6 +70,8 @@
                     </svg>
                     <span>Crews</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('shifts'))
                 <a href="{{ route('shifts.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('shifts.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -71,13 +79,17 @@
                     </svg>
                     <span>Shifts</span>
                 </a>
+                @endif
             </div>
         </div>
+        @endif
 
         <!-- TIME & LABOR -->
+        @if(Auth::user()->canAccess('timesheets') || Auth::user()->canAccess('payroll'))
         <div>
             <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Time & Labor</p>
             <div class="space-y-0.5">
+                @if(Auth::user()->canAccess('timesheets'))
                 <a href="{{ route('timesheets.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('timesheets.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -85,6 +97,8 @@
                     </svg>
                     <span>Timesheets</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('payroll'))
                 <a href="{{ route('payroll.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('payroll.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -92,13 +106,17 @@
                     </svg>
                     <span>Payroll</span>
                 </a>
+                @endif
             </div>
         </div>
+        @endif
 
         <!-- COSTING -->
+        @if(Auth::user()->canAccess('cost-codes') || Auth::user()->canAccess('invoices'))
         <div>
             <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Costing</p>
             <div class="space-y-0.5">
+                @if(Auth::user()->canAccess('cost-codes'))
                 <a href="{{ route('cost-codes.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('cost-codes.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -106,6 +124,8 @@
                     </svg>
                     <span>Cost Codes</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('clients'))
                 <a href="{{ route('clients.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('clients.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -113,6 +133,8 @@
                     </svg>
                     <span>Clients</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('invoices'))
                 <a href="{{ route('invoices.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('invoices.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -120,13 +142,17 @@
                     </svg>
                     <span>Vendor Invoices</span>
                 </a>
+                @endif
             </div>
         </div>
+        @endif
 
         <!-- PROCUREMENT -->
+        @if(Auth::user()->canAccess('purchase-orders') || Auth::user()->canAccess('equipment') || Auth::user()->canAccess('materials'))
         <div>
             <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Procurement</p>
             <div class="space-y-0.5">
+                @if(Auth::user()->canAccess('purchase-orders'))
                 <a href="{{ route('purchase-orders.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('purchase-orders.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -134,6 +160,8 @@
                     </svg>
                     <span>Purchase Orders</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('vendors'))
                 <a href="{{ route('vendors.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('vendors.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -141,6 +169,8 @@
                     </svg>
                     <span>Vendors</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('equipment'))
                 <a href="{{ route('equipment.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('equipment.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -148,6 +178,8 @@
                     </svg>
                     <span>Equipment</span>
                 </a>
+                @endif
+                @if(Auth::user()->canAccess('materials'))
                 <a href="{{ route('materials.index') }}"
                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('materials.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -155,10 +187,13 @@
                     </svg>
                     <span>Materials</span>
                 </a>
+                @endif
             </div>
         </div>
+        @endif
 
         <!-- BILLING -->
+        @if(Auth::user()->canAccess('billing'))
         <div>
             <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Billing</p>
             <a href="{{ route('billing.index') }}"
@@ -169,9 +204,11 @@
                 <span>Client Billing</span>
             </a>
         </div>
+        @endif
 
         <!-- REPORTS -->
-        <div class="pb-6">
+        @if(Auth::user()->canAccess('reports'))
+        <div>
             <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Reports</p>
             <a href="{{ route('reports.timesheets') }}"
                class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('reports.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
@@ -182,6 +219,35 @@
             </a>
             <p class="px-3 py-2 text-xs text-gray-600 italic">Project reports available within each project</p>
         </div>
+        @endif
+
+        <!-- USER MANAGEMENT — Admin only -->
+        @if(Auth::user()->canAccess('users'))
+        <div>
+            <p class="px-3 mb-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Administration</p>
+            <a href="{{ route('users.index') }}"
+               class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('users.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span>User Management</span>
+            </a>
+        </div>
+        @endif
 
     </nav>
+
+    <!-- User Info at Bottom -->
+    <div class="px-4 py-3 border-t border-gray-800">
+        <div class="flex items-center gap-2">
+            <div class="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-white text-xs font-bold">{{ substr(Auth::user()->name, 0, 1) }}</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs font-medium text-gray-300 truncate">{{ Auth::user()->name }}</p>
+                <p class="text-[10px] text-gray-500">{{ Auth::user()->role_label }}</p>
+            </div>
+        </div>
+    </div>
 </aside>

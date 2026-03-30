@@ -34,6 +34,16 @@ class AuthController extends Controller
         $remember = $request->boolean('remember');
 
         if (Auth::attempt($credentials, $remember)) {
+            // Check if user account is active
+            if (!Auth::user()->is_active) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->withErrors([
+                    'email' => 'Your account has been deactivated. Please contact an administrator.',
+                ])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
             return redirect()->intended(route('dashboard'));
         }
@@ -56,7 +66,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle registration
+     * Handle registration — new users default to 'viewer' role
      */
     public function register(Request $request)
     {
@@ -70,6 +80,8 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'role' => User::ROLE_VIEWER,
+            'is_active' => true,
         ]);
 
         Auth::login($user);
