@@ -64,18 +64,18 @@
             </div>
 
             <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Rental Rates</h3>
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Rental rates (day / week / month)</h3>
                 <div class="space-y-3">
                     <div>
-                        <p class="text-xs font-semibold text-gray-600 uppercase">Daily Rate</p>
+                        <p class="text-xs font-semibold text-gray-600 uppercase">Day</p>
                         <p class="text-lg font-bold text-gray-800">${{ number_format($equipment->daily_rate ?? 0, 2) }}</p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold text-gray-600 uppercase">Weekly Rate</p>
+                        <p class="text-xs font-semibold text-gray-600 uppercase">Week</p>
                         <p class="text-lg font-bold text-gray-800">${{ number_format($equipment->weekly_rate ?? 0, 2) }}</p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold text-gray-600 uppercase">Monthly Rate</p>
+                        <p class="text-xs font-semibold text-gray-600 uppercase">Month</p>
                         <p class="text-lg font-bold text-gray-800">${{ number_format($equipment->monthly_rate ?? 0, 2) }}</p>
                     </div>
                 </div>
@@ -178,6 +178,8 @@ function editEquipment(id){
         f.querySelector('[name="model_number"]').value=d.model_number||'';
         f.querySelector('[name="serial_number"]').value=d.serial_number||'';
         f.querySelector('[name="daily_rate"]').value=d.daily_rate;
+        f.querySelector('[name="weekly_rate"]').value=d.weekly_rate != null ? d.weekly_rate : '';
+        f.querySelector('[name="monthly_rate"]').value=d.monthly_rate != null ? d.monthly_rate : '';
         f.querySelector('[name="status"]').value=d.status;
         document.getElementById('editSaveBtn').onclick=function(){ submitForm('editForm','{{ url('/equipment') }}/'+d.id,'PUT',table,'editModal'); };
         openModal('editModal');

@@ -8,7 +8,7 @@
 
         <!-- Filters -->
         <div class="bg-gray-50 p-6 rounded-lg mb-8 border border-gray-200">
-            <form method="GET" action="{{ route('reports.manhours', $project->id) }}" class="flex items-end gap-6">
+            <form method="GET" action="{{ route('projects.reports.manhours', $project) }}" class="flex items-end gap-6">
                 <!-- Date Range -->
                 <div class="flex-1">
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Date Range</label>
@@ -203,7 +203,7 @@
 
         <!-- Actions -->
         <div class="mt-8 flex gap-4">
-            <a href="{{ route('reports.manhours.pdf', ['project' => $project->id]) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
+            <a href="{{ route('projects.reports.manhours.pdf', $project) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
                 Download PDF
             </a>
             <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded">

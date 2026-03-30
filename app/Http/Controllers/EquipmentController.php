@@ -41,7 +41,7 @@ class EquipmentController extends Controller
         }
         $filteredRecords = $query->count();
 
-        $columns = ['name', 'type', 'model_number', 'serial_number', 'daily_rate', 'status'];
+        $columns = ['name', 'type', 'model_number', 'serial_number', 'daily_rate', 'weekly_rate', 'monthly_rate', 'status'];
         $orderCol = $columns[$request->input('order.0.column', 0)] ?? 'name';
         $orderDir = $request->input('order.0.dir', 'asc');
         $query->orderBy($orderCol, $orderDir);
@@ -62,6 +62,8 @@ class EquipmentController extends Controller
                     'model_number' => $equipment->model_number,
                     'serial_number' => $equipment->serial_number,
                     'daily_rate' => $equipment->daily_rate,
+                    'weekly_rate' => $equipment->weekly_rate,
+                    'monthly_rate' => $equipment->monthly_rate,
                     'status' => $equipment->status,
                     'actions' => $equipment->id,
                 ];

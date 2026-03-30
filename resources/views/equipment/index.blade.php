@@ -13,14 +13,14 @@
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">
         <thead><tr>
-            <th>Name</th><th>Type</th><th>Model#</th><th>Serial#</th><th>Daily Rate</th><th>Status</th><th class="text-center" width="100">Actions</th>
+            <th>Name</th><th>Type</th><th>Model#</th><th>Serial#</th><th>Day</th><th>Week</th><th>Month</th><th>Status</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
 
 <!-- Create Modal -->
 <div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('createModal')">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Add New Equipment</h3>
             <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
@@ -41,7 +41,14 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Model Number</label><input type="text" name="model_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label><input type="text" name="serial_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Daily Rate *</label><input type="number" step="0.01" name="daily_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+            <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rates (day / week / month)</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Day *</label><input type="number" step="0.01" name="daily_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required placeholder="0.00"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Week</label><input type="number" step="0.01" name="weekly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0.00"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Month</label><input type="number" step="0.01" name="monthly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0.00"></div>
+                </div>
+            </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="">Select...</option><option value="available">Available</option><option value="in_use">In Use</option><option value="maintenance">Maintenance</option><option value="retired">Retired</option></select></div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
@@ -76,7 +83,9 @@ var table = $('#dataTable').DataTable({
         {data:'type', render: function(t){ if(!t) return '—'; var m={owned:'Owned',rented:'Rented',third_party:'Third party'}; return m[t]||t; }},
         {data:'model_number', render: d => d ? d : '<span class="text-gray-400">—</span>'},
         {data:'serial_number', render: d => d ? d : '<span class="text-gray-400">—</span>'},
-        {data:'daily_rate', render: function(d){ return '$'+parseFloat(d||0).toFixed(2); }},
+        {data:'daily_rate', className:'text-right', render: function(d){ return '$'+parseFloat(d||0).toFixed(2); }},
+        {data:'weekly_rate', className:'text-right', render: function(d){ return '$'+parseFloat(d||0).toFixed(2); }},
+        {data:'monthly_rate', className:'text-right', render: function(d){ return '$'+parseFloat(d||0).toFixed(2); }},
         {data:'status', className:'text-center', render: d=>d==='available'?'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Available</span>':(d==='in_use'?'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">In Use</span>':(d==='maintenance'?'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Maintenance</span>':'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Retired</span>'))},
         {data:'actions', orderable:false, searchable:false, className:'text-center',
          render: function(data) {
@@ -99,6 +108,8 @@ function editEquipment(id){
         f.querySelector('[name="model_number"]').value=d.model_number||'';
         f.querySelector('[name="serial_number"]').value=d.serial_number||'';
         f.querySelector('[name="daily_rate"]').value=d.daily_rate;
+        f.querySelector('[name="weekly_rate"]').value=d.weekly_rate != null ? d.weekly_rate : '';
+        f.querySelector('[name="monthly_rate"]').value=d.monthly_rate != null ? d.monthly_rate : '';
         f.querySelector('[name="status"]').value=d.status;
         document.getElementById('editSaveBtn').onclick=function(){ submitForm('editForm','{{ url('/equipment') }}/'+d.id,'PUT',table,'editModal'); };
         openModal('editModal');
@@ -116,7 +127,7 @@ function viewEquipment(id){
             '<div class="space-y-4">'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div><div><p class="text-xs text-gray-500 mb-1">Type</p><p class="text-sm">'+typeLabel+'</p></div></div>'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Model Number</p><p class="text-sm">'+(d.model_number||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Serial Number</p><p class="text-sm">'+(d.serial_number||'—')+'</p></div></div>'+
-            '<div><p class="text-xs text-gray-500 mb-1">Daily Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.daily_rate||0).toFixed(2)+'</p></div>'+
+            '<div class="grid grid-cols-3 gap-3"><div><p class="text-xs text-gray-500 mb-1">Day</p><p class="text-sm font-semibold">$'+parseFloat(d.daily_rate||0).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Week</p><p class="text-sm font-semibold">$'+parseFloat(d.weekly_rate||0).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Month</p><p class="text-sm font-semibold">$'+parseFloat(d.monthly_rate||0).toFixed(2)+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Status</p>'+statusBadge+'</div>'+
             '</div>';
         openModal('viewModal');

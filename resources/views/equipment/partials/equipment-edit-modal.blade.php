@@ -1,6 +1,6 @@
 <!-- Edit Equipment Modal (shared: index + show) -->
 <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editModal')">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Edit Equipment</h3>
             <button type="button" onclick="closeModal('editModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
@@ -21,7 +21,14 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Model Number</label><input type="text" name="model_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label><input type="text" name="serial_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Daily Rate *</label><input type="number" step="0.01" name="daily_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+            <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rates (day / week / month)</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Day *</label><input type="number" step="0.01" name="daily_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Week</label><input type="number" step="0.01" name="weekly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Month</label><input type="number" step="0.01" name="monthly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                </div>
+            </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
                 <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
                     <option value="available">Available</option>
