@@ -172,4 +172,27 @@ class ChangeOrderController extends Controller
 
         return response()->json(['message' => 'Change order approved and project budget updated']);
     }
+
+    /**
+     * Generate and download a Change Order PDF with signature lines
+     */
+    public function downloadPdf(Project $project, ChangeOrder $changeOrder)
+    {
+        $changeOrder->load(['items', 'laborDetails']);
+        $project->load('client');
+
+        // Calculate previously approved CO totals (excluding this one)
+        $previousCOTotal = ChangeOrder::where('project_id', $project->id)
+            ->where('id', '!=', $changeOrder->id)
+            ->where('status', 'approved')
+            ->sum('amount');
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.change-order', [
+            'project' => $project,
+            'changeOrder' => $changeOrder,
+            'previousCOTotal' => $previousCOTotal,
+        ]);
+
+        return $pdf->download("CO-{$changeOrder->co_number}-{$project->project_number}.pdf");
+    }
 }

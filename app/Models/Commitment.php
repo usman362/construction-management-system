@@ -13,6 +13,7 @@ class Commitment extends Model
         'vendor_id',
         'cost_code_id',
         'commitment_number',
+        'po_number',
         'description',
         'amount',
         'committed_date',

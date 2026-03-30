@@ -207,6 +207,28 @@ class PurchaseOrderController extends Controller
                     ]);
                 }
 
+                // Auto-create commitment so PO shows in committed costs
+                $lastCommitment = Commitment::where('project_id', $validated['project_id'])
+                    ->orderBy('id', 'desc')
+                    ->first();
+                $nextCommNum = ($lastCommitment ? (int)substr($lastCommitment->commitment_number, 5) + 1 : 1);
+                $commNumber = 'COMM-' . str_pad($nextCommNum, 5, '0', STR_PAD_LEFT);
+
+                $commitData = [
+                    'project_id' => $validated['project_id'],
+                    'vendor_id' => $validated['vendor_id'],
+                    'commitment_number' => $commNumber,
+                    'po_number' => $poNumber,
+                    'description' => $validated['description'],
+                    'amount' => $totalAmount,
+                    'committed_date' => $validated['date'],
+                    'status' => 'pending',
+                ];
+                if (!empty($validated['cost_code_id'])) {
+                    $commitData['cost_code_id'] = $validated['cost_code_id'];
+                }
+                Commitment::create($commitData);
+
                 return $po;
             });
 
@@ -388,6 +410,17 @@ class PurchaseOrderController extends Controller
                     ]);
                 }
             });
+
+            // Sync linked commitment amount
+            $linkedCommitment = Commitment::where('po_number', $purchaseOrder->po_number)->first();
+            if ($linkedCommitment) {
+                $linkedCommitment->update([
+                    'amount' => $totalAmount,
+                    'vendor_id' => $validated['vendor_id'],
+                    'cost_code_id' => $validated['cost_code_id'] ?? null,
+                    'description' => $validated['description'],
+                ]);
+            }
 
             return response()->json(['message' => 'Purchase order updated successfully']);
         } catch (\Exception $e) {

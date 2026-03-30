@@ -19,7 +19,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label for="project_id" class="block text-sm font-medium text-gray-700 mb-2">Project *</label>
-                        <select name="project_id" id="project_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('project_id') border-red-500 @enderror" onchange="location.href='{{ route('timesheets.bulk-create') }}?project_id=' + this.value">
+                        <select name="project_id" id="project_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('project_id') border-red-500 @enderror" onchange="reloadWithCrew()">
                             <option value="">Select Project</option>
                             @foreach ($projects as $project)
                                 <option value="{{ $project->id }}" {{ request('project_id') == $project->id ? 'selected' : '' }}>
@@ -34,10 +34,10 @@
 
                     <div>
                         <label for="crew_id" class="block text-sm font-medium text-gray-700 mb-2">Crew *</label>
-                        <select name="crew_id" id="crew_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('crew_id') border-red-500 @enderror">
+                        <select name="crew_id" id="crew_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('crew_id') border-red-500 @enderror" onchange="reloadWithCrew()">
                             <option value="">Select Crew</option>
                             @foreach ($crews as $crew)
-                                <option value="{{ $crew->id }}" {{ old('crew_id') == $crew->id ? 'selected' : '' }}>
+                                <option value="{{ $crew->id }}" {{ request('crew_id') == $crew->id ? 'selected' : '' }}>
                                     {{ $crew->name }}
                                 </option>
                             @endforeach
@@ -89,16 +89,16 @@
                             <tr class="border-b hover:bg-gray-50">
                                 <td class="px-6 py-4 text-sm text-gray-900 font-medium">
                                     {{ $employee->first_name }} {{ $employee->last_name }}
-                                    <input type="hidden" name="timesheets[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}">
+                                    <input type="hidden" name="entries[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}">
                                 </td>
                                 <td class="px-6 py-4 text-center">
-                                    <input type="number" name="timesheets[{{ $loop->index }}][regular_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                    <input type="number" name="entries[{{ $loop->index }}][regular_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
                                 </td>
                                 <td class="px-6 py-4 text-center">
-                                    <input type="number" name="timesheets[{{ $loop->index }}][overtime_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                    <input type="number" name="entries[{{ $loop->index }}][overtime_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
                                 </td>
                                 <td class="px-6 py-4 text-center">
-                                    <input type="number" name="timesheets[{{ $loop->index }}][double_time_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                    <input type="number" name="entries[{{ $loop->index }}][double_time_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
                                 </td>
                                 <td class="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                                     <span class="total">0</span> hrs
@@ -129,6 +129,15 @@
 </div>
 
 <script>
+    function reloadWithCrew() {
+        var projectId = document.getElementById('project_id').value;
+        var crewId = document.getElementById('crew_id').value;
+        var url = '{{ route('timesheets.bulk-create') }}?';
+        if (projectId) url += 'project_id=' + projectId + '&';
+        if (crewId) url += 'crew_id=' + crewId;
+        location.href = url;
+    }
+
     function updateTotal(input) {
         const row = input.closest('tr');
         const regularHours = parseFloat(row.querySelector('input[name*="regular_hours"]').value) || 0;

@@ -150,11 +150,36 @@
             </svg>
             <span>New Timesheet</span>
         </a>
-        <a href="{{ route('projects.index') }}" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
+        <button onclick="document.getElementById('coProjectModal').classList.remove('hidden')" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
             <span>New Change Order</span>
-        </a>
+        </button>
     </div>
+
+    <!-- Project Picker Modal for Change Orders -->
+    <div id="coProjectModal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5)" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Select Project for Change Order</h3>
+            <select id="coProjectSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white mb-4">
+                <option value="">Choose a project...</option>
+                @foreach($allProjects ?? [] as $proj)
+                    <option value="{{ $proj->id }}">{{ $proj->name }} ({{ $proj->project_number }})</option>
+                @endforeach
+            </select>
+            <div class="flex gap-3 justify-end">
+                <button onclick="document.getElementById('coProjectModal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button onclick="goToChangeOrders()" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">Go to Change Orders</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function goToChangeOrders() {
+        var projectId = document.getElementById('coProjectSelect').value;
+        if (!projectId) { alert('Please select a project first.'); return; }
+        window.location.href = '/projects/' + projectId + '/change-orders';
+    }
+    </script>
 @endsection

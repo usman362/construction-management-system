@@ -449,7 +449,7 @@ function editPO(id) {
             document.getElementById('editPoId').value = id;
             document.querySelector('#editForm [name="project_id"]').value = po.project_id;
             document.querySelector('#editForm [name="vendor_id"]').value = po.vendor_id;
-            document.querySelector('#editForm [name="cost_code_id"]').value = po.cost_code_id;
+            document.querySelector('#editForm [name="cost_code_id"]').value = po.cost_code_id || '';
             document.querySelector('#editForm [name="date"]').value = po.date;
             document.querySelector('#editForm [name="delivery_date"]').value = po.delivery_date || '';
             document.querySelector('#editForm [name="description"]').value = po.description || '';
@@ -463,11 +463,13 @@ function editPO(id) {
                 po.items.forEach(function(item) {
                     var row = document.createElement('tr');
                     row.className = 'border-t border-gray-200 hover:bg-gray-50';
-                    row.innerHTML = '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm" value="' + (item.description || '') + '"></td>' +
-                        '<td class="px-3 py-2"><input type="number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right qty-input" value="' + item.quantity + '" step="0.01"></td>' +
-                        '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center" value="' + (item.unit_of_measure || '') + '"></td>' +
-                        '<td class="px-3 py-2"><input type="number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right unit-cost-input" value="' + item.unit_cost + '" step="0.01"></td>' +
-                        '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right bg-gray-100 font-medium item-total" readonly value="$' + (item.total_cost || 0).toFixed(2) + '"></td>' +
+                    var descEscaped = (item.description || '').replace(/"/g, '&quot;');
+                    var uomEscaped = (item.unit_of_measure || '').replace(/"/g, '&quot;');
+                    row.innerHTML = '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm" value="' + descEscaped + '"></td>' +
+                        '<td class="px-3 py-2"><input type="number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right qty-input" value="' + parseFloat(item.quantity || 0) + '" step="0.01"></td>' +
+                        '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center" value="' + uomEscaped + '"></td>' +
+                        '<td class="px-3 py-2"><input type="number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right unit-cost-input" value="' + parseFloat(item.unit_cost || 0) + '" step="0.01"></td>' +
+                        '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right bg-gray-100 font-medium item-total" readonly value="$' + parseFloat(item.total_cost || 0).toFixed(2) + '"></td>' +
                         '<td class="px-3 py-2 text-center"><button type="button" onclick="removeItemRow(this)" class="text-red-600 hover:text-red-700"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>';
                     itemsBody.appendChild(row);
                     attachItemEventListeners(row);

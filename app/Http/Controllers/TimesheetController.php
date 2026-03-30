@@ -304,16 +304,26 @@ class TimesheetController extends Controller
         ]);
     }
 
-    public function bulkCreate(): View
+    public function bulkCreate(Request $request): View
     {
         $crews = Crew::with(['project', 'foreman'])->get();
         $projects = Project::where('status', 'active')->get();
         $shifts = Shift::all();
+        $crewMembers = collect();
+
+        // Load crew members (employees) if crew_id is provided via query string
+        if ($request->filled('crew_id')) {
+            $crew = Crew::find($request->crew_id);
+            if ($crew) {
+                $crewMembers = $crew->employees;
+            }
+        }
 
         return view('timesheets.bulk-create', [
             'crews' => $crews,
             'projects' => $projects,
             'shifts' => $shifts,
+            'crewMembers' => $crewMembers,
         ]);
     }
 
@@ -361,6 +371,12 @@ class TimesheetController extends Controller
             ]);
 
             $timesheets[] = $timesheet;
+        }
+
+        // If traditional form POST (not AJAX), redirect back with success message
+        if (!$request->ajax() && !$request->wantsJson()) {
+            return redirect()->route('timesheets.index')
+                ->with('success', count($timesheets) . ' timesheets created successfully.');
         }
 
         return response()->json([

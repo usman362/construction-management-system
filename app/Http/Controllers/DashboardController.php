@@ -23,6 +23,10 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $allProjects = Project::where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'project_number']);
+
         return view('dashboard', [
             'stats' => [
                 'activeProjects' => $activeProjectsCount,
@@ -31,6 +35,7 @@ class DashboardController extends Controller
                 'openChangeOrders' => $openChangeOrders,
             ],
             'recentProjects' => $recentProjects,
+            'allProjects' => $allProjects,
         ]);
     }
 }
