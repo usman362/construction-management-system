@@ -17,7 +17,13 @@ class CommitmentController extends Controller
         if ($request->ajax()) {
             return $this->dataTable($project, $request);
         }
-        return view('commitments.index', ['project' => $project]);
+        $vendors = Vendor::orderBy('name')->get(['id', 'name']);
+        $costCodes = CostCode::orderBy('code')->get(['id', 'code', 'name']);
+        return view('commitments.index', [
+            'project' => $project,
+            'vendors' => $vendors,
+            'costCodes' => $costCodes,
+        ]);
     }
 
     private function dataTable(Project $project, Request $request): JsonResponse

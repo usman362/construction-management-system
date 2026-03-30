@@ -33,28 +33,31 @@ class ManhourBudgetController extends Controller
         ]);
     }
 
-    public function store(Request $request, Project $project): RedirectResponse
+    public function store(Request $request, Project $project)
     {
         $validated = $request->validate([
             'cost_code_id' => 'required|exists:cost_codes,id',
-            'estimated_hours' => 'required|numeric|min:0',
-            'labor_type' => 'required|in:regular,overtime,double_time',
-            'notes' => 'nullable|string',
+            'budget_hours' => 'required|numeric|min:0',
+            'category' => 'required|in:direct,indirect',
         ]);
 
         $existing = $project->manhourBudgets()
             ->where('cost_code_id', $validated['cost_code_id'])
-            ->where('labor_type', $validated['labor_type'])
+            ->where('category', $validated['category'])
             ->first();
 
         if ($existing) {
-            $existing->update(['estimated_hours' => $existing->estimated_hours + $validated['estimated_hours']]);
+            $existing->update(['budget_hours' => $existing->budget_hours + $validated['budget_hours']]);
         } else {
             $project->manhourBudgets()->create($validated);
         }
 
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json(['message' => 'Manhour budget saved successfully']);
+        }
+
         return redirect()->route('projects.manhour-budgets.index', $project)
-            ->with('success', 'Manhour budget created successfully.');
+            ->with('success', 'Manhour budget saved successfully.');
     }
 
     public function show(Project $project, ManhourBudget $manhourBudget): View
@@ -76,16 +79,19 @@ class ManhourBudgetController extends Controller
         ]);
     }
 
-    public function update(Request $request, Project $project, ManhourBudget $manhourBudget): RedirectResponse
+    public function update(Request $request, Project $project, ManhourBudget $manhourBudget)
     {
         $validated = $request->validate([
             'cost_code_id' => 'required|exists:cost_codes,id',
-            'estimated_hours' => 'required|numeric|min:0',
-            'labor_type' => 'required|in:regular,overtime,double_time',
-            'notes' => 'nullable|string',
+            'budget_hours' => 'required|numeric|min:0',
+            'category' => 'required|in:direct,indirect',
         ]);
 
         $manhourBudget->update($validated);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json(['message' => 'Manhour budget updated successfully']);
+        }
 
         return redirect()->route('projects.manhour-budgets.index', $manhourBudget->project)
             ->with('success', 'Manhour budget updated successfully.');
