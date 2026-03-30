@@ -86,9 +86,21 @@ class ChangeOrderController extends Controller
     public function show(Project $project, ChangeOrder $changeOrder): View
     {
         $changeOrder->load(['items', 'laborDetails']);
+
+        // Get previously approved COs (excluding current one)
+        $previousCOs = ChangeOrder::where('project_id', $project->id)
+            ->where('id', '!=', $changeOrder->id)
+            ->where('status', 'approved')
+            ->orderBy('date')
+            ->get();
+
+        $previousCOsTotal = $previousCOs->sum('amount');
+
         return view('change-orders.show', [
             'project' => $project,
             'changeOrder' => $changeOrder,
+            'previousCOs' => $previousCOs,
+            'previousCOsTotal' => $previousCOsTotal,
         ]);
     }
 

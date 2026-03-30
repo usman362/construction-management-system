@@ -190,6 +190,15 @@ function editChangeOrder(id) {
 function viewChangeOrder(id) {
     window.location.href = '/projects/{{ $project->id }}/change-orders/' + id;
 }
+
+// Auto-open edit modal if ?edit= param is in URL
+$(document).ready(function() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var editId = urlParams.get('edit');
+    if (editId) {
+        editChangeOrder(editId);
+    }
+});
 </script>
 @endpush
 

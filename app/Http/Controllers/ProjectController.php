@@ -71,6 +71,12 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function create(): View
+    {
+        $clients = Client::orderBy('name')->get();
+        return view('projects.create', ['clients' => $clients]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -91,6 +97,11 @@ class ProjectController extends Controller
             'original_budget' => $budget,
             'current_budget' => $budget,
         ]));
+
+        if (!$request->ajax() && !$request->wantsJson()) {
+            return redirect()->route('projects.show', $project)
+                ->with('success', 'Project created successfully.');
+        }
 
         return response()->json([
             'success' => true,

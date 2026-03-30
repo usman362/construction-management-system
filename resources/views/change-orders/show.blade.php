@@ -7,7 +7,7 @@
     <div class="mb-6 flex justify-between items-center">
         <a href="{{ route('projects.change-orders.index', $project) }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Change Orders</a>
         <div class="space-x-2">
-            <a href="{{ route('projects.change-orders.edit', [$project, $changeOrder]) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Edit</a>
+            <a href="{{ route('projects.change-orders.index', $project) }}?edit={{ $changeOrder->id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Edit</a>
             <form id="delete-change-order-form" method="POST" action="{{ route('projects.change-orders.destroy', [$project, $changeOrder]) }}" style="display:inline;">
                 @csrf
                 @method('DELETE')
@@ -192,27 +192,19 @@
     </div>
 
     <!-- Action Buttons -->
-    @if (in_array($changeOrder->status, ['draft', 'submitted']))
+    @if (in_array($changeOrder->status, ['pending', 'draft', 'submitted']))
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold mb-4">Actions</h3>
             <div class="flex gap-4">
-                @if ($changeOrder->status === 'submitted' || $changeOrder->status === 'draft')
-                    <form method="POST" action="{{ route('projects.change-orders.approve', [$project, $changeOrder]) }}" style="display:inline;">
-                        @csrf
-                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
-                            Approve
-                        </button>
-                    </form>
-                @endif
-
-                @if ($changeOrder->status === 'submitted' || $changeOrder->status === 'draft')
-                    <form method="POST" action="{{ route('projects.change-orders.reject', [$project, $changeOrder]) }}" style="display:inline;">
-                        @csrf
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
-                            Reject
-                        </button>
-                    </form>
-                @endif
+                <form method="POST" action="{{ route('projects.change-orders.approve', [$project, $changeOrder]) }}" style="display:inline;">
+                    @csrf
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
+                        Approve Change Order
+                    </button>
+                </form>
+                <a href="{{ route('projects.change-orders.index', $project) }}?edit={{ $changeOrder->id }}" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-6 rounded">
+                    Edit
+                </a>
             </div>
         </div>
     @endif

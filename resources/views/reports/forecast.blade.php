@@ -7,7 +7,7 @@
         <div class="flex justify-between items-start mb-8 pb-6 border-b-2 border-gray-300">
             <div>
                 <h1 class="text-3xl font-bold text-gray-800">FORECAST REPORT</h1>
-                <p class="text-lg text-gray-600 mt-2">{{ $project->client_name ?? 'N/A' }}</p>
+                <p class="text-lg text-gray-600 mt-2">{{ $project->client->name ?? 'N/A' }}</p>
                 <p class="text-sm text-gray-500 mt-1">Project #: {{ $project->project_number ?? 'N/A' }}</p>
                 <p class="text-sm text-gray-500">Including CO's 1-{{ count($changeOrders ?? []) }}</p>
                 <p class="text-sm text-gray-500">Date: {{ now()->format('m/d/Y') }}</p>

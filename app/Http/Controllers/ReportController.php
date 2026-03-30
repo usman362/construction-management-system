@@ -18,6 +18,7 @@ class ReportController extends Controller
 {
     public function costReport(Request $request, Project $project): View
     {
+        $project->load('client');
         $validated = $request->validate([
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
@@ -65,6 +66,7 @@ class ReportController extends Controller
 
         return view('reports.cost-report', [
             'project' => $project,
+            'costData' => collect($costCodeData)->values(),
             'costCodeData' => $costCodeData,
             'changeOrders' => $changeOrders,
             'manhourData' => $manhourData,
@@ -74,6 +76,7 @@ class ReportController extends Controller
 
     public function forecast(Request $request, Project $project): View
     {
+        $project->load('client');
         $validated = $request->validate([
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
@@ -117,12 +120,18 @@ class ReportController extends Controller
         }
 
         $manhourData = $this->getManHourForecastData($project, $validated);
+        $changeOrders = $project->changeOrders()->where('status', 'approved')->get();
 
         return view('reports.forecast', [
             'project' => $project,
             'costCodeData' => $costCodeData,
+            'costData' => collect($costCodeData)->values(),
+            'forecastData' => collect($costCodeData)->values(),
             'originalBudgetTotal' => $originalBudgetTotal,
             'forecastBudgetTotal' => $forecastBudgetTotal,
+            'originalBudgetTotals' => ['budget' => $originalBudgetTotal],
+            'forecastTotals' => ['budget' => $forecastBudgetTotal],
+            'changeOrders' => $changeOrders,
             'manhourData' => $manhourData,
             'export' => $request->get('export'),
         ]);
@@ -300,6 +309,18 @@ class ReportController extends Controller
             'margin' => $margin,
             'marginPercentage' => $marginPercentage,
             'byCodeData' => $byCodeData,
+            'plData' => collect($byCodeData)->values()->map(function ($item) use ($totalRevenue, $totalCosts) {
+                return [
+                    'code' => $item['code'],
+                    'name' => $item['name'],
+                    'revenue' => ($item['cost'] > 0 && $totalCosts > 0) ? ($item['cost'] / $totalCosts) * $totalRevenue : 0,
+                    'cost' => $item['cost'],
+                ];
+            }),
+            'summary' => [
+                'total_revenue' => $totalRevenue,
+                'total_cost' => $totalCosts,
+            ],
             'export' => $request->get('export'),
         ]);
     }
