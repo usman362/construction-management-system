@@ -30,21 +30,37 @@
         <form id="createForm" class="p-6 space-y-4">
             <div class="grid grid-cols-3 gap-4">
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
+                    <input type="text" name="po_number" placeholder="Leave blank for auto (PO-0001)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div class="col-span-2"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
                     <select name="project_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
                         <option value="">Select project</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->id }}">{{ $project->name }} ({{ $project->project_number }})</option>
+                        @endforeach
                     </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
                     <select name="vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
                         <option value="">Select vendor</option>
+                        @foreach($vendors as $vendor)
+                            <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code *</label>
-                    <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code</label>
+                    <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
                         <option value="">Select cost code</option>
+                        @foreach($costCodes as $cc)
+                            <option value="{{ $cc->id }}">{{ $cc->code }}</option>
+                        @endforeach
                     </select>
                 </div>
             </div>
@@ -60,8 +76,8 @@
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea name="description" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" rows="2"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                    <textarea name="description" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" rows="2" required></textarea>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -123,18 +139,27 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
                     <select name="project_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
                         <option value="">Select project</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->id }}">{{ $project->name }} ({{ $project->project_number }})</option>
+                        @endforeach
                     </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
                     <select name="vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
                         <option value="">Select vendor</option>
+                        @foreach($vendors as $vendor)
+                            <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code *</label>
-                    <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code</label>
+                    <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
                         <option value="">Select cost code</option>
+                        @foreach($costCodes as $cc)
+                            <option value="{{ $cc->id }}">{{ $cc->code }}</option>
+                        @endforeach
                     </select>
                 </div>
             </div>
@@ -291,57 +316,7 @@ var vendors = [];
 var costCodes = [];
 var materials = [];
 
-function loadDropdowns() {
-    $.ajax({
-        url: '/projects',
-        type: 'GET',
-        dataType: 'json',
-        success: function(data) {
-            projects = data;
-            populateDropdown('createForm [name="project_id"]', data);
-            populateDropdown('editForm [name="project_id"]', data);
-        }
-    });
-
-    $.ajax({
-        url: '/vendors',
-        type: 'GET',
-        dataType: 'json',
-        success: function(data) {
-            vendors = data;
-            populateDropdown('createForm [name="vendor_id"]', data);
-            populateDropdown('editForm [name="vendor_id"]', data);
-        }
-    });
-
-    $.ajax({
-        url: '/cost-codes',
-        type: 'GET',
-        dataType: 'json',
-        success: function(data) {
-            costCodes = data;
-            populateDropdown('createForm [name="cost_code_id"]', data);
-            populateDropdown('editForm [name="cost_code_id"]', data);
-        }
-    });
-
-    $.ajax({
-        url: '/materials',
-        type: 'GET',
-        dataType: 'json',
-        success: function(data) {
-            materials = data;
-        }
-    });
-}
-
-function populateDropdown(selector, data) {
-    var $select = $(selector);
-    data.forEach(function(item) {
-        var label = item.name || item.project_name || item.code_name || item.vendor_name || item.description;
-        $select.append('<option value="' + item.id + '">' + label + '</option>');
-    });
-}
+// Dropdowns populated via Blade server-side
 
 function addItemRow(tableId) {
     var tbody = document.getElementById(tableId === 'createItemsTable' ? 'createItemsBody' : 'editItemsBody');
@@ -619,8 +594,6 @@ function closeModal(id) {
 }
 
 $(document).ready(function() {
-    loadDropdowns();
-
     table = $('#dataTable').DataTable({
         ajax: '{{ route("purchase-orders.index") }}',
         columns: [
