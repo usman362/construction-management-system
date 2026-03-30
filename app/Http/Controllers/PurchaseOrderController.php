@@ -128,6 +128,7 @@ class PurchaseOrderController extends Controller
             'project_id' => 'required|exists:projects,id',
             'vendor_id' => 'required|exists:vendors,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'po_number' => 'nullable|string|max:50|unique:purchase_orders,po_number',
             'description' => 'required|string|max:500',
             'date' => 'required|date',
             'delivery_date' => 'nullable|date|after_or_equal:date',
@@ -143,10 +144,14 @@ class PurchaseOrderController extends Controller
         ]);
 
         try {
-            // Generate next PO number
-            $lastPo = PurchaseOrder::orderBy('id', 'desc')->first();
-            $nextNumber = ($lastPo ? (int)substr($lastPo->po_number, 3) + 1 : 1);
-            $poNumber = 'PO-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            // Use custom PO number if provided, otherwise auto-generate
+            if (!empty($validated['po_number'])) {
+                $poNumber = $validated['po_number'];
+            } else {
+                $lastPo = PurchaseOrder::orderBy('id', 'desc')->first();
+                $nextNumber = ($lastPo ? (int)substr($lastPo->po_number, 3) + 1 : 1);
+                $poNumber = 'PO-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            }
 
             // Calculate totals
             $subtotal = 0;

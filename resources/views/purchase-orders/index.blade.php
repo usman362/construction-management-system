@@ -64,7 +64,7 @@
                     </select>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-4 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">PO Date *</label>
                     <input type="date" name="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
@@ -72,6 +72,14 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Delivery Date</label>
                     <input type="date" name="delivery_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                    <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="e.g. 9.45" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Shipping ($)</label>
+                    <input type="number" name="shipping_amount" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
@@ -163,7 +171,7 @@
                     </select>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-4 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">PO Date *</label>
                     <input type="date" name="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
@@ -172,11 +180,19 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Delivery Date</label>
                     <input type="date" name="delivery_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                    <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="e.g. 9.45" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Shipping ($)</label>
+                    <input type="number" name="shipping_amount" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea name="description" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" rows="2"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                    <textarea name="description" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" rows="2" required></textarea>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -388,6 +404,7 @@ function submitCreateForm() {
         });
     });
 
+    var poNumber = document.querySelector('#createForm [name="po_number"]').value.trim();
     var data = {
         project_id: document.querySelector('#createForm [name="project_id"]').value,
         vendor_id: document.querySelector('#createForm [name="vendor_id"]').value,
@@ -396,8 +413,11 @@ function submitCreateForm() {
         delivery_date: document.querySelector('#createForm [name="delivery_date"]').value,
         description: document.querySelector('#createForm [name="description"]').value,
         notes: document.querySelector('#createForm [name="notes"]').value,
+        tax_rate: parseFloat(document.querySelector('#createForm [name="tax_rate"]').value) || 0,
+        shipping_amount: parseFloat(document.querySelector('#createForm [name="shipping_amount"]').value) || 0,
         items: items
     };
+    if (poNumber) data.po_number = poNumber;
 
     $.ajax({
         url: '{{ route("purchase-orders.store") }}',
@@ -434,6 +454,8 @@ function editPO(id) {
             document.querySelector('#editForm [name="delivery_date"]').value = po.delivery_date || '';
             document.querySelector('#editForm [name="description"]').value = po.description || '';
             document.querySelector('#editForm [name="notes"]').value = po.notes || '';
+            document.querySelector('#editForm [name="tax_rate"]').value = po.tax_rate || '';
+            document.querySelector('#editForm [name="shipping_amount"]').value = po.shipping_amount || '';
 
             var itemsBody = document.getElementById('editItemsBody');
             itemsBody.innerHTML = '';
@@ -485,6 +507,8 @@ function submitEditForm() {
         delivery_date: document.querySelector('#editForm [name="delivery_date"]').value,
         description: document.querySelector('#editForm [name="description"]').value,
         notes: document.querySelector('#editForm [name="notes"]').value,
+        tax_rate: parseFloat(document.querySelector('#editForm [name="tax_rate"]').value) || 0,
+        shipping_amount: parseFloat(document.querySelector('#editForm [name="shipping_amount"]').value) || 0,
         items: items
     };
 
