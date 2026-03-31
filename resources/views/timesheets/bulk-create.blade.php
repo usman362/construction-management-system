@@ -70,6 +70,15 @@
                         @enderror
                     </div>
                 </div>
+                <div class="mt-4 max-w-md">
+                    <label for="cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Cost code (applies to all rows)</label>
+                    <select name="cost_code_id" id="cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
+                        <option value="">— Optional —</option>
+                        @foreach ($costCodes ?? [] as $cc)
+                            <option value="{{ $cc->id }}" {{ old('cost_code_id') == $cc->id ? 'selected' : '' }}>{{ $cc->code }} — {{ $cc->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
 
             <!-- Crew Members Table -->
@@ -132,7 +141,7 @@
     function reloadWithCrew() {
         var projectId = document.getElementById('project_id').value;
         var crewId = document.getElementById('crew_id').value;
-        var url = '{{ route('timesheets.bulk-create') }}?';
+        var url = '{{ route("timesheets.bulk-create") }}?';
         if (projectId) url += 'project_id=' + projectId + '&';
         if (crewId) url += 'crew_id=' + crewId;
         location.href = url;

@@ -15,6 +15,7 @@ class Commitment extends Model
         'commitment_number',
         'po_number',
         'description',
+        'notes',
         'amount',
         'committed_date',
         'status',

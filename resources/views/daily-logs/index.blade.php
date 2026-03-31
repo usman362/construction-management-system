@@ -76,7 +76,7 @@
                 <button type="button" onclick="closeModal('addModal')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
                     Cancel
                 </button>
-                <button type="button" onclick="submitForm('addForm', '{{ route('projects.daily-logs.store', $project) }}', 'POST', dailyLogsTable, 'addModal')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                <button type="button" onclick="submitForm('addForm', '{{ route("projects.daily-logs.store", $project) }}', 'POST', dailyLogsTable, 'addModal')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                     Save
                 </button>
             </div>
@@ -144,7 +144,7 @@ $(document).ready(function() {
         processing: true,
         serverSide: true,
         ajax: {
-            url: '{{ route('projects.daily-logs.index', $project) }}',
+            url: '{{ route("projects.daily-logs.index", $project) }}',
             type: 'GET',
         },
         columns: [

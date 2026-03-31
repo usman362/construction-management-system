@@ -74,13 +74,17 @@ class CommitmentController extends Controller
 
     public function store(Request $request, Project $project): JsonResponse
     {
+        $request->merge([
+            'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+        ]);
+
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
             'po_number' => 'nullable|string|max:100',
-            'status' => 'required|in:draft,released,accepted,completed',
+            'status' => 'required|in:pending,approved,completed,cancelled',
             'notes' => 'nullable|string',
         ]);
 
@@ -89,6 +93,7 @@ class CommitmentController extends Controller
         $project->commitments()->create([
             ...$validated,
             'commitment_number' => $commNumber,
+            'committed_date' => now()->toDateString(),
         ]);
 
         return response()->json(['message' => 'Commitment created successfully']);
@@ -110,13 +115,17 @@ class CommitmentController extends Controller
 
     public function update(Request $request, Project $project, Commitment $commitment): JsonResponse
     {
+        $request->merge([
+            'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+        ]);
+
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
             'po_number' => 'nullable|string|max:100',
-            'status' => 'required|in:draft,released,accepted,completed',
+            'status' => 'required|in:pending,approved,completed,cancelled',
             'notes' => 'nullable|string',
         ]);
 

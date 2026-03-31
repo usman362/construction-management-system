@@ -6,6 +6,7 @@ use App\Models\PayrollPeriod;
 use App\Models\PayrollEntry;
 use App\Models\Timesheet;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Carbon;
@@ -93,7 +94,7 @@ class PayrollController extends Controller
 
     public function show(PayrollPeriod $payrollPeriod): View
     {
-        $payrollPeriod->load(['entries.employee', 'entries.project']);
+        $payrollPeriod->load(['entries.employee', 'entries.project', 'entries.costCode']);
 
         return view('payroll.show', [
             'payrollPeriod' => $payrollPeriod,
@@ -131,14 +132,17 @@ class PayrollController extends Controller
 
     public function generate(Request $request, PayrollPeriod $payrollPeriod): JsonResponse|RedirectResponse
     {
-        $timesheets = Timesheet::where('status', 'approved')
+        $timesheetsQuery = Timesheet::query()
+            ->whereIn('status', ['submitted', 'approved'])
             ->whereBetween('date', [$payrollPeriod->start_date, $payrollPeriod->end_date])
-            ->with('employee')
-            ->get()
-            ->groupBy('employee_id');
+            ->with('employee');
+
+        $timesheetRows = (clone $timesheetsQuery)->with(['costAllocations'])->get();
+        $timesheets = $timesheetRows->groupBy('employee_id');
 
         foreach ($timesheets as $employeeId => $employeeTimesheets) {
             $first = $employeeTimesheets->first();
+            $costCodeId = $this->resolvePrimaryCostCodeFromTimesheets($employeeTimesheets);
             $regularHours = (float) $employeeTimesheets->sum('regular_hours');
             $overtimeHours = (float) $employeeTimesheets->sum('overtime_hours');
             $doubleTimeHours = (float) $employeeTimesheets->sum('double_time_hours');
@@ -156,6 +160,7 @@ class PayrollController extends Controller
                 ],
                 [
                     'project_id' => $first->project_id,
+                    'cost_code_id' => $costCodeId,
                     'regular_hours' => $regularHours,
                     'overtime_hours' => $overtimeHours,
                     'double_time_hours' => $doubleTimeHours,
@@ -169,11 +174,45 @@ class PayrollController extends Controller
             );
         }
 
-        $message = 'Payroll entries generated successfully';
+        $employeeCount = $timesheets->count();
+        $rowCount = $timesheetRows->count();
+        $message = $employeeCount > 0
+            ? "Payroll generated: {$employeeCount} employee(s), {$rowCount} timesheet row(s) in period."
+            : 'No submitted or approved timesheets in this period — no payroll entries were created. Approve or submit timesheets for dates within the payroll period, then try again.';
 
         return $request->expectsJson()
-            ? response()->json(['message' => $message])
+            ? response()->json(['message' => $message, 'employees' => $employeeCount, 'timesheet_rows' => $rowCount])
             : redirect()->route('payroll.show', $payrollPeriod)->with('success', $message);
+    }
+
+    /**
+     * Use the cost code with the most hours (from allocations or timesheet-level cost code).
+     */
+    private function resolvePrimaryCostCodeFromTimesheets(Collection $employeeTimesheets): ?int
+    {
+        $weights = [];
+        foreach ($employeeTimesheets as $t) {
+            $allocRows = $t->relationLoaded('costAllocations')
+                ? $t->costAllocations
+                : $t->costAllocations()->get();
+            if ($allocRows->isNotEmpty()) {
+                foreach ($allocRows as $a) {
+                    $cid = $a->cost_code_id;
+                    $weights[$cid] = ($weights[$cid] ?? 0) + (float) $a->hours;
+                }
+            } elseif ($t->cost_code_id) {
+                $cid = $t->cost_code_id;
+                $weights[$cid] = ($weights[$cid] ?? 0) + (float) $t->total_hours;
+            }
+        }
+
+        if ($weights === []) {
+            return null;
+        }
+
+        arsort($weights);
+
+        return (int) array_key_first($weights);
     }
 
     public function process(Request $request, PayrollPeriod $payrollPeriod): JsonResponse|RedirectResponse

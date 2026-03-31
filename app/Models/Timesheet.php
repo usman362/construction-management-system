@@ -11,6 +11,7 @@ class Timesheet extends Model
     protected $fillable = [
         'employee_id',
         'project_id',
+        'cost_code_id',
         'crew_id',
         'date',
         'shift_id',
@@ -53,6 +54,11 @@ class Timesheet extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function costCode(): BelongsTo
+    {
+        return $this->belongsTo(CostCode::class);
     }
 
     public function crew(): BelongsTo

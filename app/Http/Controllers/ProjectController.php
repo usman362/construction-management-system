@@ -86,7 +86,10 @@ class ProjectController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'budget' => 'required|numeric|min:0',
-            'status' => 'required|in:active,inactive,completed,on_hold',
+            'contract_value' => 'nullable|numeric|min:0',
+            'po_number' => 'nullable|string|max:100',
+            'po_date' => 'nullable|date',
+            'status' => 'required|in:bidding,awarded,active,on_hold,completed,closed',
             'description' => 'nullable|string',
         ]);
 
@@ -142,6 +145,11 @@ class ProjectController extends Controller
             ];
         })->values();
 
+        $revisedBudget = ($project->current_budget ?? 0) + $coTotal;
+        $percentComplete = $revisedBudget > 0
+            ? min(round(($committedTotal / $revisedBudget) * 100, 1), 100)
+            : 0;
+
         return view('projects.show', [
             'project' => $project,
             'budgetLines' => $budgetLines,
@@ -155,6 +163,7 @@ class ProjectController extends Controller
             'invoicedTotal' => $invoicedTotal,
             'coTotal' => $coTotal,
             'balance' => ($budgetTotal + $coTotal) - $committedTotal,
+            'percentComplete' => $percentComplete,
         ]);
     }
 
@@ -178,7 +187,10 @@ class ProjectController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'budget' => 'required|numeric|min:0',
-            'status' => 'required|in:active,inactive,completed,on_hold',
+            'contract_value' => 'nullable|numeric|min:0',
+            'po_number' => 'nullable|string|max:100',
+            'po_date' => 'nullable|date',
+            'status' => 'required|in:bidding,awarded,active,on_hold,completed,closed',
             'description' => 'nullable|string',
         ]);
 

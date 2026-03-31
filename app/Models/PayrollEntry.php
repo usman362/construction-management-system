@@ -13,6 +13,7 @@ class PayrollEntry extends Model
         'payroll_period_id',
         'employee_id',
         'project_id',
+        'cost_code_id',
         'regular_hours',
         'overtime_hours',
         'double_time_hours',
@@ -49,5 +50,10 @@ class PayrollEntry extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function costCode(): BelongsTo
+    {
+        return $this->belongsTo(CostCode::class);
     }
 }

@@ -8,7 +8,7 @@
         <a href="{{ route('materials.index') }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Materials</a>
         <div class="space-x-2">
             <button type="button" onclick="editMaterial({{ $material->id }})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Edit</button>
-            <button type="button" onclick="confirmDelete('{{ route('materials.destroy', $material) }}', null, '{{ route('materials.index') }}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Delete</button>
+            <button type="button" onclick="confirmDelete('{{ route("materials.destroy", $material) }}', null, '{{ route("materials.index") }}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Delete</button>
         </div>
     </div>
 

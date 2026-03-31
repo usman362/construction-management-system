@@ -7,7 +7,7 @@
         <div class="flex justify-between items-start mb-8">
             <div>
                 <h1 class="text-3xl font-bold text-gray-800">Daily Log</h1>
-                <p class="text-gray-600 mt-2">{{ $log->date?->format('l, F j, Y') ?? 'N/A' }}</p>
+                <p class="text-gray-600 mt-2">{{ $dailyLog->date?->format('l, F j, Y') ?? 'N/A' }}</p>
                 <p class="text-gray-500 text-sm">Project: {{ $project->name ?? 'N/A' }}</p>
             </div>
             <div class="flex gap-2">
@@ -24,11 +24,11 @@
                 <div class="space-y-3">
                     <div>
                         <p class="text-xs font-semibold text-gray-600 uppercase">Weather Condition</p>
-                        <p class="text-lg text-gray-800 capitalize">{{ $log->weather ?? 'N/A' }}</p>
+                        <p class="text-lg text-gray-800 capitalize">{{ $dailyLog->weather ?? 'N/A' }}</p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold text-gray-600 uppercase">Temperature</p>
-                        <p class="text-lg text-gray-800">{{ $log->temperature ?? 'N/A' }}°F</p>
+                        <p class="text-lg text-gray-800">{{ $dailyLog->temperature ?? 'N/A' }}°F</p>
                     </div>
                 </div>
             </div>
@@ -38,11 +38,11 @@
                 <div class="space-y-3">
                     <div>
                         <p class="text-xs font-semibold text-gray-600 uppercase">Date</p>
-                        <p class="text-lg text-gray-800">{{ $log->date?->format('m/d/Y') ?? 'N/A' }}</p>
+                        <p class="text-lg text-gray-800">{{ $dailyLog->date?->format('m/d/Y') ?? 'N/A' }}</p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold text-gray-600 uppercase">Created By</p>
-                        <p class="text-lg text-gray-800">{{ $log->created_by ?? 'N/A' }}</p>
+                        <p class="text-lg text-gray-800">{{ $dailyLog->creator?->name ?? '—' }}</p>
                     </div>
                 </div>
             </div>
@@ -52,7 +52,7 @@
         <div class="bg-blue-50 p-8 rounded-lg border border-blue-200 mb-10">
             <h3 class="text-lg font-bold text-gray-800 mb-4">Notes</h3>
             <div class="prose prose-sm max-w-none">
-                <p class="text-gray-800 whitespace-pre-wrap">{{ $log->notes ?? 'No notes' }}</p>
+                <p class="text-gray-800 whitespace-pre-wrap">{{ $dailyLog->notes ?? 'No notes' }}</p>
             </div>
         </div>
 
@@ -62,11 +62,11 @@
             <div class="grid grid-cols-2 gap-6 text-sm">
                 <div>
                     <p class="text-xs font-semibold text-gray-600 uppercase">Created At</p>
-                    <p class="text-gray-800">{{ $log->created_at?->format('m/d/Y g:i A') ?? 'N/A' }}</p>
+                    <p class="text-gray-800">{{ $dailyLog->created_at?->format('m/d/Y g:i A') ?? 'N/A' }}</p>
                 </div>
                 <div>
                     <p class="text-xs font-semibold text-gray-600 uppercase">Last Updated</p>
-                    <p class="text-gray-800">{{ $log->updated_at?->format('m/d/Y g:i A') ?? 'N/A' }}</p>
+                    <p class="text-gray-800">{{ $dailyLog->updated_at?->format('m/d/Y g:i A') ?? 'N/A' }}</p>
                 </div>
             </div>
         </div>

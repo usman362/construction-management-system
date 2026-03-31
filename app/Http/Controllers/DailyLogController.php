@@ -79,6 +79,8 @@ class DailyLogController extends Controller
 
     public function show(Project $project, DailyLog $dailyLog): View
     {
+        $dailyLog->load('creator');
+
         return view('daily-logs.show', [
             'project' => $project,
             'dailyLog' => $dailyLog,

@@ -8,7 +8,7 @@
         <a href="{{ route('payroll.index') }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Payroll</a>
         <div class="space-x-2">
             <button type="button" onclick="editPeriod({{ $payrollPeriod->id }})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Edit</button>
-            <button type="button" onclick="confirmDelete('{{ route('payroll.destroy', $payrollPeriod) }}', null, '{{ route('payroll.index') }}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Delete</button>
+            <button type="button" onclick="confirmDelete('{{ route("payroll.destroy", $payrollPeriod) }}', null, '{{ route("payroll.index") }}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Delete</button>
         </div>
     </div>
 
@@ -33,6 +33,12 @@
                 </span>
             </div>
         </div>
+
+        @if(session('success'))
+            <div class="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                {{ session('success') }}
+            </div>
+        @endif
 
         <div class="flex gap-4 mb-8 flex-wrap">
             @if($payrollPeriod->status === 'open')
@@ -60,6 +66,7 @@
                     <tr class="bg-blue-100 border border-gray-300">
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Employee</th>
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Project</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Cost code</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Reg. Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">OT Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">DT Hrs</th>
@@ -93,14 +100,14 @@
                         </tr>
                     @empty
                         <tr class="bg-gray-50 border border-gray-300">
-                            <td colspan="10" class="border border-gray-300 px-4 py-4 text-center text-gray-500">
+                                <td colspan="11" class="border border-gray-300 px-4 py-4 text-center text-gray-500">
                                 No payroll entries. Click &quot;Generate Entries from Timesheets&quot; to create them.
                             </td>
                         </tr>
                     @endforelse
                     @if($entries->isNotEmpty())
                         <tr class="bg-blue-100 border border-gray-300 font-bold">
-                            <td colspan="2" class="border border-gray-300 px-4 py-2">TOTALS</td>
+                            <td colspan="3" class="border border-gray-300 px-4 py-2">TOTALS</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) $entries->sum('regular_hours'), 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) $entries->sum('overtime_hours'), 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) $entries->sum('double_time_hours'), 1) }}</td>

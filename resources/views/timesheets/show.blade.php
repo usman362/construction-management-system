@@ -8,7 +8,7 @@
         <a href="{{ route('timesheets.index') }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Timesheets</a>
         <div class="space-x-2">
             <button type="button" onclick="editTimesheet({{ $timesheet->id }}, null)" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Edit</button>
-            <button type="button" onclick="confirmDelete('{{ route('timesheets.destroy', $timesheet) }}', null, '{{ route('timesheets.index') }}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Delete</button>
+            <button type="button" onclick="confirmDelete('{{ route("timesheets.destroy", $timesheet) }}', null, '{{ route("timesheets.index") }}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Delete</button>
         </div>
     </div>
 
@@ -33,6 +33,11 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Project</label>
                         <p class="text-lg text-gray-900 mt-1">{{ $timesheet->project->name }}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Cost code</label>
+                        <p class="text-lg text-gray-900 mt-1">{{ $timesheet->costCode?->code ?? '—' }}</p>
                     </div>
 
                     <div>
@@ -146,8 +151,29 @@
 
     <!-- Cost Allocation Section -->
     <div class="bg-white rounded-lg shadow p-6 mt-6">
-        <h3 class="text-lg font-semibold mb-4">Cost Allocation</h3>
-        <p class="text-gray-600">Cost allocation details for this timesheet will appear here.</p>
+        <h3 class="text-lg font-semibold mb-4">Cost allocation</h3>
+        @if($timesheet->costAllocations->isNotEmpty())
+            <table class="w-full text-sm border border-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="text-left px-3 py-2 border-b">Code</th>
+                        <th class="text-right px-3 py-2 border-b">Hours</th>
+                        <th class="text-right px-3 py-2 border-b">Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($timesheet->costAllocations as $alloc)
+                        <tr>
+                            <td class="px-3 py-2 border-b">{{ $alloc->costCode?->code ?? '—' }}</td>
+                            <td class="px-3 py-2 border-b text-right">{{ number_format((float) $alloc->hours, 2) }}</td>
+                            <td class="px-3 py-2 border-b text-right">${{ number_format((float) $alloc->cost, 2) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @else
+            <p class="text-gray-600">No cost code assigned. Edit the timesheet and choose a cost code to allocate labor.</p>
+        @endif
     </div>
 </div>
 

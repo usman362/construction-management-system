@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Timesheet;
+use App\Models\TimesheetCostAllocation;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectBillableRate;
 use App\Models\Crew;
 use App\Models\Shift;
+use App\Models\CostCode;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +27,7 @@ class TimesheetController extends Controller
 
     private function dataTable(Request $request): JsonResponse
     {
-        $query = Timesheet::with(['employee', 'project', 'crew']);
+        $query = Timesheet::with(['employee', 'project', 'crew', 'costCode']);
 
         // Apply filters
         if ($request->filled('employee_id')) {
@@ -69,20 +71,21 @@ class TimesheetController extends Controller
         // Get filtered records count
         $recordsFiltered = $query->count();
 
-        // Ordering (columns match index DataTable: date, employee, project, crew, reg, ot, dt, total, cost, status, actions)
+        // Ordering (columns match index DataTable: date, employee, project, cost code, crew, reg, ot, dt, total, cost, status, actions)
         $orderColumn = (int) $request->input('order.0.column', 0);
         $orderDir = $request->input('order.0.dir', 'desc');
         $columns = [
             0 => 'date',
             1 => 'employee_id',
             2 => 'project_id',
-            3 => 'crew_id',
-            4 => 'regular_hours',
-            5 => 'overtime_hours',
-            6 => 'double_time_hours',
-            7 => 'total_hours',
-            8 => 'total_cost',
-            9 => 'status',
+            3 => 'cost_code_id',
+            4 => 'crew_id',
+            5 => 'regular_hours',
+            6 => 'overtime_hours',
+            7 => 'double_time_hours',
+            8 => 'total_hours',
+            9 => 'total_cost',
+            10 => 'status',
         ];
 
         if (isset($columns[$orderColumn])) {
@@ -106,6 +109,7 @@ class TimesheetController extends Controller
                 'employee_name' => $emp ? trim($emp->first_name.' '.$emp->last_name) : '—',
                 'project_id' => $timesheet->project_id,
                 'project_name' => $timesheet->project->name ?? '',
+                'cost_code' => $timesheet->costCode?->code ?? '—',
                 'crew_id' => $timesheet->crew_id,
                 'crew_name' => $timesheet->crew->name ?? '—',
                 'date' => $timesheet->date,
@@ -130,9 +134,14 @@ class TimesheetController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $request->merge([
+            'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+        ]);
+
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'project_id' => 'required|exists:projects,id',
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
             'crew_id' => 'nullable|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'nullable|exists:shifts,id',
@@ -151,6 +160,7 @@ class TimesheetController extends Controller
         $timesheet = Timesheet::create([
             'employee_id' => $validated['employee_id'],
             'project_id' => $validated['project_id'],
+            'cost_code_id' => $validated['cost_code_id'] ?? null,
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
@@ -169,6 +179,8 @@ class TimesheetController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
+        $this->syncTimesheetCostAllocation($timesheet->fresh());
+
         return response()->json([
             'success' => true,
             'message' => 'Timesheet created successfully.',
@@ -178,7 +190,7 @@ class TimesheetController extends Controller
 
     public function show(Timesheet $timesheet): View
     {
-        $timesheet->load(['employee', 'project', 'crew', 'shift']);
+        $timesheet->load(['employee', 'project', 'crew', 'shift', 'costCode', 'costAllocations.costCode']);
 
         return view('timesheets.show', array_merge(
             ['timesheet' => $timesheet],
@@ -206,14 +218,20 @@ class TimesheetController extends Controller
             'projects' => Project::query()->orderBy('name')->get(),
             'crews' => Crew::query()->with('project')->orderBy('name')->get(),
             'shifts' => Shift::query()->orderBy('name')->get(),
+            'costCodes' => CostCode::query()->orderBy('code')->get(['id', 'code', 'name']),
         ];
     }
 
     public function update(Request $request, Timesheet $timesheet): JsonResponse
     {
+        $request->merge([
+            'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+        ]);
+
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'project_id' => 'required|exists:projects,id',
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
             'crew_id' => 'nullable|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'nullable|exists:shifts,id',
@@ -232,6 +250,7 @@ class TimesheetController extends Controller
         $timesheet->update([
             'employee_id' => $validated['employee_id'],
             'project_id' => $validated['project_id'],
+            'cost_code_id' => $validated['cost_code_id'] ?? null,
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
@@ -249,11 +268,29 @@ class TimesheetController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
+        $this->syncTimesheetCostAllocation($timesheet->fresh());
+
         return response()->json([
             'success' => true,
             'message' => 'Timesheet updated successfully.',
             'timesheet' => $timesheet->fresh(),
         ]);
+    }
+
+    /**
+     * Keep a single allocation row in sync so payroll and reports can resolve cost code by hours.
+     */
+    private function syncTimesheetCostAllocation(Timesheet $timesheet): void
+    {
+        $timesheet->costAllocations()->delete();
+        if ($timesheet->cost_code_id) {
+            TimesheetCostAllocation::create([
+                'timesheet_id' => $timesheet->id,
+                'cost_code_id' => $timesheet->cost_code_id,
+                'hours' => $timesheet->total_hours,
+                'cost' => $timesheet->total_cost,
+            ]);
+        }
     }
 
     public function destroy(Timesheet $timesheet): JsonResponse
@@ -309,6 +346,7 @@ class TimesheetController extends Controller
         $crews = Crew::with(['project', 'foreman'])->get();
         $projects = Project::where('status', 'active')->get();
         $shifts = Shift::all();
+        $costCodes = CostCode::query()->orderBy('code')->get(['id', 'code', 'name']);
         $crewMembers = collect();
 
         // Load crew members (employees) if crew_id is provided via query string
@@ -324,16 +362,22 @@ class TimesheetController extends Controller
             'projects' => $projects,
             'shifts' => $shifts,
             'crewMembers' => $crewMembers,
+            'costCodes' => $costCodes,
         ]);
     }
 
     public function bulkStore(Request $request): JsonResponse
     {
+        $request->merge([
+            'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+        ]);
+
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
             'crew_id' => 'required|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'required|exists:shifts,id',
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
             'entries' => 'required|array|min:1',
             'entries.*.employee_id' => 'required|exists:employees,id',
             'entries.*.regular_hours' => 'required|numeric|min:0',
@@ -353,6 +397,7 @@ class TimesheetController extends Controller
             $timesheet = Timesheet::create([
                 'employee_id' => $entry['employee_id'],
                 'project_id' => $validated['project_id'],
+                'cost_code_id' => $validated['cost_code_id'] ?? null,
                 'crew_id' => $validated['crew_id'],
                 'date' => $validated['date'],
                 'shift_id' => $validated['shift_id'],
@@ -369,6 +414,8 @@ class TimesheetController extends Controller
                 'project_billable_rate_id' => $totals['project_billable_rate_id'],
                 'status' => 'draft',
             ]);
+
+            $this->syncTimesheetCostAllocation($timesheet->fresh());
 
             $timesheets[] = $timesheet;
         }

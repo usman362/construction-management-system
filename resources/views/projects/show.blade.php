@@ -67,19 +67,19 @@
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Committed</p>
-            <p class="text-2xl font-bold text-gray-900">${{ number_format($project->cost_summary?->total_committed ?? 0, 0) }}</p>
+            <p class="text-2xl font-bold text-gray-900">${{ number_format($committedTotal ?? 0, 0) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Profit</p>
             @php
-                $profit = ($project->contract_value ?? 0) - ($project->cost_summary?->total_committed ?? 0);
+                $profit = ($project->contract_value ?? 0) - ($committedTotal ?? 0);
                 $profitClass = $profit >= 0 ? 'text-green-600' : 'text-red-600';
             @endphp
             <p class="text-2xl font-bold {{ $profitClass }}">${{ number_format($profit, 0) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">% Complete</p>
-            <p class="text-2xl font-bold text-gray-900">{{ $project->percent_complete ?? 0 }}%</p>
+            <p class="text-2xl font-bold text-gray-900">{{ $percentComplete ?? 0 }}%</p>
         </div>
     </div>
 
@@ -236,10 +236,24 @@
 
             <!-- Change Orders Tab -->
             <div x-show="activeTab === 'change-orders'" class="space-y-4">
+                @php
+                    $coApproved = $changeOrders->where('status', 'approved');
+                    $coPending = $changeOrders->where('status', 'pending');
+                @endphp
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <p class="text-sm font-medium text-green-800">Total approved</p>
+                        <p class="text-2xl font-bold text-green-900">${{ number_format((float) $coApproved->sum('amount'), 2) }}</p>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <p class="text-sm font-medium text-amber-800">Total pending</p>
+                        <p class="text-2xl font-bold text-amber-900">${{ number_format((float) $coPending->sum('amount'), 2) }}</p>
+                    </div>
+                </div>
                 <div class="flex justify-end mb-4">
-                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    <a href="{{ route('projects.change-orders.index', $project) }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
                         New Change Order
-                    </button>
+                    </a>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -257,7 +271,7 @@
                         <tbody class="divide-y divide-gray-200">
                             @forelse($changeOrders as $co)
                                 <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-2 text-gray-900 font-medium">{{ $co->number }}</td>
+                                    <td class="px-4 py-2 text-gray-900 font-medium">{{ $co->co_number ?? $co->id }}</td>
                                     <td class="px-4 py-2 text-gray-700">{{ $co->date?->format('M d, Y') ?? 'N/A' }}</td>
                                     <td class="px-4 py-2 text-gray-700">{{ $co->description ?? 'N/A' }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($co->amount ?? 0, 2) }}</td>
@@ -300,8 +314,8 @@
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-4 py-2 text-gray-900">{{ $timesheet->date?->format('M d, Y') ?? 'N/A' }}</td>
                                     <td class="px-4 py-2 text-gray-900">{{ $timesheet->employee?->full_name ?? 'N/A' }}</td>
-                                    <td class="px-4 py-2 text-right text-gray-900">{{ number_format($timesheet->hours ?? 0, 2) }}</td>
-                                    <td class="px-4 py-2 text-right text-gray-900">${{ number_format($timesheet->cost ?? 0, 2) }}</td>
+                                    <td class="px-4 py-2 text-right text-gray-900">{{ number_format((float) ($timesheet->total_hours ?? 0), 2) }}</td>
+                                    <td class="px-4 py-2 text-right text-gray-900">${{ number_format((float) ($timesheet->total_cost ?? 0), 2) }}</td>
                                     <td class="px-4 py-2">
                                         <span class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
                                             {{ ucfirst($timesheet->status ?? 'submitted') }}
@@ -382,6 +396,8 @@
             <button onclick="closeModal('editModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="editForm" class="p-6 space-y-4">
+            @csrf
+            @method('PUT')
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Project Number *</label><input type="text" name="project_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
@@ -393,7 +409,16 @@
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Budget *</label><input type="number" step="0.01" name="budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="active">Active</option><option value="inactive">Inactive</option><option value="completed">Completed</option><option value="on_hold">On Hold</option></select></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Contract Value</label><input type="number" step="0.01" name="contract_value" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0.00"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Client PO #</label><input type="text" name="po_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">PO Date</label><input type="date" name="po_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                    @foreach(['bidding' => 'Bidding', 'awarded' => 'Awarded', 'active' => 'Active', 'on_hold' => 'On Hold', 'completed' => 'Completed', 'closed' => 'Closed'] as $val => $label)
+                        <option value="{{ $val }}">{{ $label }}</option>
+                    @endforeach
+                </select></div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
         </form>
@@ -408,20 +433,23 @@
 <script>
 function editProject() {
     $.get('/projects/{{ $project->id }}/edit', function(d) {
+        var p = d.project || d;
         var f = document.getElementById('editForm');
-        f.querySelector('[name="project_number"]').value = d.project.project_number || '';
-        f.querySelector('[name="name"]').value = d.project.name || '';
-        f.querySelector('[name="start_date"]').value = d.project.start_date ? d.project.start_date.substring(0,10) : '';
-        f.querySelector('[name="end_date"]').value = d.project.end_date ? d.project.end_date.substring(0,10) : '';
-        f.querySelector('[name="budget"]').value = d.project.budget || '';
-        f.querySelector('[name="status"]').value = d.project.status || 'active';
-        f.querySelector('[name="description"]').value = d.project.description || '';
+        f.querySelector('[name="project_number"]').value = p.project_number || '';
+        f.querySelector('[name="name"]').value = p.name || '';
+        f.querySelector('[name="start_date"]').value = p.start_date ? String(p.start_date).substring(0,10) : '';
+        f.querySelector('[name="end_date"]').value = p.end_date ? String(p.end_date).substring(0,10) : '';
+        f.querySelector('[name="budget"]').value = p.current_budget != null ? p.current_budget : (p.budget != null ? p.budget : '');
+        f.querySelector('[name="contract_value"]').value = p.contract_value || '';
+        f.querySelector('[name="po_number"]').value = p.po_number || '';
+        f.querySelector('[name="po_date"]').value = p.po_date ? String(p.po_date).substring(0,10) : '';
+        f.querySelector('[name="status"]').value = p.status || 'active';
+        f.querySelector('[name="description"]').value = p.description || '';
 
-        // Populate clients dropdown
         var opts = '<option value="">Select Client</option>';
         if (d.clients) {
             d.clients.forEach(function(c) {
-                opts += '<option value="'+c.id+'" '+(c.id == d.project.client_id ? 'selected' : '')+'>'+c.name+'</option>';
+                opts += '<option value="'+c.id+'" '+(c.id == p.client_id ? 'selected' : '')+'>'+c.name+'</option>';
             });
         }
         document.getElementById('editClientId').innerHTML = opts;

@@ -138,10 +138,15 @@ class PurchaseOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:500',
             'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.unit_of_measure' => 'required|string|max:50',
+            'items.*.unit_of_measure' => 'nullable|string|max:50',
             'items.*.unit_cost' => 'required|numeric|min:0',
             'items.*.material_id' => 'nullable|exists:materials,id',
         ]);
+
+        foreach ($validated['items'] as &$item) {
+            $item['unit_of_measure'] = $item['unit_of_measure'] ?? 'EA';
+        }
+        unset($item);
 
         try {
             // Use custom PO number if provided, otherwise auto-generate
@@ -236,7 +241,7 @@ class PurchaseOrderController extends Controller
                 'message' => 'Purchase order created successfully',
                 'po_id' => $po->id,
                 'po_number' => $po->po_number,
-            ], 201);
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error creating purchase order',
@@ -349,10 +354,15 @@ class PurchaseOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:500',
             'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.unit_of_measure' => 'required|string|max:50',
+            'items.*.unit_of_measure' => 'nullable|string|max:50',
             'items.*.unit_cost' => 'required|numeric|min:0',
             'items.*.material_id' => 'nullable|exists:materials,id',
         ]);
+
+        foreach ($validated['items'] as &$item) {
+            $item['unit_of_measure'] = $item['unit_of_measure'] ?? 'EA';
+        }
+        unset($item);
 
         try {
             // Calculate totals

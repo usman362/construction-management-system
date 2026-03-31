@@ -8,6 +8,7 @@ use App\Models\Commitment;
 use App\Models\Invoice;
 use App\Models\ChangeOrder;
 use App\Models\Timesheet;
+use App\Models\Employee;
 use App\Models\ManhourBudget;
 use App\Models\BillingInvoice;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -193,14 +194,14 @@ class ReportController extends Controller
         $validated = $request->validate([
             'employee_id' => 'nullable|exists:employees,id',
             'project_id' => 'nullable|exists:projects,id',
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date|after_or_equal:date_from',
-            'group_by' => 'nullable|in:employee,project',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'group_by' => 'nullable|in:employee,project,date',
         ]);
 
         $groupBy = $validated['group_by'] ?? 'employee';
 
-        $query = Timesheet::where('status', 'approved')
+        $query = Timesheet::whereIn('status', ['submitted', 'approved'])
             ->with(['employee', 'project']);
 
         if ($validated['employee_id'] ?? null) {
@@ -211,52 +212,82 @@ class ReportController extends Controller
             $query->where('project_id', $validated['project_id']);
         }
 
-        if ($validated['date_from'] ?? null) {
-            $query->where('date', '>=', $validated['date_from']);
+        if ($validated['start_date'] ?? null) {
+            $query->where('date', '>=', $validated['start_date']);
         }
 
-        if ($validated['date_to'] ?? null) {
-            $query->where('date', '<=', $validated['date_to']);
+        if ($validated['end_date'] ?? null) {
+            $query->where('date', '<=', $validated['end_date']);
         }
 
         $timesheets = $query->get();
-        $groupedData = [];
+
+        $totalHours = $timesheets->sum('total_hours');
+        $totalCost = $timesheets->sum('total_cost');
+        $uniqueDays = $timesheets->pluck('date')->unique()->count();
+        $billableRate = 1.5;
+        $totalBillable = $totalCost * $billableRate;
+
+        $summary = [
+            'total_hours' => $totalHours,
+            'total_cost' => $totalCost,
+            'total_billable' => $totalBillable,
+            'avg_hours_per_day' => $uniqueDays > 0 ? round($totalHours / $uniqueDays, 1) : 0,
+        ];
+
+        $groupedData = collect();
 
         if ($groupBy === 'employee') {
-            $groupedData = $timesheets->groupBy('employee_id')->map(function ($group) {
-                return [
-                    'name' => $group->first()->employee->first_name . ' ' . $group->first()->employee->last_name,
-                    'type' => 'employee',
-                    'total_hours' => $group->sum('total_hours'),
-                    'total_cost' => $group->sum('total_cost'),
-                    'entries' => $group->map(fn ($t) => [
-                        'date' => $t->date,
-                        'project' => $t->project->name,
+            foreach ($timesheets->groupBy('employee_id') as $group) {
+                $emp = $group->first()->employee;
+                $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                foreach ($group as $t) {
+                    $groupedData->push([
+                        'group_name' => $empName,
+                        'detail' => ($t->project->name ?? 'N/A') . ' — ' . ($t->date?->format('M j, Y') ?? ''),
                         'hours' => $t->total_hours,
-                        'cost' => $t->total_cost,
-                    ]),
-                ];
-            });
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                    ]);
+                }
+            }
+        } elseif ($groupBy === 'project') {
+            foreach ($timesheets->groupBy('project_id') as $group) {
+                $projName = $group->first()->project->name ?? 'Unknown';
+                foreach ($group as $t) {
+                    $emp = $t->employee;
+                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                    $groupedData->push([
+                        'group_name' => $projName,
+                        'detail' => $empName . ' — ' . ($t->date?->format('M j, Y') ?? ''),
+                        'hours' => $t->total_hours,
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                    ]);
+                }
+            }
         } else {
-            $groupedData = $timesheets->groupBy('project_id')->map(function ($group) {
-                return [
-                    'name' => $group->first()->project->name,
-                    'type' => 'project',
-                    'total_hours' => $group->sum('total_hours'),
-                    'total_cost' => $group->sum('total_cost'),
-                    'entries' => $group->map(fn ($t) => [
-                        'date' => $t->date,
-                        'employee' => $t->employee->first_name . ' ' . $t->employee->last_name,
+            foreach ($timesheets->sortBy('date')->groupBy(fn ($t) => $t->date?->format('Y-m-d')) as $dateStr => $group) {
+                foreach ($group as $t) {
+                    $emp = $t->employee;
+                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                    $groupedData->push([
+                        'group_name' => \Carbon\Carbon::parse($dateStr)->format('M j, Y'),
+                        'detail' => $empName . ' — ' . ($t->project->name ?? 'N/A'),
                         'hours' => $t->total_hours,
-                        'cost' => $t->total_cost,
-                    ]),
-                ];
-            });
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                    ]);
+                }
+            }
         }
 
         return view('reports.timesheet-report', [
             'groupedData' => $groupedData,
+            'summary' => $summary,
             'groupBy' => $groupBy,
+            'employees' => Employee::orderBy('first_name')->get(),
+            'projects' => Project::orderBy('name')->get(),
             'export' => $request->get('export'),
         ]);
     }
@@ -609,41 +640,66 @@ class ReportController extends Controller
         $validated = $request->validate([
             'employee_id' => 'nullable|exists:employees,id',
             'project_id' => 'nullable|exists:projects,id',
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date|after_or_equal:date_from',
-            'group_by' => 'nullable|in:employee,project',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'group_by' => 'nullable|in:employee,project,date',
         ]);
 
         $groupBy = $validated['group_by'] ?? 'employee';
-        $query = Timesheet::where('status', 'approved')->with(['employee', 'project']);
+        $query = Timesheet::whereIn('status', ['submitted', 'approved'])->with(['employee', 'project']);
 
         if ($validated['employee_id'] ?? null) $query->where('employee_id', $validated['employee_id']);
         if ($validated['project_id'] ?? null) $query->where('project_id', $validated['project_id']);
-        if ($validated['date_from'] ?? null) $query->where('date', '>=', $validated['date_from']);
-        if ($validated['date_to'] ?? null) $query->where('date', '<=', $validated['date_to']);
+        if ($validated['start_date'] ?? null) $query->where('date', '>=', $validated['start_date']);
+        if ($validated['end_date'] ?? null) $query->where('date', '<=', $validated['end_date']);
 
         $timesheets = $query->get();
+        $billableRate = 1.5;
+        $groupedData = collect();
 
         if ($groupBy === 'employee') {
-            $groupedData = $timesheets->groupBy('employee_id')->map(function ($group) {
-                return [
-                    'name' => $group->first()->employee->first_name . ' ' . $group->first()->employee->last_name,
-                    'type' => 'employee',
-                    'total_hours' => $group->sum('total_hours'),
-                    'total_cost' => $group->sum('total_cost'),
-                    'entries' => $group->map(fn ($t) => ['date' => $t->date, 'project' => $t->project->name, 'hours' => $t->total_hours, 'cost' => $t->total_cost]),
-                ];
-            });
+            foreach ($timesheets->groupBy('employee_id') as $group) {
+                $emp = $group->first()->employee;
+                $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                foreach ($group as $t) {
+                    $groupedData->push([
+                        'group_name' => $empName,
+                        'detail' => ($t->project->name ?? 'N/A') . ' — ' . ($t->date?->format('M j, Y') ?? ''),
+                        'hours' => $t->total_hours,
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                    ]);
+                }
+            }
+        } elseif ($groupBy === 'project') {
+            foreach ($timesheets->groupBy('project_id') as $group) {
+                $projName = $group->first()->project->name ?? 'Unknown';
+                foreach ($group as $t) {
+                    $emp = $t->employee;
+                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                    $groupedData->push([
+                        'group_name' => $projName,
+                        'detail' => $empName . ' — ' . ($t->date?->format('M j, Y') ?? ''),
+                        'hours' => $t->total_hours,
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                    ]);
+                }
+            }
         } else {
-            $groupedData = $timesheets->groupBy('project_id')->map(function ($group) {
-                return [
-                    'name' => $group->first()->project->name,
-                    'type' => 'project',
-                    'total_hours' => $group->sum('total_hours'),
-                    'total_cost' => $group->sum('total_cost'),
-                    'entries' => $group->map(fn ($t) => ['date' => $t->date, 'employee' => $t->employee->first_name . ' ' . $t->employee->last_name, 'hours' => $t->total_hours, 'cost' => $t->total_cost]),
-                ];
-            });
+            foreach ($timesheets->sortBy('date')->groupBy(fn ($t) => $t->date?->format('Y-m-d')) as $dateStr => $group) {
+                foreach ($group as $t) {
+                    $emp = $t->employee;
+                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                    $groupedData->push([
+                        'group_name' => \Carbon\Carbon::parse($dateStr)->format('M j, Y'),
+                        'detail' => $empName . ' — ' . ($t->project->name ?? 'N/A'),
+                        'hours' => $t->total_hours,
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                    ]);
+                }
+            }
         }
 
         $pdf = Pdf::loadView('pdf.timesheet-report', compact('groupedData', 'groupBy'));

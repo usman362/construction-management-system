@@ -107,11 +107,11 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-3 py-2 text-left font-medium text-gray-700">Description</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-16">Qty</th>
-                                <th class="px-3 py-2 text-center font-medium text-gray-700 w-16">UOM</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-24">Unit Cost</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-24">Total</th>
-                                <th class="px-3 py-2 text-center w-8"></th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Qty</th>
+                                <th class="px-3 py-2 text-center font-medium text-gray-700 w-24">UOM</th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Unit Cost</th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Total</th>
+                                <th class="px-3 py-2 text-center w-10"></th>
                             </tr>
                         </thead>
                         <tbody id="createItemsBody"></tbody>
@@ -214,11 +214,11 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-3 py-2 text-left font-medium text-gray-700">Description</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-16">Qty</th>
-                                <th class="px-3 py-2 text-center font-medium text-gray-700 w-16">UOM</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-24">Unit Cost</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-24">Total</th>
-                                <th class="px-3 py-2 text-center w-8"></th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Qty</th>
+                                <th class="px-3 py-2 text-center font-medium text-gray-700 w-24">UOM</th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Unit Cost</th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Total</th>
+                                <th class="px-3 py-2 text-center w-10"></th>
                             </tr>
                         </thead>
                         <tbody id="editItemsBody"></tbody>
@@ -295,10 +295,10 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-3 py-2 text-left font-medium text-gray-700">Description</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-16">Qty</th>
-                                <th class="px-3 py-2 text-center font-medium text-gray-700 w-16">UOM</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-24">Unit Cost</th>
-                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-24">Total</th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Qty</th>
+                                <th class="px-3 py-2 text-center font-medium text-gray-700 w-24">UOM</th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Unit Cost</th>
+                                <th class="px-3 py-2 text-right font-medium text-gray-700 w-28">Total</th>
                             </tr>
                         </thead>
                         <tbody id="viewItemsBody"></tbody>
@@ -319,12 +319,6 @@
 </div>
 
 @push('scripts')
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
 var table;
 var projects = [];
@@ -389,32 +383,36 @@ function calculateTotals() {
 }
 
 function submitCreateForm() {
-    if (!document.getElementById('createForm').checkValidity()) {
-        Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please fill in all required fields.' });
-        return;
-    }
+    var form = document.getElementById('createForm');
+    if (!form.reportValidity()) return;
 
     var items = [];
     document.querySelectorAll('#createItemsBody tr').forEach(function(row) {
         items.push({
-            description: row.cells[0].querySelector('input').value,
+            description: row.cells[0].querySelector('input').value || '',
             quantity: parseFloat(row.querySelector('.qty-input').value) || 0,
-            unit_of_measure: row.cells[2].querySelector('input').value,
+            unit_of_measure: row.cells[2].querySelector('input').value || 'EA',
             unit_cost: parseFloat(row.querySelector('.unit-cost-input').value) || 0
         });
     });
 
-    var poNumber = document.querySelector('#createForm [name="po_number"]').value.trim();
+    if (items.length === 0) {
+        Swal.fire({ icon: 'warning', title: 'No line items', text: 'Add at least one line item before creating a purchase order.' });
+        return;
+    }
+
+    var poNumber = form.querySelector('[name="po_number"]').value.trim();
+    var costCodeVal = form.querySelector('[name="cost_code_id"]').value;
     var data = {
-        project_id: document.querySelector('#createForm [name="project_id"]').value,
-        vendor_id: document.querySelector('#createForm [name="vendor_id"]').value,
-        cost_code_id: document.querySelector('#createForm [name="cost_code_id"]').value,
-        date: document.querySelector('#createForm [name="date"]').value,
-        delivery_date: document.querySelector('#createForm [name="delivery_date"]').value,
-        description: document.querySelector('#createForm [name="description"]').value,
-        notes: document.querySelector('#createForm [name="notes"]').value,
-        tax_rate: parseFloat(document.querySelector('#createForm [name="tax_rate"]').value) || 0,
-        shipping_amount: parseFloat(document.querySelector('#createForm [name="shipping_amount"]').value) || 0,
+        project_id: form.querySelector('[name="project_id"]').value,
+        vendor_id: form.querySelector('[name="vendor_id"]').value,
+        cost_code_id: costCodeVal || null,
+        date: form.querySelector('[name="date"]').value,
+        delivery_date: form.querySelector('[name="delivery_date"]').value || null,
+        description: form.querySelector('[name="description"]').value,
+        notes: form.querySelector('[name="notes"]').value || null,
+        tax_rate: parseFloat(form.querySelector('[name="tax_rate"]').value) || 0,
+        shipping_amount: parseFloat(form.querySelector('[name="shipping_amount"]').value) || 0,
         items: items
     };
     if (poNumber) data.po_number = poNumber;
@@ -425,17 +423,23 @@ function submitCreateForm() {
         contentType: 'application/json',
         dataType: 'json',
         data: JSON.stringify(data),
-        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
         success: function(response) {
-            Swal.fire({ icon: 'success', title: 'Success', text: 'Purchase Order created successfully!', timer: 2000 });
             closeModal('createModal');
-            document.getElementById('createForm').reset();
+            table.ajax.reload(null, false);
+            form.reset();
             document.getElementById('createItemsBody').innerHTML = '';
             document.getElementById('createSubtotal').textContent = '0.00';
-            table.ajax.reload();
+            Toast.fire({ icon: 'success', title: response.message || 'Purchase Order created!' });
         },
         error: function(xhr) {
-            Swal.fire({ icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'Failed to create purchase order.' });
+            var errors = xhr.responseJSON?.errors;
+            if (errors) {
+                var msg = Object.values(errors).flat().join('<br>');
+                Swal.fire({ icon: 'error', title: 'Validation Error', html: msg, confirmButtonColor: '#2563eb' });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'Failed to create purchase order.' });
+            }
         }
     });
 }
@@ -486,31 +490,35 @@ function editPO(id) {
 
 function submitEditForm() {
     var poId = document.getElementById('editPoId').value;
-    if (!document.getElementById('editForm').checkValidity()) {
-        Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please fill in all required fields.' });
-        return;
-    }
+    var form = document.getElementById('editForm');
+    if (!form.reportValidity()) return;
 
     var items = [];
     document.querySelectorAll('#editItemsBody tr').forEach(function(row) {
         items.push({
-            description: row.cells[0].querySelector('input').value,
+            description: row.cells[0].querySelector('input').value || '',
             quantity: parseFloat(row.querySelector('.qty-input').value) || 0,
-            unit_of_measure: row.cells[2].querySelector('input').value,
+            unit_of_measure: row.cells[2].querySelector('input').value || 'EA',
             unit_cost: parseFloat(row.querySelector('.unit-cost-input').value) || 0
         });
     });
 
+    if (items.length === 0) {
+        Swal.fire({ icon: 'warning', title: 'No line items', text: 'Add at least one line item.' });
+        return;
+    }
+
+    var costCodeVal = form.querySelector('[name="cost_code_id"]').value;
     var data = {
-        project_id: document.querySelector('#editForm [name="project_id"]').value,
-        vendor_id: document.querySelector('#editForm [name="vendor_id"]').value,
-        cost_code_id: document.querySelector('#editForm [name="cost_code_id"]').value,
-        date: document.querySelector('#editForm [name="date"]').value,
-        delivery_date: document.querySelector('#editForm [name="delivery_date"]').value,
-        description: document.querySelector('#editForm [name="description"]').value,
-        notes: document.querySelector('#editForm [name="notes"]').value,
-        tax_rate: parseFloat(document.querySelector('#editForm [name="tax_rate"]').value) || 0,
-        shipping_amount: parseFloat(document.querySelector('#editForm [name="shipping_amount"]').value) || 0,
+        project_id: form.querySelector('[name="project_id"]').value,
+        vendor_id: form.querySelector('[name="vendor_id"]').value,
+        cost_code_id: costCodeVal || null,
+        date: form.querySelector('[name="date"]').value,
+        delivery_date: form.querySelector('[name="delivery_date"]').value || null,
+        description: form.querySelector('[name="description"]').value,
+        notes: form.querySelector('[name="notes"]').value || null,
+        tax_rate: parseFloat(form.querySelector('[name="tax_rate"]').value) || 0,
+        shipping_amount: parseFloat(form.querySelector('[name="shipping_amount"]').value) || 0,
         items: items
     };
 
@@ -520,14 +528,20 @@ function submitEditForm() {
         contentType: 'application/json',
         dataType: 'json',
         data: JSON.stringify(data),
-        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
         success: function(response) {
-            Swal.fire({ icon: 'success', title: 'Success', text: 'Purchase Order updated successfully!', timer: 2000 });
             closeModal('editModal');
-            table.ajax.reload();
+            table.ajax.reload(null, false);
+            Toast.fire({ icon: 'success', title: response.message || 'Purchase Order updated!' });
         },
         error: function(xhr) {
-            Swal.fire({ icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'Failed to update purchase order.' });
+            var errors = xhr.responseJSON?.errors;
+            if (errors) {
+                var msg = Object.values(errors).flat().join('<br>');
+                Swal.fire({ icon: 'error', title: 'Validation Error', html: msg, confirmButtonColor: '#2563eb' });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'Failed to update purchase order.' });
+            }
         }
     });
 }
@@ -609,14 +623,6 @@ function deletePO(id) {
             });
         }
     });
-}
-
-function openModal(id) {
-    document.getElementById(id).classList.remove('hidden');
-}
-
-function closeModal(id) {
-    document.getElementById(id).classList.add('hidden');
 }
 
 $(document).ready(function() {

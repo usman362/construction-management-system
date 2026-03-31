@@ -40,6 +40,15 @@
                     </select>
                 </div>
             </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cost code</label>
+                <select name="cost_code_id" id="edit_cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                    <option value="">— Optional —</option>
+                    @foreach($costCodes ?? [] as $cc)
+                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                    @endforeach
+                </select>
+            </div>
             <div class="grid grid-cols-4 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Regular Hrs *</label><input type="number" step="0.5" name="regular_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Hrs</label><input type="number" step="0.5" name="overtime_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
