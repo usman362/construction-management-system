@@ -188,7 +188,7 @@ function deleteDailyLog(id) {
 
 function editDailyLog(id) {
     $.get('/projects/{{ $project->id }}/daily-logs/' + id + '/edit', function(d) {
-        document.getElementById('edit_date').value = d.date || '';
+        document.getElementById('edit_date').value = d.date ? String(d.date).substring(0, 10) : '';
         document.getElementById('edit_weather').value = d.weather || '';
         document.getElementById('edit_temperature').value = d.temperature || '';
         document.getElementById('edit_notes').value = d.notes || '';

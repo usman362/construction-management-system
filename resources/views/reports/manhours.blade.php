@@ -18,6 +18,17 @@
                     </div>
                 </div>
 
+                <!-- Cost Code -->
+                <div class="flex-1 min-w-[12rem]">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Cost Code</label>
+                    <select name="cost_code_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All cost codes</option>
+                        @foreach($costCodesForFilter ?? [] as $cc)
+                            <option value="{{ $cc->id }}" {{ (string) request('cost_code_id') === (string) $cc->id ? 'selected' : '' }}>{{ $cc->code }} — {{ $cc->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <!-- Group By -->
                 <div class="flex-1">
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Group By</label>
@@ -52,6 +63,7 @@
                     <tr class="bg-blue-100 border border-gray-300">
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Employee Name</th>
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Craft</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Cost Code</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Regular Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">OT Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">DT Hrs</th>
@@ -82,6 +94,7 @@
                         <tr class="{{ $bgClass }} border border-gray-300">
                             <td class="border border-gray-300 px-4 py-2">{{ $item['employee_name'] ?? 'N/A' }}</td>
                             <td class="border border-gray-300 px-4 py-2">{{ $item['craft'] ?? 'N/A' }}</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ $item['cost_code'] ?? 'N/A' }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($item['regular_hours'] ?? 0, 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($item['ot_hours'] ?? 0, 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($item['dt_hours'] ?? 0, 1) }}</td>
@@ -90,7 +103,7 @@
                         </tr>
                     @endforeach
                     <tr class="bg-blue-100 border border-gray-300 font-bold">
-                        <td colspan="2" class="border border-gray-300 px-4 py-2">TOTALS</td>
+                        <td colspan="3" class="border border-gray-300 px-4 py-2">TOTALS</td>
                         <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($totalRegular, 1) }}</td>
                         <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($totalOT, 1) }}</td>
                         <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($totalDT, 1) }}</td>
@@ -203,7 +216,7 @@
 
         <!-- Actions -->
         <div class="mt-8 flex gap-4">
-            <a href="{{ route('projects.reports.manhours.pdf', $project) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
+            <a href="{{ route('projects.reports.manhours.pdf', $project) }}{{ request()->getQueryString() ? '?' . request()->getQueryString() : '' }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
                 Download PDF
             </a>
             <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded">

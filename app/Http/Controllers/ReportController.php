@@ -11,6 +11,7 @@ use App\Models\Timesheet;
 use App\Models\Employee;
 use App\Models\ManhourBudget;
 use App\Models\BillingInvoice;
+use App\Models\CostCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,14 +26,15 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()
-            ->with(['costCode', 'commitments', 'invoices'])
-            ->get();
+        $budgetLines = $project->budgetLines()->with('costCode')->get();
+        $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
+        $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
 
         $costCodeData = [];
 
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
+            $ccId = $line->cost_code_id;
 
             if (!isset($costCodeData[$code])) {
                 $costCodeData[$code] = [
@@ -46,8 +48,8 @@ class ReportController extends Controller
                 ];
             }
 
-            $committed = $line->commitments->sum('amount');
-            $invoiced = $line->invoices->sum('amount');
+            $committed = ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+            $invoiced = ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
             $budget = $line->amount;
 
             $costCodeData[$code]['budget'] += $budget;
@@ -83,9 +85,9 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()
-            ->with(['costCode', 'commitments', 'invoices'])
-            ->get();
+        $budgetLines = $project->budgetLines()->with('costCode')->get();
+        $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
+        $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
 
         $originalBudgetTotal = $budgetLines->sum('amount');
         $approvedCoTotal = $project->changeOrders()
@@ -97,6 +99,7 @@ class ReportController extends Controller
 
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
+            $ccId = $line->cost_code_id;
 
             if (!isset($costCodeData[$code])) {
                 $costCodeData[$code] = [
@@ -110,8 +113,8 @@ class ReportController extends Controller
                 ];
             }
 
-            $committed = $line->commitments->sum('amount');
-            $invoiced = $line->invoices->sum('amount');
+            $committed = ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+            $invoiced = ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
 
             $costCodeData[$code]['original_budget'] += $line->amount;
             $costCodeData[$code]['forecast_budget'] += $line->amount;
@@ -141,52 +144,126 @@ class ReportController extends Controller
     public function manhourReport(Request $request, Project $project): View
     {
         $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'group_by' => 'nullable|in:employee,craft,cost_code',
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
         ]);
 
-        $query = Timesheet::where('project_id', $project->id)
-            ->where('status', 'approved')
-            ->with(['employee.craft']);
-
-        if ($validated['date_from'] ?? null) {
-            $query->where('date', '>=', $validated['date_from']);
-        }
-
-        if ($validated['date_to'] ?? null) {
-            $query->where('date', '<=', $validated['date_to']);
-        }
-
-        $timesheets = $query->get()->groupBy('employee_id');
-
-        $manhourData = [];
-
-        foreach ($timesheets as $employeeId => $employeeTimesheets) {
-            $employee = $employeeTimesheets->first()->employee;
-
-            $regularHours = $employeeTimesheets->sum('regular_hours');
-            $otHours = $employeeTimesheets->sum('ot_hours');
-            $dtHours = $employeeTimesheets->sum('dt_hours');
-            $totalHours = $regularHours + $otHours + $dtHours;
-            $totalCost = $employeeTimesheets->sum('total_cost');
-
-            $manhourData[] = [
-                'employee_name' => $employee->first_name . ' ' . $employee->last_name,
-                'craft' => $employee->craft?->name ?? 'N/A',
-                'project' => $project->name,
-                'regular_hours' => $regularHours,
-                'ot_hours' => $otHours,
-                'dt_hours' => $dtHours,
-                'total_hours' => $totalHours,
-                'labor_cost' => $totalCost,
-            ];
-        }
+        $payload = $this->buildManhourReportPayload($project, $validated);
 
         return view('reports.manhours', [
             'project' => $project,
-            'manhourData' => $manhourData,
+            'manhourData' => $payload['manhourData'],
+            'groupBy' => $payload['groupBy'],
+            'costCodesForFilter' => $payload['costCodesForFilter'],
             'export' => $request->get('export'),
         ]);
+    }
+
+    /**
+     * @return array{manhourData: array<int, array<string, mixed>>, groupBy: string, costCodesForFilter: \Illuminate\Support\Collection<int, CostCode>}
+     */
+    protected function buildManhourReportPayload(Project $project, array $validated): array
+    {
+        $dateFrom = $validated['start_date'] ?? $validated['date_from'] ?? null;
+        $dateTo = $validated['end_date'] ?? $validated['date_to'] ?? null;
+        $groupBy = $validated['group_by'] ?? 'employee';
+
+        $query = Timesheet::where('project_id', $project->id)
+            ->whereIn('status', ['submitted', 'approved'])
+            ->with(['employee.craft', 'costCode']);
+
+        if ($dateFrom) {
+            $query->whereDate('date', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->whereDate('date', '<=', $dateTo);
+        }
+
+        if (! empty($validated['cost_code_id'])) {
+            $query->where('cost_code_id', $validated['cost_code_id']);
+        }
+
+        $timesheets = $query->get();
+
+        $manhourData = [];
+
+        if ($groupBy === 'craft') {
+            $byCraft = $timesheets->groupBy(fn ($t) => $t->employee?->craft_id ?? 0);
+            foreach ($byCraft as $craftTimesheets) {
+                $craft = $craftTimesheets->first()->employee?->craft;
+                $employeeIds = $craftTimesheets->pluck('employee_id')->unique();
+                $regular = (float) $craftTimesheets->sum('regular_hours');
+                $ot = (float) $craftTimesheets->sum('overtime_hours');
+                $dt = (float) $craftTimesheets->sum('double_time_hours');
+                $manhourData[] = [
+                    'craft_code' => $craft?->code ?? 'N/A',
+                    'craft_name' => $craft?->name ?? 'N/A',
+                    'employee_count' => $employeeIds->count(),
+                    'total_hours' => $regular + $ot + $dt,
+                    'total_cost' => $craftTimesheets->sum('total_cost'),
+                ];
+            }
+        } elseif ($groupBy === 'cost_code') {
+            $manhourBudgets = $project->manhourBudgets()->with('costCode')->get();
+            foreach ($manhourBudgets as $budget) {
+                if (! empty($validated['cost_code_id']) && (int) $budget->cost_code_id !== (int) $validated['cost_code_id']) {
+                    continue;
+                }
+                $actualHours = (float) $timesheets
+                    ->where('cost_code_id', $budget->cost_code_id)
+                    ->sum('total_hours');
+                $cc = $budget->costCode;
+                $manhourData[] = [
+                    'cost_code' => $cc?->code ?? 'N/A',
+                    'name' => $cc?->name ?? 'N/A',
+                    'budget_hours' => (float) $budget->budget_hours,
+                    'actual_hours' => $actualHours,
+                ];
+            }
+        } else {
+            foreach ($timesheets->groupBy('employee_id') as $employeeTimesheets) {
+                $employee = $employeeTimesheets->first()->employee;
+
+                $regularHours = (float) $employeeTimesheets->sum('regular_hours');
+                $otHours = (float) $employeeTimesheets->sum('overtime_hours');
+                $dtHours = (float) $employeeTimesheets->sum('double_time_hours');
+                $totalHours = $regularHours + $otHours + $dtHours;
+                $totalCost = $employeeTimesheets->sum('total_cost');
+
+                $manhourData[] = [
+                    'employee_name' => $employee->first_name . ' ' . $employee->last_name,
+                    'craft' => $employee->craft?->name ?? 'N/A',
+                    'cost_code' => $employeeTimesheets->first()->costCode?->code ?? 'N/A',
+                    'project' => $project->name,
+                    'regular_hours' => $regularHours,
+                    'ot_hours' => $otHours,
+                    'dt_hours' => $dtHours,
+                    'total_hours' => $totalHours,
+                    'labor_cost' => $totalCost,
+                ];
+            }
+        }
+
+        $costCodeIds = Timesheet::where('project_id', $project->id)
+            ->whereNotNull('cost_code_id')
+            ->distinct()
+            ->pluck('cost_code_id')
+            ->merge($project->budgetLines()->pluck('cost_code_id'))
+            ->unique()
+            ->filter();
+
+        $costCodesForFilter = CostCode::whereIn('id', $costCodeIds)->orderBy('code')->get();
+
+        return [
+            'manhourData' => $manhourData,
+            'groupBy' => $groupBy,
+            'costCodesForFilter' => $costCodesForFilter,
+        ];
     }
 
     public function timesheetReport(Request $request): View
@@ -313,14 +390,15 @@ class ReportController extends Controller
         $margin = $totalRevenue - $totalCosts;
         $marginPercentage = $totalRevenue > 0 ? round(($margin / $totalRevenue) * 100, 2) : 0;
 
-        $budgetLines = $project->budgetLines()
-            ->with(['costCode', 'commitments', 'invoices'])
-            ->get();
+        $budgetLines = $project->budgetLines()->with('costCode')->get();
+        $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
+        $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
 
         $byCodeData = [];
 
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
+            $ccId = $line->cost_code_id;
 
             if (!isset($byCodeData[$code])) {
                 $byCodeData[$code] = [
@@ -330,7 +408,8 @@ class ReportController extends Controller
                 ];
             }
 
-            $byCodeData[$code]['cost'] += $line->commitments->sum('amount') + $line->invoices->sum('amount');
+            $byCodeData[$code]['cost'] += ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount')
+                + ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
         }
 
         return view('reports.profit-loss', [
@@ -367,9 +446,14 @@ class ReportController extends Controller
         $timesheets = $this->getTimesheetsForPeriod($project, $validated);
 
         $productivityData = [];
+        $sumBudgetHours = 0;
+        $sumActualHours = 0;
+        $sumEarnedHours = 0;
+        $sumForecast = 0;
 
         foreach ($manhourBudgets as $budget) {
-            $earnedHours = $budget->estimated_hours;
+            $budgetHours = $budget->budget_hours;
+            $earnedHours = $budgetHours;
 
             $actualHours = $timesheets
                 ->where('cost_code_id', $budget->cost_code_id)
@@ -379,19 +463,34 @@ class ReportController extends Controller
                 ? round(($earnedHours / $actualHours) * 100, 2)
                 : 0;
 
-            $variance = $earnedHours - $actualHours;
+            $forecast = $productivity > 0
+                ? ($budgetHours / $productivity) * 100
+                : $actualHours;
 
             $productivityData[] = [
-                'cost_code' => $budget->costCode?->code ?? 'Unassigned',
-                'earned_hours' => $earnedHours,
+                'code' => $budget->costCode?->code ?? 'Unassigned',
+                'budget_hours' => $budgetHours,
                 'actual_hours' => $actualHours,
-                'productivity' => $productivity,
-                'variance' => $variance,
+                'earned_hours' => $earnedHours,
+                'forecast' => $forecast,
             ];
+
+            $sumBudgetHours += $budgetHours;
+            $sumActualHours += $actualHours;
+            $sumEarnedHours += $earnedHours;
+            $sumForecast += $forecast;
         }
+
+        $summary = [
+            'budget_hours' => $sumBudgetHours,
+            'actual_hours' => $sumActualHours,
+            'earned_hours' => $sumEarnedHours,
+            'forecast_at_completion' => $sumForecast,
+        ];
 
         return view('reports.productivity', [
             'project' => $project,
+            'summary' => $summary,
             'productivityData' => $productivityData,
             'export' => $request->get('export'),
         ]);
@@ -399,34 +498,58 @@ class ReportController extends Controller
 
     protected function getManHourData(Project $project, array $filters): array
     {
+        $normalizeCcKey = static fn ($id): string => $id === null ? '_null_' : (string) $id;
+
         $query = Timesheet::where('project_id', $project->id)
-            ->where('status', 'approved');
+            ->whereIn('status', ['submitted', 'approved'])
+            ->with('costCode');
 
         if ($filters['date_from'] ?? null) {
-            $query->where('date', '>=', $filters['date_from']);
+            $query->whereDate('date', '>=', $filters['date_from']);
         }
 
         if ($filters['date_to'] ?? null) {
-            $query->where('date', '<=', $filters['date_to']);
+            $query->whereDate('date', '<=', $filters['date_to']);
         }
 
         $timesheets = $query->get();
+        $byCostCode = $timesheets->groupBy(fn ($t) => $normalizeCcKey($t->cost_code_id));
 
-        $totalRegularHours = $timesheets->sum('regular_hours');
-        $totalOtHours = $timesheets->sum('ot_hours');
-        $totalDtHours = $timesheets->sum('dt_hours');
-        $totalHours = $totalRegularHours + $totalOtHours + $totalDtHours;
+        $manhourBudgets = $project->manhourBudgets()->with('costCode')->get();
 
-        $budgetHours = $project->manhourBudgets()->sum('estimated_hours');
+        $keys = $manhourBudgets->map(fn ($b) => $normalizeCcKey($b->cost_code_id))
+            ->merge($timesheets->map(fn ($t) => $normalizeCcKey($t->cost_code_id)))
+            ->unique()
+            ->sort()
+            ->values();
 
-        return [
-            'total_regular_hours' => $totalRegularHours,
-            'total_ot_hours' => $totalOtHours,
-            'total_dt_hours' => $totalDtHours,
-            'total_hours' => $totalHours,
-            'budget_hours' => $budgetHours,
-            'hours_variance' => $budgetHours - $totalHours,
-        ];
+        $rows = [];
+        foreach ($keys as $key) {
+            $ccId = $key === '_null_' ? null : (int) $key;
+
+            $group = $byCostCode->get($key, collect());
+            $actualHours = (float) $group->sum('total_hours');
+            $laborCost = (float) $group->sum('total_cost');
+
+            $budgetHours = (float) $manhourBudgets
+                ->where('cost_code_id', $ccId)
+                ->sum('budget_hours');
+
+            $budget = $manhourBudgets->firstWhere('cost_code_id', $ccId);
+            $firstTs = $group->first();
+            $label = $budget?->costCode?->name
+                ?? $firstTs?->costCode?->name
+                ?? ($ccId === null ? 'Unassigned' : 'Unknown');
+
+            $rows[] = [
+                'date' => $label,
+                'actual_hours' => $actualHours,
+                'budget_hours' => $budgetHours,
+                'labor_cost' => $laborCost,
+            ];
+        }
+
+        return $rows;
     }
 
     protected function getManHourForecastData(Project $project, array $filters): array
@@ -438,7 +561,7 @@ class ReportController extends Controller
         $totalDtHours = $timesheets->sum('dt_hours');
         $totalActualHours = $totalRegularHours + $totalOtHours + $totalDtHours;
 
-        $budgetHours = $project->manhourBudgets()->sum('estimated_hours');
+        $budgetHours = $project->manhourBudgets()->sum('budget_hours');
 
         $productivity = $totalActualHours > 0
             ? round(($budgetHours / $totalActualHours) * 100, 2)
@@ -459,14 +582,14 @@ class ReportController extends Controller
     protected function getTimesheetsForPeriod(Project $project, array $filters): \Illuminate\Support\Collection
     {
         $query = Timesheet::where('project_id', $project->id)
-            ->where('status', 'approved');
+            ->whereIn('status', ['submitted', 'approved']);
 
         if ($filters['date_from'] ?? null) {
-            $query->where('date', '>=', $filters['date_from']);
+            $query->whereDate('date', '>=', $filters['date_from']);
         }
 
         if ($filters['date_to'] ?? null) {
-            $query->where('date', '<=', $filters['date_to']);
+            $query->whereDate('date', '<=', $filters['date_to']);
         }
 
         return $query->get();
@@ -548,32 +671,17 @@ class ReportController extends Controller
     public function manhourReportPdf(Request $request, Project $project)
     {
         $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'group_by' => 'nullable|in:employee,craft,cost_code',
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
         ]);
 
-        $query = Timesheet::where('project_id', $project->id)->where('status', 'approved')->with(['employee.craft']);
-        if ($validated['date_from'] ?? null) $query->where('date', '>=', $validated['date_from']);
-        if ($validated['date_to'] ?? null) $query->where('date', '<=', $validated['date_to']);
-
-        $timesheets = $query->get()->groupBy('employee_id');
-        $manhourData = [];
-
-        foreach ($timesheets as $employeeId => $employeeTimesheets) {
-            $employee = $employeeTimesheets->first()->employee;
-            $regularHours = $employeeTimesheets->sum('regular_hours');
-            $otHours = $employeeTimesheets->sum('ot_hours');
-            $dtHours = $employeeTimesheets->sum('dt_hours');
-            $manhourData[] = [
-                'employee_name' => $employee->first_name . ' ' . $employee->last_name,
-                'craft' => $employee->craft?->name ?? 'N/A',
-                'regular_hours' => $regularHours,
-                'ot_hours' => $otHours,
-                'dt_hours' => $dtHours,
-                'total_hours' => $regularHours + $otHours + $dtHours,
-                'labor_cost' => $employeeTimesheets->sum('total_cost'),
-            ];
-        }
+        $validated['group_by'] = 'employee';
+        $payload = $this->buildManhourReportPayload($project, $validated);
+        $manhourData = $payload['manhourData'];
 
         $pdf = Pdf::loadView('pdf.manhours', compact('project', 'manhourData'));
         $pdf->setPaper('a4', 'landscape');
@@ -618,7 +726,7 @@ class ReportController extends Controller
         $productivityData = [];
 
         foreach ($manhourBudgets as $budget) {
-            $earnedHours = $budget->estimated_hours;
+            $earnedHours = $budget->budget_hours;
             $actualHours = $timesheets->where('cost_code_id', $budget->cost_code_id)->sum('total_hours');
             $productivity = $actualHours > 0 ? round(($earnedHours / $actualHours) * 100, 2) : 0;
             $productivityData[] = [

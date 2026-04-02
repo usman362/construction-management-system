@@ -44,17 +44,17 @@ class BudgetLine extends Model
         return $this->current_amount;
     }
 
-    /** Commitments on this project tagged with the same cost code. */
+    /** Commitments on this project tagged with the same cost code (lazy-load only). */
     public function commitments(): HasMany
     {
         return $this->hasMany(Commitment::class, 'cost_code_id', 'cost_code_id')
-            ->whereColumn('commitments.project_id', $this->qualifyColumn('project_id'));
+            ->where('commitments.project_id', $this->project_id);
     }
 
-    /** Vendor invoices on this project for the same cost code. */
+    /** Vendor invoices on this project for the same cost code (lazy-load only). */
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class, 'cost_code_id', 'cost_code_id')
-            ->whereColumn('invoices.project_id', $this->qualifyColumn('project_id'));
+            ->where('invoices.project_id', $this->project_id);
     }
 }

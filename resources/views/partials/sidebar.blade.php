@@ -2,14 +2,23 @@
 <aside class="w-64 min-w-[256px] bg-gray-900 text-gray-100 overflow-y-auto flex flex-col" style="scrollbar-width: thin; scrollbar-color: #4b5563 #1f2937;">
 
     <!-- Logo / Brand -->
+    @php
+        $companyName = \App\Models\Setting::get('company_name', 'BuildTrack');
+        $companyTagline = \App\Models\Setting::get('company_tagline', 'Construction Mgmt');
+        $companyLogo = \App\Models\Setting::get('company_logo');
+    @endphp
     <div class="px-5 py-5 border-b border-gray-800">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
-            <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
-                BT
+            <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0 overflow-hidden">
+                @if($companyLogo)
+                    <img src="{{ $companyLogo }}" class="w-full h-full object-contain" alt="{{ $companyName }}">
+                @else
+                    {{ strtoupper(substr($companyName, 0, 2)) }}
+                @endif
             </div>
             <div>
-                <h2 class="text-base font-bold text-white leading-tight">BuildTrack</h2>
-                <p class="text-[11px] text-gray-500 leading-tight">Construction Mgmt</p>
+                <h2 class="text-base font-bold text-white leading-tight">{{ $companyName }}</h2>
+                <p class="text-[11px] text-gray-500 leading-tight">{{ $companyTagline }}</p>
             </div>
         </a>
     </div>

@@ -150,6 +150,16 @@ class ProjectController extends Controller
             ? min(round(($committedTotal / $revisedBudget) * 100, 1), 100)
             : 0;
 
+        $commitmentsByCostCode = $commitments->groupBy('cost_code_id');
+        $invoicesByCostCode = $invoices->groupBy('cost_code_id');
+
+        foreach ($budgetLines as $line) {
+            $line->committed = ($commitmentsByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
+            $line->invoiced = ($invoicesByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
+            $revised = $line->revised_amount ?: $line->budget_amount;
+            $line->percent_complete = $revised > 0 ? round(($line->committed / $revised) * 100, 1) : 0;
+        }
+
         return view('projects.show', [
             'project' => $project,
             'budgetLines' => $budgetLines,

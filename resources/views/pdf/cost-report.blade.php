@@ -170,32 +170,31 @@
     </table>
     @endif
 
-    {{-- Manhour Summary --}}
+    {{-- Manhour Summary (per cost code rows; totals below) --}}
+    @php
+        $mhRows = is_array($manhourData) ? array_values($manhourData) : [];
+        $mhTotalBudget = collect($mhRows)->sum('budget_hours');
+        $mhTotalActual = collect($mhRows)->sum('actual_hours');
+        $mhTotalCost = collect($mhRows)->sum('labor_cost');
+        $mhVariance = $mhTotalBudget - $mhTotalActual;
+    @endphp
     <div class="section-title">Manhour Summary</div>
     <div class="summary-grid">
         <div class="summary-item">
             <div class="label">Budget Hours</div>
-            <div class="value">{{ number_format($manhourData['budget_hours'], 1) }}</div>
+            <div class="value">{{ number_format($mhTotalBudget, 1) }}</div>
         </div>
         <div class="summary-item">
-            <div class="label">Regular Hours</div>
-            <div class="value">{{ number_format($manhourData['total_regular_hours'] ?? 0, 1) }}</div>
+            <div class="label">Actual Hours</div>
+            <div class="value">{{ number_format($mhTotalActual, 1) }}</div>
         </div>
         <div class="summary-item">
-            <div class="label">OT Hours</div>
-            <div class="value">{{ number_format($manhourData['total_ot_hours'] ?? 0, 1) }}</div>
+            <div class="label">Labor Cost</div>
+            <div class="value">${{ number_format($mhTotalCost, 2) }}</div>
         </div>
-        <div class="summary-item">
-            <div class="label">DT Hours</div>
-            <div class="value">{{ number_format($manhourData['total_dt_hours'] ?? 0, 1) }}</div>
-        </div>
-        <div class="summary-item">
-            <div class="label">Total Hours</div>
-            <div class="value">{{ number_format($manhourData['total_hours'], 1) }}</div>
-        </div>
-        <div class="summary-item {{ $manhourData['hours_variance'] >= 0 ? 'positive' : 'negative' }}">
+        <div class="summary-item {{ $mhVariance >= 0 ? 'positive' : 'negative' }}">
             <div class="label">Hours Variance</div>
-            <div class="value">{{ number_format($manhourData['hours_variance'], 1) }} hrs</div>
+            <div class="value">{{ number_format($mhVariance, 1) }} hrs</div>
         </div>
     </div>
 @endsection

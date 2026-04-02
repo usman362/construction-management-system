@@ -29,6 +29,7 @@
             <tr>
                 <th>Employee</th>
                 <th>Craft</th>
+                <th>Cost Code</th>
                 <th class="text-right">Regular Hrs</th>
                 <th class="text-right">OT Hrs</th>
                 <th class="text-right">DT Hrs</th>
@@ -41,6 +42,7 @@
             <tr>
                 <td><strong>{{ $data['employee_name'] }}</strong></td>
                 <td>{{ $data['craft'] }}</td>
+                <td>{{ $data['cost_code'] ?? 'N/A' }}</td>
                 <td class="text-right">{{ number_format($data['regular_hours'], 1) }}</td>
                 <td class="text-right">{{ number_format($data['ot_hours'], 1) }}</td>
                 <td class="text-right">{{ number_format($data['dt_hours'], 1) }}</td>
@@ -49,7 +51,7 @@
             </tr>
             @endforeach
             <tr class="totals-row">
-                <td colspan="2"><strong>TOTAL</strong></td>
+                <td colspan="3"><strong>TOTAL</strong></td>
                 <td class="text-right">{{ number_format(collect($manhourData)->sum('regular_hours'), 1) }}</td>
                 <td class="text-right">{{ number_format(collect($manhourData)->sum('ot_hours'), 1) }}</td>
                 <td class="text-right">{{ number_format(collect($manhourData)->sum('dt_hours'), 1) }}</td>

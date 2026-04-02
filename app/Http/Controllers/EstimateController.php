@@ -77,9 +77,12 @@ class EstimateController extends Controller
     public function show(Project $project, Estimate $estimate): View
     {
         $estimate->load('lines.costCode');
+        $costCodes = CostCode::orderBy('code')->get();
+
         return view('estimates.show', [
             'project' => $project,
             'estimate' => $estimate,
+            'costCodes' => $costCodes,
         ]);
     }
 
@@ -112,10 +115,12 @@ class EstimateController extends Controller
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'description' => 'required|string|max:255',
             'quantity' => 'required|numeric|min:0',
-            'unit_price' => 'required|numeric|min:0',
+            'unit_cost' => 'required|numeric|min:0',
+            'unit' => 'nullable|string|max:50',
+            'labor_hours' => 'nullable|numeric|min:0',
         ]);
 
-        $amount = $validated['quantity'] * $validated['unit_price'];
+        $amount = $validated['quantity'] * $validated['unit_cost'];
         $estimate->lines()->create($validated + ['amount' => $amount]);
 
         return response()->json(['message' => 'Line item added to estimate']);

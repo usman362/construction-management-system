@@ -50,6 +50,11 @@ Route::middleware('auth')->group(function () {
     Route::put('profile', [ProfileController::class, 'updateProfile'])->name('profile.update');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
+    // Settings — Admin only
+    Route::middleware('role:admin')->group(function () {
+        Route::put('settings', [ProfileController::class, 'updateSettings'])->name('settings.update');
+    });
+
     // ─── User Management — Admin only ────────────────────────────
     Route::middleware('role:admin')->group(function () {
         Route::resource('users', UserController::class)->except(['show']);
@@ -109,7 +114,7 @@ Route::middleware('auth')->group(function () {
 
         // Daily Logs — Admin, PM, Field
         Route::middleware('role:admin,project_manager,field')->group(function () {
-            Route::resource('daily-logs', DailyLogController::class)->except(['edit', 'update']);
+            Route::resource('daily-logs', DailyLogController::class);
         });
 
         // Project Reports — Admin, PM, Accountant

@@ -75,11 +75,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
-                    <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="e.g. 9.45" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="e.g. 9.45" oninput="calculateTotals()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Shipping ($)</label>
-                    <input type="number" name="shipping_amount" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <input type="number" name="shipping_amount" step="0.01" min="0" placeholder="0.00" oninput="calculateTotals()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
@@ -120,6 +120,16 @@
                                 <td colspan="4" class="px-3 py-2 text-right font-semibold text-gray-900">Subtotal:</td>
                                 <td class="px-3 py-2 text-right font-bold text-gray-900">$<span id="createSubtotal">0.00</span></td>
                                 <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" class="px-3 py-2 text-right font-semibold text-gray-900">Tax:</td>
+                                <td class="px-3 py-2 text-right font-bold text-gray-900">$<span id="createTax">0.00</span></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" class="px-3 py-2 text-right font-semibold text-gray-900 border-t border-gray-200">Grand Total:</td>
+                                <td class="px-3 py-2 text-right font-bold text-gray-900 border-t border-gray-200">$<span id="createGrandTotal">0.00</span></td>
+                                <td class="border-t border-gray-200"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -182,11 +192,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
-                    <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="e.g. 9.45" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="e.g. 9.45" oninput="calculateTotals()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Shipping ($)</label>
-                    <input type="number" name="shipping_amount" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <input type="number" name="shipping_amount" step="0.01" min="0" placeholder="0.00" oninput="calculateTotals()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
@@ -227,6 +237,16 @@
                                 <td colspan="4" class="px-3 py-2 text-right font-semibold text-gray-900">Subtotal:</td>
                                 <td class="px-3 py-2 text-right font-bold text-gray-900">$<span id="editSubtotal">0.00</span></td>
                                 <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" class="px-3 py-2 text-right font-semibold text-gray-900">Tax:</td>
+                                <td class="px-3 py-2 text-right font-bold text-gray-900">$<span id="editTax">0.00</span></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" class="px-3 py-2 text-right font-semibold text-gray-900 border-t border-gray-200">Grand Total:</td>
+                                <td class="px-3 py-2 text-right font-bold text-gray-900 border-t border-gray-200">$<span id="editGrandTotal">0.00</span></td>
+                                <td class="border-t border-gray-200"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -372,6 +392,12 @@ function calculateTotals() {
         createTotal += itemTotal;
     });
     document.getElementById('createSubtotal').textContent = createTotal.toFixed(2);
+    var createTaxRate = parseFloat(document.querySelector('#createForm [name="tax_rate"]')?.value) || 0;
+    var createShipping = parseFloat(document.querySelector('#createForm [name="shipping_amount"]')?.value) || 0;
+    var createTax = createTotal * (createTaxRate / 100);
+    var createGrandTotal = createTotal + createTax + createShipping;
+    document.getElementById('createTax').textContent = createTax.toFixed(2);
+    document.getElementById('createGrandTotal').textContent = createGrandTotal.toFixed(2);
 
     var editItems = document.querySelectorAll('#editItemsBody tr');
     var editTotal = 0;
@@ -380,6 +406,12 @@ function calculateTotals() {
         editTotal += itemTotal;
     });
     document.getElementById('editSubtotal').textContent = editTotal.toFixed(2);
+    var editTaxRate = parseFloat(document.querySelector('#editForm [name="tax_rate"]')?.value) || 0;
+    var editShipping = parseFloat(document.querySelector('#editForm [name="shipping_amount"]')?.value) || 0;
+    var editTax = editTotal * (editTaxRate / 100);
+    var editGrandTotal = editTotal + editTax + editShipping;
+    document.getElementById('editTax').textContent = editTax.toFixed(2);
+    document.getElementById('editGrandTotal').textContent = editGrandTotal.toFixed(2);
 }
 
 function submitCreateForm() {
@@ -430,6 +462,8 @@ function submitCreateForm() {
             form.reset();
             document.getElementById('createItemsBody').innerHTML = '';
             document.getElementById('createSubtotal').textContent = '0.00';
+            document.getElementById('createTax').textContent = '0.00';
+            document.getElementById('createGrandTotal').textContent = '0.00';
             Toast.fire({ icon: 'success', title: response.message || 'Purchase Order created!' });
         },
         error: function(xhr) {

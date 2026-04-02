@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -10,13 +11,17 @@ use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
-    /**
-     * Show profile settings page.
-     */
     public function index()
     {
         return view('profile.index', [
             'user' => Auth::user(),
+            'settings' => [
+                'company_name' => Setting::get('company_name', 'BuildTrack'),
+                'company_tagline' => Setting::get('company_tagline', 'Construction Mgmt'),
+                'company_logo' => Setting::get('company_logo'),
+                'favicon' => Setting::get('favicon'),
+                'primary_color' => Setting::get('primary_color', '#2563eb'),
+            ],
         ]);
     }
 
@@ -62,5 +67,54 @@ class ProfileController extends Controller
         ]);
 
         return response()->json(['message' => 'Password changed successfully']);
+    }
+
+    public function updateSettings(Request $request): JsonResponse
+    {
+        $request->validate([
+            'company_name' => 'required|string|max:255',
+            'company_tagline' => 'nullable|string|max:255',
+            'primary_color' => 'nullable|string|max:7',
+            'company_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'favicon' => 'nullable|image|mimes:png,ico,jpg,jpeg,svg|max:1024',
+            'remove_logo' => 'nullable|boolean',
+            'remove_favicon' => 'nullable|boolean',
+        ]);
+
+        Setting::set('company_name', $request->input('company_name'));
+        Setting::set('company_tagline', $request->input('company_tagline', ''));
+        Setting::set('primary_color', $request->input('primary_color', '#2563eb'));
+
+        if ($request->input('remove_logo')) {
+            $oldLogo = Setting::get('company_logo');
+            if ($oldLogo && file_exists(public_path($oldLogo))) {
+                unlink(public_path($oldLogo));
+            }
+            Setting::set('company_logo', null);
+        } elseif ($request->hasFile('company_logo')) {
+            $oldLogo = Setting::get('company_logo');
+            if ($oldLogo && file_exists(public_path($oldLogo))) {
+                unlink(public_path($oldLogo));
+            }
+            $path = $request->file('company_logo')->store('settings', 'public_uploads');
+            Setting::set('company_logo', '/uploads/' . $path);
+        }
+
+        if ($request->input('remove_favicon')) {
+            $oldFav = Setting::get('favicon');
+            if ($oldFav && file_exists(public_path($oldFav))) {
+                unlink(public_path($oldFav));
+            }
+            Setting::set('favicon', null);
+        } elseif ($request->hasFile('favicon')) {
+            $oldFav = Setting::get('favicon');
+            if ($oldFav && file_exists(public_path($oldFav))) {
+                unlink(public_path($oldFav));
+            }
+            $path = $request->file('favicon')->store('settings', 'public_uploads');
+            Setting::set('favicon', '/uploads/' . $path);
+        }
+
+        return response()->json(['message' => 'Website settings updated successfully']);
     }
 }

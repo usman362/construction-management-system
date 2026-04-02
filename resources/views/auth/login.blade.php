@@ -3,7 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - BuildTrack</title>
+    @php
+        $companyName = \App\Models\Setting::get('company_name', 'BuildTrack');
+        $companyTagline = \App\Models\Setting::get('company_tagline', 'Construction Mgmt');
+        $companyLogo = \App\Models\Setting::get('company_logo');
+        $appFavicon = \App\Models\Setting::get('favicon');
+    @endphp
+    <title>Login - {{ $companyName }}</title>
+    @if($appFavicon)
+    <link rel="icon" href="{{ $appFavicon }}" type="image/png">
+    @endif
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 min-h-screen flex items-center justify-center px-4">
@@ -11,11 +20,15 @@
     <div class="w-full max-w-md">
         <!-- Logo -->
         <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-                <span class="text-2xl font-bold text-white">BT</span>
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 overflow-hidden">
+                @if($companyLogo)
+                    <img src="{{ $companyLogo }}" class="w-full h-full object-contain p-1" alt="{{ $companyName }}">
+                @else
+                    <span class="text-2xl font-bold text-white">{{ strtoupper(substr($companyName, 0, 2)) }}</span>
+                @endif
             </div>
-            <h1 class="text-3xl font-bold text-white">BuildTrack</h1>
-            <p class="text-gray-400 mt-1">Construction Management System</p>
+            <h1 class="text-3xl font-bold text-white">{{ $companyName }}</h1>
+            <p class="text-gray-400 mt-1">{{ $companyTagline }}</p>
         </div>
 
         <!-- Login Card -->
