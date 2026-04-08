@@ -88,7 +88,8 @@ class CommitmentController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $commNumber = 'COMM-' . str_pad($project->commitments()->count() + 1, 5, '0', STR_PAD_LEFT);
+        $maxId = (int) ($project->commitments()->max('id') ?? 0);
+        $commNumber = 'COMM-' . str_pad($maxId + 1, 5, '0', STR_PAD_LEFT);
 
         $project->commitments()->create([
             ...$validated,

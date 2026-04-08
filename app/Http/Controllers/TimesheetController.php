@@ -510,13 +510,20 @@ class TimesheetController extends Controller
         $dtCost = $doubleTimeHours * ((float) $employee->hourly_rate * 2);
         $totalCost = $regularCost + $otCost + $dtCost;
 
+        // Billable amount = client-facing rate (with markup) × hours
+        // OT billed at 1.5x billable_rate, DT at 2x billable_rate
+        $bRate = (float) ($employee->billable_rate ?? $employee->hourly_rate);
+        $billableAmount = ($regularHours * $bRate)
+            + ($overtimeHours * $bRate * 1.5)
+            + ($doubleTimeHours * $bRate * 2);
+
         return [
             'total_hours' => $totalHours,
             'total_cost' => $totalCost,
             'regular_rate' => $employee->hourly_rate,
             'overtime_rate' => $employee->overtime_rate,
-            'billable_rate' => $employee->billable_rate,
-            'billable_amount' => $totalCost,
+            'billable_rate' => $bRate,
+            'billable_amount' => $billableAmount,
             'rate_type' => 'standard',
             'project_billable_rate_id' => null,
         ];

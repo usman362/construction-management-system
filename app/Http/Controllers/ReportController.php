@@ -302,8 +302,7 @@ class ReportController extends Controller
         $totalHours = $timesheets->sum('total_hours');
         $totalCost = $timesheets->sum('total_cost');
         $uniqueDays = $timesheets->pluck('date')->unique()->count();
-        $billableRate = 1.5;
-        $totalBillable = $totalCost * $billableRate;
+        $totalBillable = (float) $timesheets->sum('billable_amount');
 
         $summary = [
             'total_hours' => $totalHours,
@@ -324,7 +323,7 @@ class ReportController extends Controller
                         'detail' => ($t->project->name ?? 'N/A') . ' — ' . ($t->date?->format('M j, Y') ?? ''),
                         'hours' => $t->total_hours,
                         'labor_cost' => $t->total_cost,
-                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
                     ]);
                 }
             }
@@ -339,7 +338,7 @@ class ReportController extends Controller
                         'detail' => $empName . ' — ' . ($t->date?->format('M j, Y') ?? ''),
                         'hours' => $t->total_hours,
                         'labor_cost' => $t->total_cost,
-                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
                     ]);
                 }
             }
@@ -353,7 +352,7 @@ class ReportController extends Controller
                         'detail' => $empName . ' — ' . ($t->project->name ?? 'N/A'),
                         'hours' => $t->total_hours,
                         'labor_cost' => $t->total_cost,
-                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
                     ]);
                 }
             }
@@ -385,7 +384,11 @@ class ReportController extends Controller
         $commitments = $project->commitments()->get();
         $invoices = $project->invoices()->get();
 
-        $totalCosts = $commitments->sum('amount') + $invoices->sum('amount');
+        // Avoid double-counting: invoices are billed against commitments.
+        // Actual cost = sum of invoices + any commitments that have no invoices yet.
+        $invoicedCommitmentIds = $invoices->pluck('commitment_id')->filter()->unique();
+        $uninvoicedCommitments = $commitments->whereNotIn('id', $invoicedCommitmentIds);
+        $totalCosts = (float) $invoices->sum('amount') + (float) $uninvoicedCommitments->sum('amount');
 
         $margin = $totalRevenue - $totalCosts;
         $marginPercentage = $totalRevenue > 0 ? round(($margin / $totalRevenue) * 100, 2) : 0;
@@ -717,7 +720,9 @@ class ReportController extends Controller
         $totalRevenue = $billingInvoices->sum('total_amount');
         $commitments = $project->commitments()->get();
         $invoices = $project->invoices()->get();
-        $totalCosts = $commitments->sum('amount') + $invoices->sum('amount');
+        $invoicedCommitmentIds = $invoices->pluck('commitment_id')->filter()->unique();
+        $uninvoicedCommitments = $commitments->whereNotIn('id', $invoicedCommitmentIds);
+        $totalCosts = (float) $invoices->sum('amount') + (float) $uninvoicedCommitments->sum('amount');
         $margin = $totalRevenue - $totalCosts;
         $marginPercentage = $totalRevenue > 0 ? round(($margin / $totalRevenue) * 100, 2) : 0;
 
@@ -784,7 +789,6 @@ class ReportController extends Controller
         if ($validated['end_date'] ?? null) $query->where('date', '<=', $validated['end_date']);
 
         $timesheets = $query->get();
-        $billableRate = 1.5;
         $groupedData = collect();
 
         if ($groupBy === 'employee') {
@@ -797,7 +801,7 @@ class ReportController extends Controller
                         'detail' => ($t->project->name ?? 'N/A') . ' — ' . ($t->date?->format('M j, Y') ?? ''),
                         'hours' => $t->total_hours,
                         'labor_cost' => $t->total_cost,
-                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
                     ]);
                 }
             }
@@ -812,7 +816,7 @@ class ReportController extends Controller
                         'detail' => $empName . ' — ' . ($t->date?->format('M j, Y') ?? ''),
                         'hours' => $t->total_hours,
                         'labor_cost' => $t->total_cost,
-                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
                     ]);
                 }
             }
@@ -826,7 +830,7 @@ class ReportController extends Controller
                         'detail' => $empName . ' — ' . ($t->project->name ?? 'N/A'),
                         'hours' => $t->total_hours,
                         'labor_cost' => $t->total_cost,
-                        'billable_amount' => ($t->total_cost ?? 0) * $billableRate,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
                     ]);
                 }
             }

@@ -57,7 +57,7 @@ class InvoiceController extends Controller
                 return [
                     'id' => $inv->id,
                     'invoice_number' => $inv->invoice_number,
-                    'invoice_date' => $inv->invoice_date,
+                    'invoice_date' => $inv->invoice_date?->format('Y-m-d'),
                     'vendor' => $inv->vendor?->name ?? '—',
                     'project' => $inv->project?->name ?? '—',
                     'amount' => $inv->amount,

@@ -199,7 +199,7 @@ class CrewController extends Controller
             'employee_id' => 'required|exists:employees,id',
         ]);
 
-        $crew->members()->syncWithoutDetaching([$validated['employee_id']]);
+        $crew->employees()->syncWithoutDetaching([$validated['employee_id']]);
 
         return response()->json([
             'success' => true,
@@ -209,7 +209,7 @@ class CrewController extends Controller
 
     public function removeMember(Request $request, Crew $crew, $crewMemberId): JsonResponse
     {
-        $crew->members()->detach($crewMemberId);
+        $crew->employees()->detach($crewMemberId);
 
         return response()->json([
             'success' => true,

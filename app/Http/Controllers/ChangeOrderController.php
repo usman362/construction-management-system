@@ -69,14 +69,20 @@ class ChangeOrderController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'scope_of_work' => 'nullable|string',
+            'date' => 'nullable|date',
+            'contract_time_change_days' => 'nullable|integer',
+            'new_completion_date' => 'nullable|date',
             'amount' => 'required|numeric|min:0',
             'status' => 'required|in:pending,approved,rejected',
         ]);
 
-        $coNumber = 'CO-' . str_pad($project->changeOrders()->count() + 1, 4, '0', STR_PAD_LEFT);
+        $maxId = (int) ($project->changeOrders()->max('id') ?? 0);
+        $coNumber = 'CO-' . str_pad($maxId + 1, 4, '0', STR_PAD_LEFT);
 
         $project->changeOrders()->create([
             ...$validated,
+            'date' => $validated['date'] ?? now()->toDateString(),
             'co_number' => $coNumber,
         ]);
 
@@ -114,6 +120,10 @@ class ChangeOrderController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'scope_of_work' => 'nullable|string',
+            'date' => 'nullable|date',
+            'contract_time_change_days' => 'nullable|integer',
+            'new_completion_date' => 'nullable|date',
             'amount' => 'required|numeric|min:0',
             'status' => 'required|in:pending,approved,rejected',
         ]);
@@ -174,10 +184,15 @@ class ChangeOrderController extends Controller
 
     public function approve(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
     {
+        // Idempotency: don't double-credit project budget if already approved
+        if ($changeOrder->status === 'approved') {
+            return response()->json(['message' => 'Change order is already approved']);
+        }
+
         $changeOrder->update([
             'status' => 'approved',
             'approved_by' => auth()->id(),
-            'approved_at' => now(),
+            'approved_date' => now()->toDateString(),
         ]);
 
         $project->increment('current_budget', $changeOrder->amount);

@@ -73,7 +73,7 @@ class DailyLogController extends Controller
             'delays' => 'nullable|string',
         ]);
 
-        $project->dailyLogs()->create($validated);
+        $project->dailyLogs()->create($validated + ['created_by' => auth()->id()]);
         return response()->json(['message' => 'Daily log created successfully']);
     }
 

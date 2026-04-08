@@ -19,6 +19,8 @@ class Invoice extends Model
         'due_date',
         'paid_date',
         'status',
+        'approved_by',
+        'approved_at',
     ];
 
     protected $casts = [
@@ -26,7 +28,13 @@ class Invoice extends Model
         'invoice_date' => 'date',
         'due_date' => 'date',
         'paid_date' => 'date',
+        'approved_at' => 'datetime',
     ];
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
 
     public function commitment(): BelongsTo
     {

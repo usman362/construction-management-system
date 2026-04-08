@@ -33,8 +33,7 @@ use App\Http\Controllers\ProfileController;
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login']);
-    Route::get('register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('register', [AuthController::class, 'register']);
+    // Public self-registration is disabled — admin must create users via Users module.
 });
 
 Route::post('logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');

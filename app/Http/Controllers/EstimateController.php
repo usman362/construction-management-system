@@ -132,10 +132,12 @@ class EstimateController extends Controller
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'description' => 'required|string|max:255',
             'quantity' => 'required|numeric|min:0',
-            'unit_price' => 'required|numeric|min:0',
+            'unit_cost' => 'required|numeric|min:0',
+            'unit' => 'nullable|string|max:50',
+            'labor_hours' => 'nullable|numeric|min:0',
         ]);
 
-        $amount = $validated['quantity'] * $validated['unit_price'];
+        $amount = $validated['quantity'] * $validated['unit_cost'];
         $estimateLine->update($validated + ['amount' => $amount]);
 
         return response()->json(['message' => 'Line item updated']);
