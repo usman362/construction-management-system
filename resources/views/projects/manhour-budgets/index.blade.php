@@ -172,7 +172,7 @@ function openCreateModal() {
 }
 
 function editBudget(id, costCodeId, category, budgetHours) {
-    document.getElementById('editForm').action = '/projects/{{ $project->id }}/manhour-budgets/' + id;
+    document.getElementById('editForm').action = window.BASE_URL+'/projects/{{ $project->id }}/manhour-budgets/' + id;
     document.getElementById('edit_cost_code_id').value = costCodeId || '';
     document.getElementById('edit_category').value = category || '';
     document.getElementById('edit_budget_hours').value = budgetHours || '';

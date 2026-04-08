@@ -442,7 +442,7 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $manhourBudgets = $project->manhourBudgets()->get();
+        $manhourBudgets = $project->manhourBudgets()->with('costCode')->get();
         $timesheets = $this->getTimesheetsForPeriod($project, $validated);
 
         $productivityData = [];
@@ -452,20 +452,33 @@ class ReportController extends Controller
         $sumForecast = 0;
 
         foreach ($manhourBudgets as $budget) {
-            $budgetHours = $budget->budget_hours;
-            $earnedHours = $budgetHours;
+            $budgetHours = (float) $budget->budget_hours;
 
-            $actualHours = $timesheets
-                ->where('cost_code_id', $budget->cost_code_id)
-                ->sum('total_hours');
+            $ccTimesheets = $timesheets->where('cost_code_id', $budget->cost_code_id);
+
+            // Actual hours = regular + overtime + double time (use total_hours if set, else compute)
+            $actualHours = (float) $ccTimesheets->sum(function ($t) {
+                if ($t->total_hours !== null && $t->total_hours > 0) {
+                    return (float) $t->total_hours;
+                }
+                return (float) $t->regular_hours + (float) $t->overtime_hours + (float) $t->double_time_hours;
+            });
+
+            // Earned hours = budget hours * % complete (progress ratio)
+            // If commitments/invoices exist, use cost-based % complete; otherwise fall back to actual/budget ratio capped at 100%
+            $percentComplete = $budgetHours > 0
+                ? min(($actualHours / $budgetHours), 1)
+                : 0;
+            $earnedHours = $budgetHours * $percentComplete;
 
             $productivity = $actualHours > 0
                 ? round(($earnedHours / $actualHours) * 100, 2)
                 : 0;
 
-            $forecast = $productivity > 0
-                ? ($budgetHours / $productivity) * 100
-                : $actualHours;
+            // Forecast at completion = actual hours / % complete (if still working) or actual (if done)
+            $forecast = $percentComplete > 0 && $percentComplete < 1
+                ? round($actualHours / $percentComplete, 1)
+                : ($percentComplete >= 1 ? $actualHours : $budgetHours);
 
             $productivityData[] = [
                 'code' => $budget->costCode?->code ?? 'Unassigned',
@@ -556,9 +569,9 @@ class ReportController extends Controller
     {
         $timesheets = $this->getTimesheetsForPeriod($project, $filters);
 
-        $totalRegularHours = $timesheets->sum('regular_hours');
-        $totalOtHours = $timesheets->sum('ot_hours');
-        $totalDtHours = $timesheets->sum('dt_hours');
+        $totalRegularHours = (float) $timesheets->sum('regular_hours');
+        $totalOtHours = (float) $timesheets->sum('overtime_hours');
+        $totalDtHours = (float) $timesheets->sum('double_time_hours');
         $totalActualHours = $totalRegularHours + $totalOtHours + $totalDtHours;
 
         $budgetHours = $project->manhourBudgets()->sum('budget_hours');

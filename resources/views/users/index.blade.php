@@ -200,21 +200,21 @@ function openCreateModal() {
 }
 
 function editUser(id) {
-    $.get('/users/' + id + '/edit', function(d) {
+    $.get(window.BASE_URL+'/users/' + id + '/edit', function(d) {
         document.getElementById('edit_name').value = d.name || '';
         document.getElementById('edit_email').value = d.email || '';
         document.getElementById('edit_password').value = '';
         document.getElementById('edit_role').value = d.role || 'viewer';
         document.getElementById('edit_is_active').value = d.is_active ? '1' : '0';
         document.getElementById('editSaveBtn').onclick = function() {
-            submitForm('editForm', '/users/' + d.id, 'PUT', table, 'editModal');
+            submitForm('editForm', window.BASE_URL+'/users/' + d.id, 'PUT', table, 'editModal');
         };
         openModal('editModal');
     });
 }
 
 function deleteUser(id) {
-    confirmDelete('/users/' + id, table);
+    confirmDelete(window.BASE_URL+'/users/' + id, table);
 }
 </script>
 @endpush

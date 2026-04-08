@@ -480,7 +480,7 @@ function submitCreateForm() {
 
 function editPO(id) {
     $.ajax({
-        url: '/purchase-orders/' + id,
+        url: window.BASE_URL+'/purchase-orders/' + id,
         type: 'GET',
         dataType: 'json',
         success: function(po) {
@@ -557,7 +557,7 @@ function submitEditForm() {
     };
 
     $.ajax({
-        url: '/purchase-orders/' + poId,
+        url: window.BASE_URL+'/purchase-orders/' + poId,
         type: 'PUT',
         contentType: 'application/json',
         dataType: 'json',
@@ -582,7 +582,7 @@ function submitEditForm() {
 
 function viewPO(id) {
     $.ajax({
-        url: '/purchase-orders/' + id,
+        url: window.BASE_URL+'/purchase-orders/' + id,
         type: 'GET',
         dataType: 'json',
         success: function(po) {
@@ -643,7 +643,7 @@ function deletePO(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '/purchase-orders/' + id,
+                url: window.BASE_URL+'/purchase-orders/' + id,
                 type: 'DELETE',
                 dataType: 'json',
                 headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },

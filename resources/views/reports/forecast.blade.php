@@ -17,7 +17,7 @@
                     <h3 class="text-xs font-semibold text-gray-700 mb-4">ORIGINAL BUDGET</h3>
                     <div class="mb-4">
                         <p class="text-xs text-gray-600">ESTIMATE</p>
-                        <p class="text-2xl font-bold text-gray-800">${{ number_format($project->estimate_amount ?? 0, 2) }}</p>
+                        <p class="text-2xl font-bold text-gray-800">${{ number_format($project->estimate ?? 0, 2) }}</p>
                     </div>
                     <div class="mb-4">
                         <p class="text-xs text-gray-600">BUDGET</p>
@@ -25,13 +25,13 @@
                     </div>
                     <div class="mb-4">
                         <p class="text-xs text-gray-600">PROFIT</p>
-                        <p class="text-2xl font-bold text-green-600">${{ number_format(($project->estimate_amount ?? 0) - ($originalBudgetTotals['budget'] ?? 0), 2) }}</p>
+                        <p class="text-2xl font-bold text-green-600">${{ number_format(($project->estimate ?? 0) - ($originalBudgetTotals['budget'] ?? 0), 2) }}</p>
                     </div>
                     <div>
                         <p class="text-xs text-gray-600">PROFIT %</p>
                         @php
                             $origProfitPercent = ($originalBudgetTotals['budget'] ?? 0) > 0
-                                ? ((($project->estimate_amount ?? 0) - ($originalBudgetTotals['budget'] ?? 0)) / ($originalBudgetTotals['budget'] ?? 0)) * 100
+                                ? ((($project->estimate ?? 0) - ($originalBudgetTotals['budget'] ?? 0)) / ($originalBudgetTotals['budget'] ?? 0)) * 100
                                 : 0;
                         @endphp
                         <p class="text-2xl font-bold text-green-600">{{ number_format($origProfitPercent, 1) }}%</p>
@@ -45,13 +45,13 @@
                     </div>
                     <div class="mb-4">
                         <p class="text-xs text-gray-600">PROFIT</p>
-                        <p class="text-2xl font-bold text-green-600">${{ number_format(($project->estimate_amount ?? 0) - ($forecastTotals['budget'] ?? 0), 2) }}</p>
+                        <p class="text-2xl font-bold text-green-600">${{ number_format(($project->estimate ?? 0) - ($forecastTotals['budget'] ?? 0), 2) }}</p>
                     </div>
                     <div>
                         <p class="text-xs text-gray-600">PROFIT %</p>
                         @php
                             $forecastProfitPercent = ($forecastTotals['budget'] ?? 0) > 0
-                                ? ((($project->estimate_amount ?? 0) - ($forecastTotals['budget'] ?? 0)) / ($forecastTotals['budget'] ?? 0)) * 100
+                                ? ((($project->estimate ?? 0) - ($forecastTotals['budget'] ?? 0)) / ($forecastTotals['budget'] ?? 0)) * 100
                                 : 0;
                         @endphp
                         <p class="text-2xl font-bold text-green-600">{{ number_format($forecastProfitPercent, 1) }}%</p>

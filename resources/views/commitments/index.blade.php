@@ -206,11 +206,11 @@ function openCreateModal() {
 }
 
 function deleteCommitment(id) {
-    confirmDelete('/projects/{{ $project->id }}/commitments/' + id, table);
+    confirmDelete(window.BASE_URL+'/projects/{{ $project->id }}/commitments/' + id, table);
 }
 
 function editCommitment(id) {
-    $.get('/projects/{{ $project->id }}/commitments/' + id + '/edit', function(d) {
+    $.get(window.BASE_URL+'/projects/{{ $project->id }}/commitments/' + id + '/edit', function(d) {
         document.getElementById('edit_id').value = d.id;
         document.getElementById('edit_vendor_id').value = d.vendor_id || '';
         document.getElementById('edit_description').value = d.description || '';
@@ -220,14 +220,14 @@ function editCommitment(id) {
         document.getElementById('edit_po_number').value = d.po_number || '';
         document.getElementById('edit_notes').value = d.notes || '';
         document.getElementById('editSaveBtn').onclick = function() {
-            submitForm('editForm', '/projects/{{ $project->id }}/commitments/' + d.id, 'PUT', table, 'editModal');
+            submitForm('editForm', window.BASE_URL+'/projects/{{ $project->id }}/commitments/' + d.id, 'PUT', table, 'editModal');
         };
         openModal('editModal');
     });
 }
 
 function viewCommitment(id) {
-    window.location.href = '/projects/{{ $project->id }}/commitments/' + id;
+    window.location.href = window.BASE_URL+'/projects/{{ $project->id }}/commitments/' + id;
 }
 </script>
 @endpush

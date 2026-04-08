@@ -1,6 +1,6 @@
 <script>
 function editTimesheet(id, dt) {
-    $.get('/timesheets/' + id + '/edit', function(d) {
+    $.get(window.BASE_URL+'/timesheets/' + id + '/edit', function(d) {
         var f = document.getElementById('editForm');
         function setSelect(name, val) {
             var el = f.querySelector('[name="' + name + '"]');
@@ -18,7 +18,7 @@ function editTimesheet(id, dt) {
         f.querySelector('[name="double_time_hours"]').value = d.double_time_hours ?? '';
         f.querySelector('[name="is_billable"]').checked = parseFloat(d.billable_amount || 0) > 0;
         document.getElementById('editSaveBtn').onclick = function() {
-            submitForm('editForm', '/timesheets/' + d.id, 'PUT', dt, 'editModal');
+            submitForm('editForm', window.BASE_URL+'/timesheets/' + d.id, 'PUT', dt, 'editModal');
         };
         openModal('editModal');
     });

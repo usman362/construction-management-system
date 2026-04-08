@@ -183,11 +183,11 @@ $(document).ready(function() {
 });
 
 function deleteDailyLog(id) {
-    confirmDelete('/projects/{{ $project->id }}/daily-logs/' + id, dailyLogsTable);
+    confirmDelete(window.BASE_URL+'/projects/{{ $project->id }}/daily-logs/' + id, dailyLogsTable);
 }
 
 function editDailyLog(id) {
-    $.get('/projects/{{ $project->id }}/daily-logs/' + id + '/edit', function(d) {
+    $.get(window.BASE_URL+'/projects/{{ $project->id }}/daily-logs/' + id + '/edit', function(d) {
         document.getElementById('edit_date').value = d.date ? String(d.date).substring(0, 10) : '';
         document.getElementById('edit_weather').value = d.weather || '';
         document.getElementById('edit_temperature').value = d.temperature || '';
@@ -197,14 +197,14 @@ function editDailyLog(id) {
         document.getElementById('edit_delays').value = d.delays || '';
 
         document.getElementById('editSubmitBtn').onclick = function() {
-            submitForm('editForm', '/projects/{{ $project->id }}/daily-logs/' + id, 'PUT', dailyLogsTable, 'editModal');
+            submitForm('editForm', window.BASE_URL+'/projects/{{ $project->id }}/daily-logs/' + id, 'PUT', dailyLogsTable, 'editModal');
         };
         openModal('editModal');
     });
 }
 
 function viewDailyLog(id) {
-    window.location.href = '/projects/{{ $project->id }}/daily-logs/' + id;
+    window.location.href = window.BASE_URL+'/projects/{{ $project->id }}/daily-logs/' + id;
 }
 </script>
 @endpush

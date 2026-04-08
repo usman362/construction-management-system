@@ -15,6 +15,9 @@ class DailyLog extends Model
         'weather',
         'temperature',
         'notes',
+        'visitors',
+        'safety_issues',
+        'delays',
         'created_by',
     ];
 

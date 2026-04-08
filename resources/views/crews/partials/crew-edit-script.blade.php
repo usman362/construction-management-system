@@ -1,6 +1,6 @@
 <script>
 function editCrew(id, dt) {
-    $.get('/crews/' + id + '/edit', function(resp) {
+    $.get(window.BASE_URL+'/crews/' + id + '/edit', function(resp) {
         var d = resp.crew;
         if (!d) return;
         var f = document.getElementById('editForm');
@@ -10,7 +10,7 @@ function editCrew(id, dt) {
         f.querySelector('[name="foreman_id"]').value = d.foreman_id != null ? String(d.foreman_id) : '';
         f.querySelector('[name="shift_id"]').value = d.shift_id != null ? String(d.shift_id) : '';
         document.getElementById('editSaveBtn').onclick = function() {
-            submitForm('editForm', '/crews/' + d.id, 'PUT', dt, 'editModal');
+            submitForm('editForm', window.BASE_URL+'/crews/' + d.id, 'PUT', dt, 'editModal');
         };
         openModal('editModal');
     });

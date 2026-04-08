@@ -179,7 +179,7 @@
     function goToChangeOrders() {
         var projectId = document.getElementById('coProjectSelect').value;
         if (!projectId) { alert('Please select a project first.'); return; }
-        window.location.href = '/projects/' + projectId + '/change-orders';
+        window.location.href = window.BASE_URL+'/projects/' + projectId + '/change-orders';
     }
     </script>
 @endsection

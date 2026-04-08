@@ -432,7 +432,7 @@
 @push('scripts')
 <script>
 function editProject() {
-    $.get('/projects/{{ $project->id }}/edit', function(d) {
+    $.get(window.BASE_URL+'/projects/{{ $project->id }}/edit', function(d) {
         var p = d.project || d;
         var f = document.getElementById('editForm');
         f.querySelector('[name="project_number"]').value = p.project_number || '';
@@ -455,7 +455,7 @@ function editProject() {
         document.getElementById('editClientId').innerHTML = opts;
 
         document.getElementById('editSaveBtn').onclick = function() {
-            submitForm('editForm', '/projects/{{ $project->id }}', 'PUT', null, 'editModal');
+            submitForm('editForm', window.BASE_URL+'/projects/{{ $project->id }}', 'PUT', null, 'editModal');
         };
         openModal('editModal');
     });

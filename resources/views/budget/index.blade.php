@@ -199,7 +199,7 @@
     // Edit budget line
     function editBudgetLine(id) {
         currentBudgetId = id;
-        $.get(`/projects/${projectId}/budget/${id}/edit`, function(data) {
+        $.get(`${window.BASE_URL}/projects/${projectId}/budget/${id}/edit`, function(data) {
             $('#edit_cost_code_id').val(data.cost_code_id || '');
             $('#edit_description').val(data.description || '');
             $('#edit_budget_amount').val(data.budget_amount || '');
@@ -210,7 +210,7 @@
 
     // View budget line
     function viewBudgetLine(id) {
-        $.get(`/projects/${projectId}/budget/${id}/edit`, function(data) {
+        $.get(`${window.BASE_URL}/projects/${projectId}/budget/${id}/edit`, function(data) {
             $('#view_cost_code').text(data.cost_code?.code || '—');
             $('#view_description').text(data.description || '—');
             $('#view_original_amount').text('$' + parseFloat(data.budget_amount || 0).toFixed(2));
@@ -221,7 +221,7 @@
 
     // Delete budget line
     function deleteBudgetLine(id) {
-        confirmDelete(`/projects/${projectId}/budget/${id}`, table);
+        confirmDelete(`${window.BASE_URL}/projects/${projectId}/budget/${id}`, table);
     }
 
     // Form submission
@@ -232,7 +232,7 @@
 
     $('#editForm').on('submit', function(e) {
         e.preventDefault();
-        submitForm('editForm', `/projects/${projectId}/budget/${currentBudgetId}`, 'PUT', table, 'editModal');
+        submitForm('editForm', `${window.BASE_URL}/projects/${projectId}/budget/${currentBudgetId}`, 'PUT', table, 'editModal');
     });
 
     // Initialize DataTable

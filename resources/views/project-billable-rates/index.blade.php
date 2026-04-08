@@ -354,7 +354,7 @@
 
     // Load craft and employee options for create modal
     function loadCreateSelectOptions() {
-        $.get('/crafts', function(data) {
+        $.get(window.BASE_URL+'/crafts', function(data) {
             let options = '<option value="">Select Craft (Optional)</option>';
             data.forEach(function(craft) {
                 options += `<option value="${craft.id}">${craft.name}</option>`;
@@ -362,7 +362,7 @@
             $('#create_craft_id').html(options);
         });
 
-        $.get('/employees', function(data) {
+        $.get(window.BASE_URL+'/employees', function(data) {
             let options = '<option value="">Select Employee (Optional)</option>';
             data.forEach(function(employee) {
                 options += `<option value="${employee.id}">${employee.first_name} ${employee.last_name}</option>`;
@@ -373,7 +373,7 @@
 
     // Load craft and employee options for edit modal
     function loadEditSelectOptions() {
-        $.get('/crafts', function(data) {
+        $.get(window.BASE_URL+'/crafts', function(data) {
             let options = '<option value="">Select Craft (Optional)</option>';
             data.forEach(function(craft) {
                 options += `<option value="${craft.id}">${craft.name}</option>`;
@@ -381,7 +381,7 @@
             $('#edit_craft_id').html(options);
         });
 
-        $.get('/employees', function(data) {
+        $.get(window.BASE_URL+'/employees', function(data) {
             let options = '<option value="">Select Employee (Optional)</option>';
             data.forEach(function(employee) {
                 options += `<option value="${employee.id}">${employee.first_name} ${employee.last_name}</option>`;
@@ -451,7 +451,7 @@
     // Edit rate
     function editRate(id) {
         currentRateId = id;
-        $.get(`/projects/${projectId}/billable-rates/${id}/edit`, function(data) {
+        $.get(window.BASE_URL+`/projects/${projectId}/billable-rates/${id}/edit`, function(data) {
             loadEditSelectOptions();
 
             $('#edit_craft_id').val(data.craft_id || '');
@@ -473,7 +473,7 @@
 
     // View rate
     function viewRate(id) {
-        $.get(`/projects/${projectId}/billable-rates/${id}/edit`, function(data) {
+        $.get(window.BASE_URL+`/projects/${projectId}/billable-rates/${id}/edit`, function(data) {
             const craftName = data.craft ? data.craft.name : '—';
             const employeeName = data.employee ? `${data.employee.first_name} ${data.employee.last_name}` : '—';
             const markupPercent = ((parseFloat(data.payroll_tax_rate || 0) +
@@ -499,7 +499,7 @@
 
     // Delete rate
     function deleteRate(id) {
-        confirmDelete(`/projects/${projectId}/billable-rates/${id}`, table);
+        confirmDelete(window.BASE_URL+`/projects/${projectId}/billable-rates/${id}`, table);
     }
 
     // Form submission
@@ -510,7 +510,7 @@
 
     $('#editForm').on('submit', function(e) {
         e.preventDefault();
-        submitForm('editForm', `/projects/${projectId}/billable-rates/${currentRateId}`, 'PUT', table, 'editModal');
+        submitForm('editForm', window.BASE_URL+`/projects/${projectId}/billable-rates/${currentRateId}`, 'PUT', table, 'editModal');
     });
 
     // Initialize DataTable
