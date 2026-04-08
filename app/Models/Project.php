@@ -160,4 +160,35 @@ class Project extends Model
         }
         return (($this->estimate - $this->current_budget) / $this->estimate) * 100;
     }
+
+    /**
+     * % of current budget that is already committed (PO / subcontracts).
+     */
+    public function getCommittedPercentageAttribute(): float
+    {
+        $budget = (float) ($this->current_budget ?? 0);
+        if ($budget <= 0) {
+            return 0;
+        }
+        $committed = (float) $this->commitments()->sum('amount');
+        return round(($committed / $budget) * 100, 1);
+    }
+
+    /**
+     * Profit margin % = (estimate - committed cost) / estimate * 100.
+     * Uses commitments + invoices (avoiding double-count) as actual cost.
+     */
+    public function getProfitMarginAttribute(): float
+    {
+        $estimate = (float) ($this->estimate ?? 0);
+        if ($estimate <= 0) {
+            return 0;
+        }
+        $invoices = $this->invoices()->get();
+        $commitments = $this->commitments()->get();
+        $invoicedCommitmentIds = $invoices->pluck('commitment_id')->filter()->unique();
+        $uninvoicedCommitments = $commitments->whereNotIn('id', $invoicedCommitmentIds);
+        $totalCost = (float) $invoices->sum('amount') + (float) $uninvoicedCommitments->sum('amount');
+        return round((($estimate - $totalCost) / $estimate) * 100, 1);
+    }
 }
