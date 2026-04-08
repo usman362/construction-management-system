@@ -377,10 +377,10 @@ class ReportController extends Controller
         ]);
 
         $billingInvoices = BillingInvoice::where('project_id', $project->id)
-            ->where('status', 'paid')
+            ->whereIn('status', ['sent', 'paid', 'partial'])
             ->get();
 
-        $totalRevenue = $billingInvoices->sum('total_amount');
+        $totalRevenue = (float) $billingInvoices->sum('total_amount');
 
         $commitments = $project->commitments()->get();
         $invoices = $project->invoices()->get();
@@ -445,16 +445,25 @@ class ReportController extends Controller
         $manhourBudgets = $project->manhourBudgets()->with('costCode')->get();
         $timesheets = $this->getTimesheetsForPeriod($project, $validated);
 
+        // Build merged list of cost codes: from manhour budgets + any cost codes that appear in timesheets
+        $budgetByCc = $manhourBudgets->keyBy('cost_code_id');
+        $tsCcIds = $timesheets->pluck('cost_code_id')->unique();
+        $allCcIds = $budgetByCc->keys()->merge($tsCcIds)->unique()->values();
+
         $productivityData = [];
         $sumBudgetHours = 0;
         $sumActualHours = 0;
         $sumEarnedHours = 0;
         $sumForecast = 0;
 
-        foreach ($manhourBudgets as $budget) {
-            $budgetHours = (float) $budget->budget_hours;
+        foreach ($allCcIds as $ccId) {
+            $budget = $budgetByCc->get($ccId);
+            $budgetHours = $budget ? (float) $budget->budget_hours : 0;
+            $costCodeLabel = $budget?->costCode?->code
+                ?? optional($timesheets->firstWhere('cost_code_id', $ccId))->costCode?->code
+                ?? 'Unassigned';
 
-            $ccTimesheets = $timesheets->where('cost_code_id', $budget->cost_code_id);
+            $ccTimesheets = $timesheets->where('cost_code_id', $ccId);
 
             // Actual hours = regular + overtime + double time (use total_hours if set, else compute)
             $actualHours = (float) $ccTimesheets->sum(function ($t) {
@@ -481,7 +490,7 @@ class ReportController extends Controller
                 : ($percentComplete >= 1 ? $actualHours : $budgetHours);
 
             $productivityData[] = [
-                'code' => $budget->costCode?->code ?? 'Unassigned',
+                'code' => $costCodeLabel,
                 'budget_hours' => $budgetHours,
                 'actual_hours' => $actualHours,
                 'earned_hours' => $earnedHours,

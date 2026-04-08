@@ -219,14 +219,19 @@
                     </thead>
                     <tbody>
                         @php
-                            $summaryData = $grandTotals ?? [];
-                            $earned = $summaryData['earned'] ?? 0;
-                            $productivity = $summaryData['productivity'] ?? 0;
-                            $forecast = $summaryData['forecast'] ?? 0;
-                            $variance = $forecast - $earned;
+                            $sumActual = 0; $sumBudget = 0; $sumEarned = 0;
+                            foreach (($manhourData ?? []) as $mh) {
+                                $sumActual += $mh['actual_hours'] ?? 0;
+                                $sumBudget += $mh['budget_hours'] ?? 0;
+                                $sumEarned += $mh['earned_hours'] ?? (($mh['budget_hours'] ?? 0) * (($mh['percent_complete'] ?? 0) / 100));
+                            }
+                            $earned = $sumEarned;
+                            $productivity = $sumActual > 0 ? ($sumEarned / $sumActual) * 100 : 0;
+                            $forecast = $productivity > 0 ? ($sumBudget / ($productivity / 100)) : $sumBudget;
+                            $variance = $sumBudget - $forecast;
                         @endphp
                         <tr class="bg-gray-50 border border-gray-300">
-                            <td class="border border-gray-300 px-4 py-2">{{ number_format($summaryData['total_hours'] ?? 0, 1) }}</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ number_format($sumActual, 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($earned, 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($productivity, 1) }}%</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($forecast, 1) }}</td>

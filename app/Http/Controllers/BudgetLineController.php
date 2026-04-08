@@ -16,7 +16,8 @@ class BudgetLineController extends Controller
         if ($request->ajax()) {
             return $this->dataTable($project, $request);
         }
-        return view('budget.index', ['project' => $project]);
+        $costCodes = CostCode::orderBy('code')->get(['id', 'code', 'name']);
+        return view('budget.index', ['project' => $project, 'costCodes' => $costCodes]);
     }
 
     private function dataTable(Project $project, Request $request): JsonResponse

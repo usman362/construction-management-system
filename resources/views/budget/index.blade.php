@@ -47,6 +47,9 @@
                 <label for="create_cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Code</label>
                 <select name="cost_code_id" id="create_cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
                     <option value="">Select Cost Code</option>
+                    @foreach($costCodes as $cc)
+                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                    @endforeach
                 </select>
             </div>
 
@@ -85,6 +88,9 @@
                 <label for="edit_cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Code</label>
                 <select name="cost_code_id" id="edit_cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
                     <option value="">Select Cost Code</option>
+                    @foreach($costCodes as $cc)
+                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                    @endforeach
                 </select>
             </div>
 
