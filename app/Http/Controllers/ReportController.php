@@ -67,12 +67,20 @@ class ReportController extends Controller
 
         $manhourData = $this->getManHourData($project, $validated);
 
+        // Composite (blended) labor rate = total labor cost / total actual hours.
+        $totalLaborCost = array_sum(array_column($manhourData, 'labor_cost'));
+        $totalLaborHours = array_sum(array_column($manhourData, 'actual_hours'));
+        $compositeRate = $totalLaborHours > 0 ? round($totalLaborCost / $totalLaborHours, 2) : 0;
+
         return view('reports.cost-report', [
             'project' => $project,
             'costData' => collect($costCodeData)->values(),
             'costCodeData' => $costCodeData,
             'changeOrders' => $changeOrders,
             'manhourData' => $manhourData,
+            'compositeRate' => $compositeRate,
+            'totalLaborCost' => $totalLaborCost,
+            'totalLaborHours' => $totalLaborHours,
             'export' => $request->get('export'),
         ]);
     }
@@ -542,6 +550,11 @@ class ReportController extends Controller
 
         $manhourBudgets = $project->manhourBudgets()->with('costCode')->get();
 
+        // Build cost-based % complete by cost code (committed / budgeted dollars).
+        $budgetLines = $project->budgetLines()->get()->groupBy('cost_code_id');
+        $commitments = $project->commitments()->get()->groupBy('cost_code_id');
+        $invoices = $project->invoices()->get()->groupBy('cost_code_id');
+
         $keys = $manhourBudgets->map(fn ($b) => $normalizeCcKey($b->cost_code_id))
             ->merge($timesheets->map(fn ($t) => $normalizeCcKey($t->cost_code_id)))
             ->unique()
@@ -560,6 +573,21 @@ class ReportController extends Controller
                 ->where('cost_code_id', $ccId)
                 ->sum('budget_hours');
 
+            // % complete: prefer cost-based (committed/budget $$). Fall back to actual/budget hours.
+            $budgetDollars = (float) ($budgetLines->get($ccId)?->sum('amount') ?? 0);
+            $committedDollars = (float) ($commitments->get($ccId)?->sum('amount') ?? 0)
+                + (float) ($invoices->get($ccId)?->sum('amount') ?? 0);
+
+            if ($budgetDollars > 0) {
+                $percentComplete = min($committedDollars / $budgetDollars, 1);
+            } elseif ($budgetHours > 0) {
+                $percentComplete = min($actualHours / $budgetHours, 1);
+            } else {
+                $percentComplete = 0;
+            }
+
+            $earnedHours = $budgetHours * $percentComplete;
+
             $budget = $manhourBudgets->firstWhere('cost_code_id', $ccId);
             $firstTs = $group->first();
             $label = $budget?->costCode?->name
@@ -570,6 +598,8 @@ class ReportController extends Controller
                 'date' => $label,
                 'actual_hours' => $actualHours,
                 'budget_hours' => $budgetHours,
+                'earned_hours' => $earnedHours,
+                'percent_complete' => round($percentComplete * 100, 1),
                 'labor_cost' => $laborCost,
             ];
         }
@@ -653,7 +683,11 @@ class ReportController extends Controller
         $changeOrders = $project->changeOrders()->where('status', 'approved')->get();
         $manhourData = $this->getManHourData($project, $validated);
 
-        $pdf = Pdf::loadView('pdf.cost-report', compact('project', 'costCodeData', 'changeOrders', 'manhourData'));
+        $totalLaborCost = array_sum(array_column($manhourData, 'labor_cost'));
+        $totalLaborHours = array_sum(array_column($manhourData, 'actual_hours'));
+        $compositeRate = $totalLaborHours > 0 ? round($totalLaborCost / $totalLaborHours, 2) : 0;
+
+        $pdf = Pdf::loadView('pdf.cost-report', compact('project', 'costCodeData', 'changeOrders', 'manhourData', 'compositeRate', 'totalLaborCost', 'totalLaborHours'));
         $pdf->setPaper('a4', 'landscape');
 
         return $pdf->download("cost-report-{$project->project_number}.pdf");

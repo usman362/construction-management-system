@@ -242,6 +242,30 @@
             </div>
         </div>
 
+        <!-- Composite Labor Rate Section -->
+        <div class="mb-10">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 bg-blue-100 p-3 rounded">COMPOSITE LABOR RATE</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-blue-100 border border-gray-300">
+                            <th class="border border-gray-300 px-4 py-2 text-right font-bold">Total Labor Cost</th>
+                            <th class="border border-gray-300 px-4 py-2 text-right font-bold">Total Manhours</th>
+                            <th class="border border-gray-300 px-4 py-2 text-right font-bold">Composite Rate ($/hr)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="bg-gray-50 border border-gray-300">
+                            <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($totalLaborCost ?? 0, 2) }}</td>
+                            <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($totalLaborHours ?? 0, 1) }}</td>
+                            <td class="border border-gray-300 px-4 py-2 text-right font-bold text-blue-700">${{ number_format($compositeRate ?? 0, 2) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-500 mt-2">Blended hourly cost across all crafts and cost codes (Total Labor Cost ÷ Total Manhours).</p>
+            </div>
+        </div>
+
         <!-- Actions -->
         <div class="mt-8 flex gap-4">
             <a href="{{ route('projects.reports.cost-report', $project) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">
