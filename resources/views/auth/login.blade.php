@@ -83,13 +83,6 @@
                 </button>
             </form>
 
-            <!-- Register Link -->
-            <div class="mt-6 text-center">
-                <p class="text-gray-400 text-sm">
-                    Don't have an account?
-                    <a href="{{ route('register') }}" class="text-blue-400 hover:text-blue-300 font-medium">Create one</a>
-                </p>
-            </div>
         </div>
 
         <!-- Default Credentials Hint -->
