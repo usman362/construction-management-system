@@ -152,6 +152,9 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('role:admin,project_manager')->group(function () {
+        // Import routes registered BEFORE resource routes.
+        Route::get('crafts/import/template', [ImportController::class, 'craftTemplate'])->name('crafts.import.template');
+        Route::post('crafts/import', [ImportController::class, 'craftImport'])->name('crafts.import');
         Route::resource('crafts', CraftController::class);
         Route::resource('shifts', ShiftController::class);
     });
@@ -186,6 +189,9 @@ Route::middleware('auth')->group(function () {
     // ─── Costing ─────────────────────────────────────────────────
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
         Route::resource('cost-codes', CostCodeController::class);
+        // Client import routes registered BEFORE resource so they don't collide with {client}.
+        Route::get('clients/import/template', [ImportController::class, 'clientTemplate'])->name('clients.import.template');
+        Route::post('clients/import', [ImportController::class, 'clientImport'])->name('clients.import');
         Route::resource('clients', ClientController::class);
     });
 
@@ -202,6 +208,9 @@ Route::middleware('auth')->group(function () {
 
     // Vendors — Admin, PM, Accountant
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
+        // Import routes registered BEFORE resource so they don't collide with {vendor}.
+        Route::get('vendors/import/template', [ImportController::class, 'vendorTemplate'])->name('vendors.import.template');
+        Route::post('vendors/import', [ImportController::class, 'vendorImport'])->name('vendors.import');
         Route::resource('vendors', VendorController::class);
     });
 

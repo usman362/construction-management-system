@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\CostCode;
 use App\Models\Craft;
 use App\Models\Employee;
@@ -9,6 +10,7 @@ use App\Models\Estimate;
 use App\Models\EstimateLine;
 use App\Models\Project;
 use App\Models\ProjectBillableRate;
+use App\Models\Vendor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -163,6 +165,79 @@ class ImportController extends Controller
             'term_reason'         => $this->blankToNull($data['term_reason'] ?? null),
             'status'              => $this->blankToNull($data['status'] ?? null) ?? 'active',
         ];
+    }
+
+    // ─── Crafts ───────────────────────────────────────────────────────────
+
+    private const CRAFT_COLUMNS = [
+        'code', 'name', 'description',
+        'base_hourly_rate', 'overtime_multiplier', 'billable_rate',
+        'is_active',
+    ];
+
+    public function craftTemplate(): StreamedResponse
+    {
+        return $this->streamCsv(
+            'crafts_import_template.csv',
+            self::CRAFT_COLUMNS,
+            [
+                ['CRANE-OP', 'Crane Operator', 'Licensed crane operator', '32.50', '1.5', '78.00', 'yes'],
+                ['LAB-01',   'General Laborer', '',                        '22.00', '1.5', '55.00', 'yes'],
+                ['IRON-01',  'Ironworker',      'Structural steel',        '36.00', '1.5', '85.00', 'yes'],
+            ]
+        );
+    }
+
+    public function craftImport(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+
+        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        if (empty($rows)) {
+            return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
+        }
+
+        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+
+        DB::transaction(function () use ($rows, $header, &$result) {
+            foreach ($rows as $rowIndex => $row) {
+                $rowNumber = $rowIndex + 2;
+                $data = $this->combineRow($header, $row);
+
+                if (empty($data['code']) || empty($data['name'])) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing required code or name.'];
+                    continue;
+                }
+
+                try {
+                    $payload = [
+                        'name'                => $data['name'],
+                        'description'         => $this->blankToNull($data['description'] ?? null),
+                        'base_hourly_rate'    => $this->toDecimal($data['base_hourly_rate'] ?? 0),
+                        'overtime_multiplier' => $this->toDecimal($data['overtime_multiplier'] ?? 1.5),
+                        'billable_rate'       => $this->toDecimal($data['billable_rate'] ?? 0),
+                        'is_active'           => $this->truthy($data['is_active'] ?? true),
+                    ];
+
+                    $existing = Craft::where('code', $data['code'])->first();
+                    if ($existing) {
+                        $existing->update($payload);
+                        $result['updated']++;
+                    } else {
+                        Craft::create($payload + ['code' => $data['code']]);
+                        $result['created']++;
+                    }
+                } catch (\Throwable $e) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => $e->getMessage()];
+                }
+            }
+        });
+
+        return back()->with('import_result', $result);
     }
 
     // ─── Project Billable Rates (Billable Crafts) ─────────────────────────
@@ -322,6 +397,190 @@ class ImportController extends Controller
                         'labor_hours' => $this->toDecimal($data['labor_hours'] ?? 0),
                     ]);
                     $result['created']++;
+                } catch (\Throwable $e) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => $e->getMessage()];
+                }
+            }
+        });
+
+        return back()->with('import_result', $result);
+    }
+
+    // ─── Vendors ──────────────────────────────────────────────────────────
+
+    private const VENDOR_COLUMNS = [
+        'vendor_code', 'name', 'contact_name', 'email', 'phone',
+        'address', 'city', 'state', 'zip',
+        'type', 'specialty', 'is_preferred', 'is_active',
+    ];
+
+    public function vendorTemplate(): StreamedResponse
+    {
+        return $this->streamCsv(
+            'vendors_import_template.csv',
+            self::VENDOR_COLUMNS,
+            [
+                ['V-1001', 'Acme Steel Supply', 'John Smith', 'john@acmesteel.com', '(251) 555-0101',
+                 '100 Industrial Blvd', 'Mobile', 'AL', '36602',
+                 'supplier', 'Structural steel', 'yes', 'yes'],
+                ['V-1002', 'Gulf Coast Concrete', 'Mary Johnson', 'mary@gccconcrete.com', '(251) 555-0202',
+                 '250 Port Rd', 'Mobile', 'AL', '36603',
+                 'supplier', 'Ready-mix concrete', 'no', 'yes'],
+                ['V-2001', 'Delta Electrical Subs', 'Bob Wilson', 'bob@deltaelec.com', '(504) 555-0303',
+                 '789 Canal St', 'New Orleans', 'LA', '70130',
+                 'subcontractor', 'Electrical', 'yes', 'yes'],
+            ]
+        );
+    }
+
+    public function vendorImport(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+
+        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        if (empty($rows)) {
+            return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
+        }
+
+        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $allowedTypes = ['subcontractor', 'supplier', 'rental', 'other'];
+
+        DB::transaction(function () use ($rows, $header, $allowedTypes, &$result) {
+            foreach ($rows as $rowIndex => $row) {
+                $rowNumber = $rowIndex + 2;
+                $data = $this->combineRow($header, $row);
+
+                if (empty($data['name'])) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing required name.'];
+                    continue;
+                }
+
+                try {
+                    $type = strtolower(trim($data['type'] ?? 'supplier'));
+                    if (!in_array($type, $allowedTypes, true)) {
+                        $type = 'supplier';
+                    }
+
+                    $payload = [
+                        'vendor_code'  => $this->blankToNull($data['vendor_code'] ?? null),
+                        'name'         => $data['name'],
+                        'contact_name' => $this->blankToNull($data['contact_name'] ?? null),
+                        'email'        => $this->blankToNull($data['email'] ?? null),
+                        'phone'        => $this->blankToNull($data['phone'] ?? null),
+                        'address'      => $this->blankToNull($data['address'] ?? null),
+                        'city'         => $this->blankToNull($data['city'] ?? null),
+                        'state'        => $this->blankToNull($data['state'] ?? null),
+                        'zip'          => $this->blankToNull($data['zip'] ?? null),
+                        'type'         => $type,
+                        'specialty'    => $this->blankToNull($data['specialty'] ?? null),
+                        'is_preferred' => $this->truthy($data['is_preferred'] ?? false),
+                        'is_active'    => $this->truthy($data['is_active'] ?? true),
+                    ];
+
+                    // Match on vendor_code first (legacy identifier), fall back to exact name match.
+                    $existing = null;
+                    if (!empty($payload['vendor_code'])) {
+                        $existing = Vendor::where('vendor_code', $payload['vendor_code'])->first();
+                    }
+                    if (!$existing) {
+                        $existing = Vendor::where('name', $payload['name'])->first();
+                    }
+
+                    if ($existing) {
+                        $existing->update($payload);
+                        $result['updated']++;
+                    } else {
+                        Vendor::create($payload);
+                        $result['created']++;
+                    }
+                } catch (\Throwable $e) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => $e->getMessage()];
+                }
+            }
+        });
+
+        return back()->with('import_result', $result);
+    }
+
+    // ─── Clients ──────────────────────────────────────────────────────────
+
+    private const CLIENT_COLUMNS = [
+        'vendor_code', 'name', 'contact_name', 'email', 'phone',
+        'address', 'city', 'state', 'zip',
+    ];
+
+    public function clientTemplate(): StreamedResponse
+    {
+        return $this->streamCsv(
+            'clients_import_template.csv',
+            self::CLIENT_COLUMNS,
+            [
+                ['C-1001', 'Port Authority of Mobile', 'Sarah Lee', 'sarah.lee@portmobile.gov', '(251) 555-0401',
+                 '250 Water St', 'Mobile', 'AL', '36602'],
+                ['C-1002', 'Bengal Refining LLC', 'Mike Davis', 'mdavis@bengalref.com', '(225) 555-0502',
+                 '500 River Rd', 'Baton Rouge', 'LA', '70802'],
+            ]
+        );
+    }
+
+    public function clientImport(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+
+        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        if (empty($rows)) {
+            return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
+        }
+
+        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+
+        DB::transaction(function () use ($rows, $header, &$result) {
+            foreach ($rows as $rowIndex => $row) {
+                $rowNumber = $rowIndex + 2;
+                $data = $this->combineRow($header, $row);
+
+                if (empty($data['name'])) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing required name.'];
+                    continue;
+                }
+
+                try {
+                    $payload = [
+                        'vendor_code'  => $this->blankToNull($data['vendor_code'] ?? null),
+                        'name'         => $data['name'],
+                        'contact_name' => $this->blankToNull($data['contact_name'] ?? null),
+                        'email'        => $this->blankToNull($data['email'] ?? null),
+                        'phone'        => $this->blankToNull($data['phone'] ?? null),
+                        'address'      => $this->blankToNull($data['address'] ?? null),
+                        'city'         => $this->blankToNull($data['city'] ?? null),
+                        'state'        => $this->blankToNull($data['state'] ?? null),
+                        'zip'          => $this->blankToNull($data['zip'] ?? null),
+                    ];
+
+                    // Match on vendor_code first (legacy identifier), fall back to exact name match.
+                    $existing = null;
+                    if (!empty($payload['vendor_code'])) {
+                        $existing = Client::where('vendor_code', $payload['vendor_code'])->first();
+                    }
+                    if (!$existing) {
+                        $existing = Client::where('name', $payload['name'])->first();
+                    }
+
+                    if ($existing) {
+                        $existing->update($payload);
+                        $result['updated']++;
+                    } else {
+                        Client::create($payload);
+                        $result['created']++;
+                    }
                 } catch (\Throwable $e) {
                     $result['skipped']++;
                     $result['errors'][] = ['row' => $rowNumber, 'message' => $e->getMessage()];
