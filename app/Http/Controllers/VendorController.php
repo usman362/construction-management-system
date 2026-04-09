@@ -32,6 +32,7 @@ class VendorController extends Controller
         if ($search = $request->input('search.value')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('vendor_code', 'like', "%{$search}%")
                   ->orWhere('contact_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('type', 'like', "%{$search}%")
@@ -58,6 +59,7 @@ class VendorController extends Controller
             'data' => $data->map(function ($vendor) {
                 return [
                     'id' => $vendor->id,
+                    'vendor_code' => $vendor->vendor_code,
                     'name' => $vendor->name,
                     'contact_name' => $vendor->contact_name,
                     'email' => $vendor->email,
@@ -75,6 +77,7 @@ class VendorController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'vendor_code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'contact_name' => 'nullable|string|max:255',
             'email' => 'nullable|email',
@@ -120,6 +123,7 @@ class VendorController extends Controller
     public function update(Request $request, Vendor $vendor): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
+            'vendor_code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'contact_name' => 'nullable|string|max:255',
             'email' => 'nullable|email',

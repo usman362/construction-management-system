@@ -13,6 +13,9 @@
     </div>
 
     <h1 class="text-3xl font-bold text-gray-900">{{ $client->name }}</h1>
+    @if($client->vendor_code)
+        <p class="text-sm text-gray-500">Legacy Code: <span class="font-mono bg-gray-100 px-2 py-0.5 rounded">{{ $client->vendor_code }}</span></p>
+    @endif
 
     <!-- Client Information Card -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

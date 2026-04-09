@@ -13,6 +13,14 @@
             <!-- Basic Information -->
             <div class="grid grid-cols-2 gap-6">
                 <div>
+                    <label for="vendor_code" class="block text-sm font-semibold text-gray-700 mb-2">Legacy Vendor Code</label>
+                    <input type="text" name="vendor_code" id="vendor_code" value="{{ old('vendor_code', $vendor->vendor_code) }}" placeholder="From legacy system" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 @error('vendor_code') border-red-500 @enderror">
+                    @error('vendor_code')
+                        <p class="text-red-600 text-sm mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
                     <label for="name" class="block text-sm font-semibold text-gray-700 mb-2">Vendor Name *</label>
                     <input type="text" name="name" id="name" value="{{ old('name', $vendor->name) }}" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 @error('name') border-red-500 @enderror">
                     @error('name')

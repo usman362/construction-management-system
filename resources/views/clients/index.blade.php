@@ -13,7 +13,7 @@
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">
         <thead><tr>
-            <th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Projects</th><th class="text-center" width="100">Actions</th>
+            <th>Code</th><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Projects</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
@@ -26,7 +26,10 @@
             <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="createForm" class="p-6 space-y-4">
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Legacy Vendor Code</label><input type="text" name="vendor_code" placeholder="From legacy system" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+            </div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Contact Person</label><input type="text" name="contact_name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
@@ -69,6 +72,7 @@
 var table = $('#dataTable').DataTable({
     ajax: '{{ route("clients.index") }}',
     columns: [
+        {data:'vendor_code', render: d => d ? '<span class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">'+d+'</span>' : '<span class="text-gray-400">—</span>'},
         {data:'name'}, {data:'contact_name', render: d => d || '<span class="text-gray-400">—</span>'}, {data:'email', render: d => d || '<span class="text-gray-400">—</span>'}, {data:'phone', render: d => d || '<span class="text-gray-400">—</span>'},
         {data:'projects_count', className:'text-center'},
         {data:'actions', orderable:false, searchable:false, className:'text-center',
@@ -87,6 +91,7 @@ function editClient(id){
     $.get('{{ url('/clients') }}/'+id+'/edit', function(d){
         let f=document.getElementById('editForm');
         f.querySelector('#edit_id').value=d.id;
+        if(f.querySelector('[name="vendor_code"]')) f.querySelector('[name="vendor_code"]').value=d.vendor_code||'';
         f.querySelector('[name="name"]').value=d.name;
         f.querySelector('[name="contact_name"]').value=d.contact_name||'';
         f.querySelector('[name="email"]').value=d.email||'';

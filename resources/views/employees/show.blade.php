@@ -12,8 +12,13 @@
     <!-- Header -->
     <div class="flex justify-between items-center">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">{{ $employee->first_name }} {{ $employee->last_name }}</h1>
-            <p class="text-gray-600 mt-1">Employee #{{ $employee->employee_number }}</p>
+            <h1 class="text-3xl font-bold text-gray-900">{{ $employee->full_name }}</h1>
+            <p class="text-gray-600 mt-1">
+                Employee #{{ $employee->employee_number }}
+                @if($employee->legacy_employee_id)
+                    <span class="ml-2 text-xs text-gray-500">Legacy ID: <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded">{{ $employee->legacy_employee_id }}</span></span>
+                @endif
+            </p>
         </div>
         <a href="{{ route('employees.edit', $employee) }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
             Edit

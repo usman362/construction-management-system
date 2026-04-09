@@ -36,6 +36,7 @@ class EmployeeController extends Controller
             $searchValue = $request->input('search.value');
             $query->where(function ($q) use ($searchValue) {
                 $q->where('employee_number', 'like', "%{$searchValue}%")
+                  ->orWhere('legacy_employee_id', 'like', "%{$searchValue}%")
                   ->orWhere('first_name', 'like', "%{$searchValue}%")
                   ->orWhere('last_name', 'like', "%{$searchValue}%")
                   ->orWhere('email', 'like', "%{$searchValue}%");
@@ -95,7 +96,9 @@ class EmployeeController extends Controller
         $data = $employees->map(fn($employee) => [
             'id' => $employee->id,
             'employee_number' => $employee->employee_number,
+            'legacy_employee_id' => $employee->legacy_employee_id,
             'first_name' => $employee->first_name,
+            'middle_name' => $employee->middle_name,
             'last_name' => $employee->last_name,
             'full_name' => $employee->full_name,
             'email' => $employee->email,
@@ -117,24 +120,27 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function create(): View
     {
-        $validated = $request->validate([
-            'employee_number' => 'required|string|max:50|unique:employees,employee_number',
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:employees',
-            'phone' => 'nullable|string|max:20',
-            'craft_id' => 'nullable|exists:crafts,id',
-            'role' => 'required|in:field,foreman,superintendent,project_manager,admin,accounting',
-            'hourly_rate' => 'required|numeric|min:0',
-            'overtime_rate' => 'required|numeric|min:0',
-            'billable_rate' => 'required|numeric|min:0',
-            'status' => 'required|in:active,inactive,terminated',
-            'hire_date' => 'required|date',
+        return view('employees.create', [
+            'crafts' => Craft::orderBy('name')->get(),
         ]);
+    }
+
+    public function store(Request $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate($this->employeeRules());
+        $validated['is_supervisor'] = $request->boolean('is_supervisor');
+        $validated['certified_pay'] = $request->boolean('certified_pay');
 
         $employee = Employee::create($validated);
+
+        // Full form (non-AJAX) redirects to show
+        if (!$request->ajax() && !$request->wantsJson()) {
+            return redirect()
+                ->route('employees.show', $employee)
+                ->with('success', 'Employee created successfully.');
+        }
 
         return response()->json([
             'success' => true,
@@ -182,20 +188,9 @@ class EmployeeController extends Controller
 
     public function update(Request $request, Employee $employee): JsonResponse|RedirectResponse
     {
-        $validated = $request->validate([
-            'employee_number' => "required|string|max:50|unique:employees,employee_number,{$employee->id}",
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => "nullable|email|unique:employees,email,{$employee->id}",
-            'phone' => 'nullable|string|max:20',
-            'craft_id' => 'nullable|exists:crafts,id',
-            'role' => 'required|in:field,foreman,superintendent,project_manager,admin,accounting',
-            'hourly_rate' => 'required|numeric|min:0',
-            'overtime_rate' => 'required|numeric|min:0',
-            'billable_rate' => 'required|numeric|min:0',
-            'status' => 'required|in:active,inactive,terminated',
-            'hire_date' => 'required|date',
-        ]);
+        $validated = $request->validate($this->employeeRules($employee->id));
+        $validated['is_supervisor'] = $request->boolean('is_supervisor');
+        $validated['certified_pay'] = $request->boolean('certified_pay');
 
         $employee->update($validated);
 
@@ -220,5 +215,58 @@ class EmployeeController extends Controller
             'success' => true,
             'message' => 'Employee deleted successfully.',
         ]);
+    }
+
+    /**
+     * Shared validation rules for store/update. Pass $id to ignore current record on unique checks.
+     */
+    private function employeeRules(?int $id = null): array
+    {
+        $numberUnique = $id ? "unique:employees,employee_number,{$id}" : 'unique:employees,employee_number';
+        $emailUnique  = $id ? "unique:employees,email,{$id}" : 'unique:employees,email';
+
+        return [
+            'employee_number'     => "required|string|max:50|{$numberUnique}",
+            'legacy_employee_id'  => 'nullable|string|max:50',
+            'legacy_position'     => 'nullable|string|max:100',
+            'legacy_craft'        => 'nullable|string|max:100',
+            'first_name'          => 'required|string|max:255',
+            'middle_name'         => 'nullable|string|max:100',
+            'last_name'           => 'required|string|max:255',
+            'email'               => "nullable|email|{$emailUnique}",
+            'phone'               => 'nullable|string|max:30',
+            'address_1'           => 'nullable|string|max:255',
+            'address_2'           => 'nullable|string|max:255',
+            'city'                => 'nullable|string|max:100',
+            'state'               => 'nullable|string|max:50',
+            'zip'                 => 'nullable|string|max:20',
+            'home_phone'          => 'nullable|string|max:30',
+            'work_cell'           => 'nullable|string|max:30',
+            'personal_cell'       => 'nullable|string|max:30',
+            'craft_id'            => 'nullable|exists:crafts,id',
+            'role'                => 'required|in:field,foreman,superintendent,project_manager,admin,accounting',
+            'hourly_rate'         => 'required|numeric|min:0',
+            'overtime_rate'       => 'required|numeric|min:0',
+            'billable_rate'       => 'required|numeric|min:0',
+            'pay_cycle'           => 'nullable|in:weekly,bi_weekly,semi_monthly,monthly',
+            'pay_type'            => 'nullable|in:hourly,salary',
+            'union'               => 'nullable|string|max:100',
+            'employee_type'       => 'nullable|string|max:100',
+            'department'          => 'nullable|string|max:100',
+            'classification'      => 'nullable|string|max:100',
+            'is_supervisor'       => 'nullable|boolean',
+            'certified_pay'       => 'nullable|boolean',
+            'work_comp_code'      => 'nullable|string|max:50',
+            'suta_state'          => 'nullable|string|max:10',
+            'state_tax'           => 'nullable|string|max:10',
+            'city_tax'            => 'nullable|string|max:50',
+            'burden_rate'         => 'nullable|numeric|min:0|max:999.99',
+            'status'              => 'required|in:active,inactive,terminated',
+            'hire_date'           => 'required|date',
+            'start_date'          => 'nullable|date',
+            'rehire_date'         => 'nullable|date',
+            'term_date'           => 'nullable|date',
+            'term_reason'         => 'nullable|string',
+        ];
     }
 }

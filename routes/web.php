@@ -28,6 +28,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\ProjectBillableRateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ImportController;
 
 // ─── Guest (Auth) Routes ─────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -88,6 +89,8 @@ Route::middleware('auth')->group(function () {
             Route::post('estimates/{estimate}/lines', [EstimateController::class, 'addLine'])->name('estimates.add-line');
             Route::put('estimates/lines/{estimateLine}', [EstimateController::class, 'updateLine'])->name('estimates.update-line');
             Route::delete('estimates/lines/{estimateLine}', [EstimateController::class, 'removeLine'])->name('estimates.remove-line');
+            Route::get('estimates/{estimate}/lines/import/template', [ImportController::class, 'estimateLineTemplate'])->name('estimates.lines.import.template');
+            Route::post('estimates/{estimate}/lines/import', [ImportController::class, 'estimateLineImport'])->name('estimates.lines.import');
         });
 
         // Commitments — Admin, PM, Accountant
@@ -106,6 +109,8 @@ Route::middleware('auth')->group(function () {
         Route::middleware('role:admin,project_manager,accountant')->group(function () {
             Route::get('billable-rates', [ProjectBillableRateController::class, 'index'])->name('billable-rates.index');
             Route::post('billable-rates', [ProjectBillableRateController::class, 'store'])->name('billable-rates.store');
+            Route::get('billable-rates/import/template', [ImportController::class, 'billableRateTemplate'])->name('billable-rates.import.template');
+            Route::post('billable-rates/import', [ImportController::class, 'billableRateImport'])->name('billable-rates.import');
             Route::get('billable-rates/{projectBillableRate}/edit', [ProjectBillableRateController::class, 'edit'])->name('billable-rates.edit');
             Route::put('billable-rates/{projectBillableRate}', [ProjectBillableRateController::class, 'update'])->name('billable-rates.update');
             Route::delete('billable-rates/{projectBillableRate}', [ProjectBillableRateController::class, 'destroy'])->name('billable-rates.destroy');
@@ -124,6 +129,10 @@ Route::middleware('auth')->group(function () {
             Route::get('reports/profit-loss', [ReportController::class, 'profitLoss'])->name('reports.profit-loss');
             Route::get('reports/productivity', [ReportController::class, 'productivityReport'])->name('reports.productivity');
 
+            // Excel/CSV Report Downloads
+            Route::get('reports/cost-report/excel', [ReportController::class, 'costReportExcel'])->name('reports.cost-report.excel');
+            Route::get('reports/forecast/excel', [ReportController::class, 'forecastExcel'])->name('reports.forecast.excel');
+
             // PDF Report Downloads
             Route::get('reports/cost-report/pdf', [ReportController::class, 'costReportPdf'])->name('reports.cost-report.pdf');
             Route::get('reports/forecast/pdf', [ReportController::class, 'forecastPdf'])->name('reports.forecast.pdf');
@@ -135,6 +144,10 @@ Route::middleware('auth')->group(function () {
 
     // ─── Workforce Management ────────────────────────────────────
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
+        // Import routes must be registered BEFORE resource routes so they don't
+        // get captured by the {employee} parameter.
+        Route::get('employees/import/template', [ImportController::class, 'employeeTemplate'])->name('employees.import.template');
+        Route::post('employees/import', [ImportController::class, 'employeeImport'])->name('employees.import');
         Route::resource('employees', EmployeeController::class);
     });
 

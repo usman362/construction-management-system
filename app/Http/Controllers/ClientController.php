@@ -31,6 +31,7 @@ class ClientController extends Controller
         if ($search = $request->input('search.value')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('vendor_code', 'like', "%{$search}%")
                   ->orWhere('contact_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%");
             });
@@ -59,6 +60,7 @@ class ClientController extends Controller
             'data' => $data->map(function ($client) {
                 return [
                     'id' => $client->id,
+                    'vendor_code' => $client->vendor_code,
                     'name' => $client->name,
                     'contact_name' => $client->contact_name,
                     'email' => $client->email,
@@ -73,6 +75,7 @@ class ClientController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'vendor_code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'contact_name' => 'nullable|string|max:255',
             'email' => 'nullable|email',
@@ -111,6 +114,7 @@ class ClientController extends Controller
     public function update(Request $request, Client $client): JsonResponse
     {
         $validated = $request->validate([
+            'vendor_code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'contact_name' => 'nullable|string|max:255',
             'email' => 'nullable|email',

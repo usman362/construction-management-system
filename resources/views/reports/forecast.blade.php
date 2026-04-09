@@ -270,6 +270,10 @@
             <a href="{{ route('projects.reports.forecast.pdf', $project) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
                 Download PDF
             </a>
+            <a href="{{ route('projects.reports.forecast.excel', $project) }}" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Export to Excel
+            </a>
             <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded">
                 Print
             </button>

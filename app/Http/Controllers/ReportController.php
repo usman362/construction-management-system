@@ -875,4 +875,171 @@ class ReportController extends Controller
 
         return $pdf->download('timesheet-report.pdf');
     }
+
+    // ──────────────────────────────────────────
+    // EXCEL / CSV EXPORTS
+    // ──────────────────────────────────────────
+
+    /**
+     * Stream a CSV file that Excel will open natively. UTF-8 BOM is prepended so
+     * foreign characters and currency symbols render correctly, and the file is
+     * named with a .csv extension so double-clicking opens it in Excel.
+     */
+    protected function streamCsv(string $filename, array $header, iterable $rows): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return response()->streamDownload(function () use ($header, $rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, $header);
+            foreach ($rows as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    }
+
+    public function costReportExcel(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
+        $costCodeData = [];
+
+        foreach ($budgetLines as $line) {
+            $code = $line->costCode?->code ?? 'Unassigned';
+            if (!isset($costCodeData[$code])) {
+                $costCodeData[$code] = [
+                    'code' => $code,
+                    'name' => $line->costCode?->name ?? 'Unassigned',
+                    'budget' => 0,
+                    'committed' => 0,
+                    'invoiced' => 0,
+                    'balance' => 0,
+                ];
+            }
+            $committed = $line->commitments->sum('amount');
+            $invoiced = $line->invoices->sum('amount');
+            $costCodeData[$code]['budget']    += (float) $line->amount;
+            $costCodeData[$code]['committed'] += (float) $committed;
+            $costCodeData[$code]['invoiced']  += (float) $invoiced;
+            $costCodeData[$code]['balance']   += (float) $line->amount - (float) $committed;
+        }
+
+        $totals = ['budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
+        foreach ($costCodeData as $row) {
+            foreach ($totals as $k => $_) {
+                $totals[$k] += $row[$k];
+            }
+        }
+
+        $header = ['Cost Code', 'Name', 'Budget', 'Committed', 'Invoiced', 'Balance', '% Complete'];
+        $rows = [];
+        foreach ($costCodeData as $row) {
+            $pct = $row['budget'] > 0 ? round(($row['committed'] / $row['budget']) * 100, 2) : 0;
+            $rows[] = [
+                $row['code'],
+                $row['name'],
+                number_format($row['budget'], 2, '.', ''),
+                number_format($row['committed'], 2, '.', ''),
+                number_format($row['invoiced'], 2, '.', ''),
+                number_format($row['balance'], 2, '.', ''),
+                $pct,
+            ];
+        }
+        // Totals row
+        $totalPct = $totals['budget'] > 0 ? round(($totals['committed'] / $totals['budget']) * 100, 2) : 0;
+        $rows[] = [
+            'TOTAL',
+            '',
+            number_format($totals['budget'], 2, '.', ''),
+            number_format($totals['committed'], 2, '.', ''),
+            number_format($totals['invoiced'], 2, '.', ''),
+            number_format($totals['balance'], 2, '.', ''),
+            $totalPct,
+        ];
+
+        $filename = "cost-report-{$project->project_number}-" . now()->format('Ymd') . '.csv';
+        return $this->streamCsv($filename, $header, $rows);
+    }
+
+    public function forecastExcel(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
+        $originalBudgetTotal = (float) $budgetLines->sum('amount');
+        $approvedCoTotal = (float) $project->changeOrders()->where('status', 'approved')->sum('amount');
+        $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
+
+        $costCodeData = [];
+        foreach ($budgetLines as $line) {
+            $code = $line->costCode?->code ?? 'Unassigned';
+            if (!isset($costCodeData[$code])) {
+                $costCodeData[$code] = [
+                    'code' => $code,
+                    'name' => $line->costCode?->name ?? 'Unassigned',
+                    'original_budget' => 0,
+                    'forecast_budget' => 0,
+                    'committed' => 0,
+                    'invoiced' => 0,
+                    'balance' => 0,
+                ];
+            }
+            $committed = (float) $line->commitments->sum('amount');
+            $invoiced = (float) $line->invoices->sum('amount');
+            $costCodeData[$code]['original_budget'] += (float) $line->amount;
+            $costCodeData[$code]['forecast_budget'] += (float) $line->amount;
+            $costCodeData[$code]['committed']       += $committed;
+            $costCodeData[$code]['invoiced']        += $invoiced;
+            $costCodeData[$code]['balance']         += (float) $line->amount - $committed;
+        }
+
+        $totals = ['original_budget' => 0, 'forecast_budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
+        foreach ($costCodeData as $row) {
+            foreach ($totals as $k => $_) {
+                $totals[$k] += $row[$k];
+            }
+        }
+
+        $header = ['Cost Code', 'Name', 'Original Budget', 'Forecast Budget', 'Committed', 'Invoiced', 'Variance (Budget - Committed)'];
+        $rows = [];
+        foreach ($costCodeData as $row) {
+            $rows[] = [
+                $row['code'],
+                $row['name'],
+                number_format($row['original_budget'], 2, '.', ''),
+                number_format($row['forecast_budget'], 2, '.', ''),
+                number_format($row['committed'], 2, '.', ''),
+                number_format($row['invoiced'], 2, '.', ''),
+                number_format($row['balance'], 2, '.', ''),
+            ];
+        }
+        // Summary rows
+        $rows[] = [
+            'TOTAL',
+            '',
+            number_format($totals['original_budget'], 2, '.', ''),
+            number_format($totals['forecast_budget'], 2, '.', ''),
+            number_format($totals['committed'], 2, '.', ''),
+            number_format($totals['invoiced'], 2, '.', ''),
+            number_format($totals['balance'], 2, '.', ''),
+        ];
+        $rows[] = []; // blank
+        $rows[] = ['Approved Change Orders', '', '', number_format($approvedCoTotal, 2, '.', ''), '', '', ''];
+        $rows[] = ['Forecast Total', '', number_format($originalBudgetTotal, 2, '.', ''), number_format($forecastBudgetTotal, 2, '.', ''), '', '', ''];
+
+        $filename = "forecast-{$project->project_number}-" . now()->format('Ymd') . '.csv';
+        return $this->streamCsv($filename, $header, $rows);
+    }
 }

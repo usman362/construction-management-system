@@ -16,6 +16,9 @@
         <div class="flex justify-between items-start mb-8">
             <div>
                 <h1 class="text-3xl font-bold text-gray-800">{{ $vendor->name }}</h1>
+                @if($vendor->vendor_code)
+                    <p class="text-sm text-gray-500 mt-1">Legacy Code: <span class="font-mono bg-gray-100 px-2 py-0.5 rounded">{{ $vendor->vendor_code }}</span></p>
+                @endif
                 <p class="text-gray-600 mt-2">
                     @php
                         $typeClass = match ($vendor->type) {
