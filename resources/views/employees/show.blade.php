@@ -118,6 +118,119 @@
         </div>
     </div>
 
+    <!-- Certifications & Training -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Certifications & Training</h2>
+            <button type="button" onclick="openModal('addCertModal')" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Add Certification
+            </button>
+        </div>
+
+        @if($employee->certifications->isEmpty())
+            <p class="text-sm text-gray-400 py-4 text-center">No certifications on file.</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b"><tr>
+                        <th class="px-3 py-2 text-left font-medium text-gray-600">Name</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-600">Cert #</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-600">Issuing Authority</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-600">Issued</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-600">Expires</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-600">Status</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-600" width="80">Actions</th>
+                    </tr></thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($employee->certifications->sortBy('expiry_date') as $cert)
+                            @php
+                                $statusBadge = match($cert->status) {
+                                    'expired' => 'bg-red-100 text-red-700',
+                                    'expiring_soon' => 'bg-amber-100 text-amber-700',
+                                    default => 'bg-green-100 text-green-700',
+                                };
+                            @endphp
+                            <tr>
+                                <td class="px-3 py-2 font-medium">{{ $cert->name }}</td>
+                                <td class="px-3 py-2 text-gray-500">{{ $cert->certification_number ?? '—' }}</td>
+                                <td class="px-3 py-2 text-gray-500">{{ $cert->issuing_authority ?? '—' }}</td>
+                                <td class="px-3 py-2 text-gray-500">{{ $cert->issue_date?->format('M j, Y') ?? '—' }}</td>
+                                <td class="px-3 py-2 text-gray-500">{{ $cert->expiry_date?->format('M j, Y') ?? 'N/A' }}</td>
+                                <td class="px-3 py-2 text-center"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusBadge }}">{{ ucwords(str_replace('_', ' ', $cert->status)) }}</span></td>
+                                <td class="px-3 py-2 text-center">
+                                    <div class="flex items-center justify-center gap-1">
+                                        @if($cert->file_path)
+                                            <a href="{{ route('certifications.download', $cert) }}" class="w-7 h-7 inline-flex items-center justify-center rounded-md text-blue-600 hover:bg-blue-50" title="Download">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                                            </a>
+                                        @endif
+                                        <button type="button" onclick="confirmDelete('{{ route('employees.certifications.destroy', [$employee, $cert]) }}')" class="w-7 h-7 inline-flex items-center justify-center rounded-md text-red-600 hover:bg-red-50" title="Delete">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
+    <!-- Add Certification Modal -->
+    <div id="addCertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('addCertModal')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900">Add Certification</h3>
+                <button type="button" onclick="closeModal('addCertModal')" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <form id="certForm" class="p-6 space-y-4" enctype="multipart/form-data">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Certification Name *</label><input type="text" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. OSHA 10"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Cert Number</label><input type="text" name="certification_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Issuing Authority</label><input type="text" name="issuing_authority" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. OSHA, NCCER, NCCCO"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label><input type="date" name="issue_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label><input type="date" name="expiry_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Certificate File <span class="text-xs text-gray-400">(PDF, image — max 10MB)</span></label><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2"></div>
+            </form>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+                <button type="button" onclick="closeModal('addCertModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="button" onclick="submitCert()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save Certification</button>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+    function submitCert() {
+        var formData = new FormData(document.getElementById('certForm'));
+        $.ajax({
+            url: '{{ route("employees.certifications.store", $employee) }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+            success: function(res) {
+                closeModal('addCertModal');
+                Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2000, showConfirmButton: false });
+                setTimeout(function() { location.reload(); }, 1500);
+            },
+            error: function(xhr) {
+                var msg = xhr.responseJSON?.message || 'Save failed.';
+                if (xhr.responseJSON?.errors) msg = Object.values(xhr.responseJSON.errors).flat().join('\n');
+                Swal.fire({ icon: 'error', title: 'Error', text: msg });
+            }
+        });
+    }
+    </script>
+    @endpush
+
     <!-- Recent Timesheets -->
     <div class="bg-white rounded-lg shadow-md p-6">
         <h2 class="text-lg font-semibold text-gray-900 border-b pb-4 mb-4">Recent Timesheets</h2>

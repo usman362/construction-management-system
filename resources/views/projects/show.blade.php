@@ -463,4 +463,11 @@ function editProject() {
 </script>
 @endpush
 
+{{-- Project Documents Section --}}
+@include('documents.partials.upload-panel', [
+    'documentableType' => get_class($project),
+    'documentableId'   => $project->id,
+    'documents'        => $project->documents,
+])
+
 @endsection

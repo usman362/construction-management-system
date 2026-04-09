@@ -14,6 +14,7 @@ use App\Models\Vendor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -70,32 +71,51 @@ class ImportController extends Controller
 
     public function employeeImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        $rows = $this->parseFile($request->file('file'));
         if (empty($rows)) {
-            return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
+            return back()->with('import_result', ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => [['row' => 0, 'message' => 'File is empty or could not be read.']]]);
         }
 
-        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows));
         $crafts = Craft::pluck('id', 'name')->mapWithKeys(fn($id, $name) => [strtolower(trim($name)) => $id]);
 
-        DB::transaction(function () use ($rows, $header, $crafts, &$result) {
+        // Determine next auto-number if employee_number column is absent/empty
+        $nextAutoNum = (int) Employee::max('id') + 1;
+
+        DB::transaction(function () use ($rows, $header, $crafts, &$result, &$nextAutoNum) {
             foreach ($rows as $rowIndex => $row) {
-                $rowNumber = $rowIndex + 2; // +1 for header, +1 for 1-based indexing
+                $rowNumber = $rowIndex + 2;
                 $data = $this->combineRow($header, $row);
 
-                if (empty($data['employee_number'])) {
+                // Must have at least a first_name or last_name
+                $firstName = trim($data['first_name'] ?? '');
+                $lastName  = trim($data['last_name'] ?? '');
+                if ($firstName === '' && $lastName === '') {
                     $result['skipped']++;
-                    $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing employee_number.'];
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing name (first_name or last_name).'];
                     continue;
+                }
+
+                // Auto-generate employee_number if missing
+                if (empty($data['employee_number'])) {
+                    $data['employee_number'] = 'EMP-' . str_pad($nextAutoNum, 4, '0', STR_PAD_LEFT);
+                    $nextAutoNum++;
                 }
 
                 try {
                     $payload = $this->buildEmployeePayload($data, $crafts);
                     $existing = Employee::where('employee_number', $data['employee_number'])->first();
+
+                    // Also try matching by exact name if employee_number was auto-generated
+                    if (!$existing && $firstName !== '' && $lastName !== '') {
+                        $existing = Employee::where('first_name', $firstName)
+                            ->where('last_name', $lastName)
+                            ->first();
+                    }
 
                     if ($existing) {
                         $existing->update($payload);
@@ -122,14 +142,29 @@ class ImportController extends Controller
             $craftId = $craftsByName[$key] ?? null;
         }
 
+        // Handle "Full Name" in first_name: split into first/last if last_name is empty
+        $firstName = $data['first_name'] ?? '';
+        $lastName  = $data['last_name'] ?? '';
+        if ($firstName !== '' && $lastName === '' && str_contains($firstName, ' ')) {
+            $parts = explode(' ', $firstName, 2);
+            $firstName = $parts[0];
+            $lastName  = $parts[1] ?? '';
+        }
+        // Handle "Last, First" format
+        if ($firstName !== '' && $lastName === '' && str_contains($firstName, ',')) {
+            $parts = array_map('trim', explode(',', $firstName, 2));
+            $lastName  = $parts[0];
+            $firstName = $parts[1] ?? '';
+        }
+
         return [
             'employee_number'     => $data['employee_number'],
             'legacy_employee_id'  => $data['legacy_employee_id'] ?? null,
             'legacy_position'     => $data['legacy_position'] ?? null,
             'legacy_craft'        => $data['legacy_craft'] ?? null,
-            'first_name'          => $data['first_name'] ?? '',
+            'first_name'          => $firstName,
             'middle_name'         => $data['middle_name'] ?? null,
-            'last_name'           => $data['last_name'] ?? '',
+            'last_name'           => $lastName,
             'email'               => $this->blankToNull($data['email'] ?? null),
             'phone'               => $this->blankToNull($data['phone'] ?? null),
             'address_1'           => $this->blankToNull($data['address_1'] ?? null),
@@ -190,16 +225,16 @@ class ImportController extends Controller
 
     public function craftImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        $rows = $this->parseFile($request->file('file'));
         if (empty($rows)) {
             return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
         }
 
-        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows));
 
         DB::transaction(function () use ($rows, $header, &$result) {
             foreach ($rows as $rowIndex => $row) {
@@ -263,16 +298,16 @@ class ImportController extends Controller
 
     public function billableRateImport(Request $request, Project $project): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        $rows = $this->parseFile($request->file('file'));
         if (empty($rows)) {
             return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
         }
 
-        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows));
         $craftsByName = Craft::pluck('id', 'name')->mapWithKeys(fn($id, $name) => [strtolower(trim($name)) => $id]);
         $employeesByNumber = Employee::pluck('id', 'employee_number');
 
@@ -357,16 +392,16 @@ class ImportController extends Controller
 
     public function estimateLineImport(Request $request, Project $project, Estimate $estimate): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        $rows = $this->parseFile($request->file('file'));
         if (empty($rows)) {
             return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
         }
 
-        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows));
         $costCodesByCode = CostCode::pluck('id', 'code');
 
         DB::transaction(function () use ($rows, $header, $costCodesByCode, $estimate, &$result) {
@@ -436,16 +471,16 @@ class ImportController extends Controller
 
     public function vendorImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        $rows = $this->parseFile($request->file('file'));
         if (empty($rows)) {
             return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
         }
 
-        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows));
         $allowedTypes = ['subcontractor', 'supplier', 'rental', 'other'];
 
         DB::transaction(function () use ($rows, $header, $allowedTypes, &$result) {
@@ -530,16 +565,16 @@ class ImportController extends Controller
 
     public function clientImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-        $rows = $this->parseCsv($request->file('file')->getRealPath());
+        $rows = $this->parseFile($request->file('file'));
         if (empty($rows)) {
             return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
         }
 
-        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows));
 
         DB::transaction(function () use ($rows, $header, &$result) {
             foreach ($rows as $rowIndex => $row) {
@@ -616,7 +651,21 @@ class ImportController extends Controller
         }, $filename, $headers);
     }
 
-    /** Read a CSV file into an array of rows. */
+    /**
+     * Read a CSV or Excel file into an array of rows.
+     * First row is the header. Supports .csv, .txt, .xlsx, .xls.
+     */
+    private function parseFile(\Illuminate\Http\UploadedFile $file): array
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            return $this->parseExcel($file->getRealPath());
+        }
+
+        return $this->parseCsv($file->getRealPath());
+    }
+
     private function parseCsv(string $path): array
     {
         $rows = [];
@@ -624,11 +673,9 @@ class ImportController extends Controller
             return [];
         }
         while (($data = fgetcsv($handle)) !== false) {
-            // Strip BOM from first cell of first row
             if (empty($rows) && isset($data[0])) {
                 $data[0] = preg_replace('/^\xEF\xBB\xBF/', '', $data[0]);
             }
-            // Skip completely-empty rows
             if (count(array_filter($data, fn($v) => $v !== null && $v !== '')) === 0) {
                 continue;
             }
@@ -636,6 +683,154 @@ class ImportController extends Controller
         }
         fclose($handle);
         return $rows;
+    }
+
+    /** Read an Excel file into an array of rows using PhpSpreadsheet. */
+    private function parseExcel(string $path): array
+    {
+        $spreadsheet = IOFactory::load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = [];
+
+        foreach ($sheet->getRowIterator() as $row) {
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(false);
+            $rowData = [];
+            foreach ($cellIterator as $cell) {
+                $val = $cell->getValue();
+                $rowData[] = $val !== null ? (string) $val : '';
+            }
+            if (count(array_filter($rowData, fn($v) => $v !== '')) > 0) {
+                $rows[] = $rowData;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Normalize header column names so common variations all map to our
+     * canonical snake_case names. E.g. "First Name" → "first_name",
+     * "Employee ID" → "employee_number", "Emp #" → "employee_number".
+     */
+    private function normalizeHeader(array $rawHeader): array
+    {
+        $aliases = [
+            // Employee variants
+            'employee id'       => 'employee_number',
+            'employee_id'       => 'employee_number',
+            'emp #'             => 'employee_number',
+            'emp_#'             => 'employee_number',
+            'emp id'            => 'employee_number',
+            'emp_id'            => 'employee_number',
+            'emp no'            => 'employee_number',
+            'number'            => 'employee_number',
+            'id'                => 'employee_number',
+            'first name'        => 'first_name',
+            'firstname'         => 'first_name',
+            'first'             => 'first_name',
+            'last name'         => 'last_name',
+            'lastname'          => 'last_name',
+            'last'              => 'last_name',
+            'middle name'       => 'middle_name',
+            'middlename'        => 'middle_name',
+            'middle'            => 'middle_name',
+            'name'              => 'first_name',
+            'full name'         => 'first_name',
+            'full_name'         => 'first_name',
+
+            // Contact
+            'e-mail'            => 'email',
+            'email address'     => 'email',
+            'phone number'      => 'phone',
+            'telephone'         => 'phone',
+            'cell'              => 'personal_cell',
+            'cell phone'        => 'personal_cell',
+            'mobile'            => 'personal_cell',
+            'mobile phone'      => 'personal_cell',
+            'home phone'        => 'home_phone',
+            'work cell'         => 'work_cell',
+            'work phone'        => 'work_cell',
+            'personal cell'     => 'personal_cell',
+
+            // Address
+            'address'           => 'address_1',
+            'address 1'         => 'address_1',
+            'street'            => 'address_1',
+            'street address'    => 'address_1',
+            'address 2'         => 'address_2',
+            'zip code'          => 'zip',
+            'zipcode'           => 'zip',
+            'postal code'       => 'zip',
+            'postal_code'       => 'zip',
+
+            // Work
+            'craft'             => 'craft_name',
+            'trade'             => 'craft_name',
+            'classification'    => 'craft_name',
+            'position'          => 'legacy_position',
+            'title'             => 'employee_type',
+            'job title'         => 'employee_type',
+            'dept'              => 'department',
+
+            // Rates
+            'hourly rate'       => 'hourly_rate',
+            'rate'              => 'hourly_rate',
+            'pay rate'          => 'hourly_rate',
+            'ot rate'           => 'overtime_rate',
+            'overtime rate'     => 'overtime_rate',
+            'bill rate'         => 'billable_rate',
+            'billable rate'     => 'billable_rate',
+
+            // Dates
+            'hire date'         => 'hire_date',
+            'hired'             => 'hire_date',
+            'date hired'        => 'hire_date',
+            'start date'        => 'start_date',
+            'started'           => 'start_date',
+            'term date'         => 'term_date',
+            'termination date'  => 'term_date',
+            'terminated'        => 'term_date',
+            'rehire date'       => 'rehire_date',
+
+            // Vendor / Client
+            'vendor code'       => 'vendor_code',
+            'legacy code'       => 'vendor_code',
+            'legacy id'         => 'vendor_code',
+            'company'           => 'name',
+            'company name'      => 'name',
+            'vendor name'       => 'name',
+            'client name'       => 'name',
+            'contact'           => 'contact_name',
+            'contact name'      => 'contact_name',
+            'contact person'    => 'contact_name',
+            'type'              => 'type',
+            'vendor type'       => 'type',
+
+            // Craft
+            'code'              => 'code',
+            'craft code'        => 'code',
+            'craft name'        => 'name',
+            'description'       => 'description',
+            'hourly'            => 'base_hourly_rate',
+            'base hourly rate'  => 'base_hourly_rate',
+            'base rate'         => 'base_hourly_rate',
+            'ot multiplier'     => 'overtime_multiplier',
+            'overtime multiplier' => 'overtime_multiplier',
+            'multiplier'        => 'overtime_multiplier',
+            'active'            => 'is_active',
+            'preferred'         => 'is_preferred',
+        ];
+
+        return array_map(function ($h) use ($aliases) {
+            $normalized = strtolower(trim((string) $h));
+            // Direct match on alias
+            if (isset($aliases[$normalized])) {
+                return $aliases[$normalized];
+            }
+            // Already snake_case canonical
+            return preg_replace('/[\s\-]+/', '_', $normalized);
+        }, $rawHeader);
     }
 
     /** Combine a header and row into an associative array. */

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class ChangeOrder extends Model
 {
@@ -31,6 +32,11 @@ class ChangeOrder extends Model
         'new_completion_date' => 'date',
         'approved_date' => 'date',
     ];
+
+    public function documents(): MorphMany
+    {
+        return $this->morphMany(Document::class, 'documentable');
+    }
 
     public function project(): BelongsTo
     {

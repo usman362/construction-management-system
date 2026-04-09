@@ -29,6 +29,9 @@ use App\Http\Controllers\ProjectBillableRateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\EmployeeCertificationController;
+use App\Http\Controllers\BackupController;
 
 // ─── Guest (Auth) Routes ─────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -58,7 +61,24 @@ Route::middleware('auth')->group(function () {
     // ─── User Management — Admin only ────────────────────────────
     Route::middleware('role:admin')->group(function () {
         Route::resource('users', UserController::class)->except(['show']);
+
+        // Database Backups — Admin only
+        Route::get('admin/backups', [BackupController::class, 'index'])->name('admin.backups');
+        Route::post('admin/backup', [BackupController::class, 'create'])->name('admin.backup.create');
+        Route::get('admin/backups/{filename}/download', [BackupController::class, 'download'])->name('admin.backup.download');
+        Route::delete('admin/backups/{filename}', [BackupController::class, 'destroy'])->name('admin.backup.destroy');
     });
+
+    // ─── Documents (polymorphic — any authenticated user can view/download) ──
+    Route::post('documents', [DocumentController::class, 'store'])->name('documents.store');
+    Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+    Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
+
+    // ─── Employee Certifications ─────────────────────────────────
+    Route::post('employees/{employee}/certifications', [EmployeeCertificationController::class, 'store'])->name('employees.certifications.store');
+    Route::put('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'update'])->name('employees.certifications.update');
+    Route::delete('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'destroy'])->name('employees.certifications.destroy');
+    Route::get('certifications/{certification}/download', [EmployeeCertificationController::class, 'download'])->name('certifications.download');
 
     // ─── Projects — everyone can view, PM+ can manage ────────────
     Route::resource('projects', ProjectController::class);

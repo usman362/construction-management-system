@@ -30,10 +30,12 @@ class Employee extends Model
         'work_cell',
         'personal_cell',
         'craft_id',
+        'rotation_group_id',
         'role',
         'hourly_rate',
         'overtime_rate',
         'billable_rate',
+        'contract_weekly_hours',
         'pay_cycle',
         'pay_type',
         'union',
@@ -59,6 +61,7 @@ class Employee extends Model
         'hourly_rate' => 'decimal:2',
         'overtime_rate' => 'decimal:2',
         'billable_rate' => 'decimal:2',
+        'contract_weekly_hours' => 'decimal:2',
         'burden_rate' => 'decimal:2',
         'is_supervisor' => 'boolean',
         'certified_pay' => 'boolean',
@@ -71,6 +74,11 @@ class Employee extends Model
     public function craft(): BelongsTo
     {
         return $this->belongsTo(Craft::class);
+    }
+
+    public function rotationGroup(): BelongsTo
+    {
+        return $this->belongsTo(RotationGroup::class);
     }
 
     public function timesheets(): HasMany
@@ -86,6 +94,11 @@ class Employee extends Model
     public function payrollEntries(): HasMany
     {
         return $this->hasMany(PayrollEntry::class);
+    }
+
+    public function certifications(): HasMany
+    {
+        return $this->hasMany(EmployeeCertification::class);
     }
 
     public function getFullNameAttribute(): string

@@ -123,6 +123,7 @@ class ProjectController extends Controller
             'commitments',
             'invoices',
             'timesheets.employee',
+            'documents.uploader',
         ]);
 
         $budgetLines = $project->budgetLines;

@@ -25,6 +25,11 @@ class DailyLog extends Model
         'date' => 'date',
     ];
 
+    public function documents(): MorphMany
+    {
+        return $this->morphMany(Document::class, 'documentable');
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

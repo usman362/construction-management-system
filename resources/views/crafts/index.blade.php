@@ -57,7 +57,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">CSV File *</label>
-                <input type="file" name="file" accept=".csv,.txt" required class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2">
+                <input type="file" name="file" accept=".csv,.txt,.xlsx,.xls" required class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2">
             </div>
             <div class="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
                 <button type="button" onclick="closeModal('importModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>

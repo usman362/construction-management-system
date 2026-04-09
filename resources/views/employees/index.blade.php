@@ -50,7 +50,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">CSV File *</label>
-                <input type="file" name="file" accept=".csv,.txt" required class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2">
+                <input type="file" name="file" accept=".csv,.txt,.xlsx,.xls" required class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2">
             </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
@@ -61,20 +61,27 @@
 </div>
 
 @if(session('import_result'))
-    @php $result = session('import_result'); @endphp
-    <div class="fixed bottom-6 right-6 z-40 max-w-md bg-white border border-gray-200 shadow-lg rounded-lg p-4">
-        <p class="font-semibold text-gray-900">Import complete</p>
-        <p class="text-sm text-gray-600 mt-1">Created: <span class="font-semibold text-green-700">{{ $result['created'] ?? 0 }}</span>, Updated: <span class="font-semibold text-blue-700">{{ $result['updated'] ?? 0 }}</span>, Skipped: <span class="font-semibold text-amber-700">{{ $result['skipped'] ?? 0 }}</span></p>
-        @if(!empty($result['errors']))
-            <details class="mt-2"><summary class="text-xs text-red-700 cursor-pointer">Errors ({{ count($result['errors']) }})</summary>
-                <ul class="mt-1 text-xs text-red-600 max-h-40 overflow-auto">
-                    @foreach($result['errors'] as $err)
-                        <li>Row {{ $err['row'] }}: {{ $err['message'] }}</li>
-                    @endforeach
-                </ul>
-            </details>
-        @endif
-    </div>
+    @php $ir = session('import_result'); @endphp
+    @push('scripts')
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var errors = @json($ir['errors'] ?? []);
+        var errorHtml = '';
+        if (errors.length > 0) {
+            errorHtml = '<br><br><strong>Errors:</strong><ul style="text-align:left;max-height:200px;overflow:auto;font-size:13px;margin-top:8px">';
+            errors.forEach(function(e) { errorHtml += '<li>Row ' + e.row + ': ' + e.message + '</li>'; });
+            errorHtml += '</ul>';
+        }
+        Swal.fire({
+            icon: {{ ($ir['created'] ?? 0) + ($ir['updated'] ?? 0) > 0 ? "'success'" : "'warning'" }},
+            title: 'Import Complete',
+            html: '<b style="color:#15803d">{{ $ir['created'] ?? 0 }} created</b> &nbsp; <b style="color:#1d4ed8">{{ $ir['updated'] ?? 0 }} updated</b> &nbsp; <b style="color:#b45309">{{ $ir['skipped'] ?? 0 }} skipped</b>' + errorHtml,
+            confirmButtonColor: '#2563eb',
+            width: errors.length > 0 ? '600px' : '400px',
+        });
+    });
+    </script>
+    @endpush
 @endif
 
 @push('scripts')
