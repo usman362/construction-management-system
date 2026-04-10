@@ -176,15 +176,15 @@ class ImportController extends Controller
             'work_cell'           => $this->blankToNull($data['work_cell'] ?? null),
             'personal_cell'       => $this->blankToNull($data['personal_cell'] ?? null),
             'craft_id'            => $craftId,
-            'role'                => $data['role'] ?? 'field',
+            'role'                => $this->normalizeEnum($data['role'] ?? null, ['field', 'foreman', 'superintendent', 'project_manager', 'admin', 'accounting'], 'field'),
             'employee_type'       => $this->blankToNull($data['employee_type'] ?? null),
             'department'          => $this->blankToNull($data['department'] ?? null),
             'classification'      => $this->blankToNull($data['classification'] ?? null),
             'union'               => $this->blankToNull($data['union'] ?? null),
             'is_supervisor'       => $this->truthy($data['is_supervisor'] ?? false),
             'certified_pay'       => $this->truthy($data['certified_pay'] ?? false),
-            'pay_cycle'           => strtolower($this->blankToNull($data['pay_cycle'] ?? null) ?? 'weekly'),
-            'pay_type'            => strtolower($this->blankToNull($data['pay_type'] ?? null) ?? 'hourly'),
+            'pay_cycle'           => $this->normalizeEnum($data['pay_cycle'] ?? null, ['weekly', 'bi_weekly', 'semi_monthly', 'monthly'], 'weekly'),
+            'pay_type'            => $this->normalizeEnum($data['pay_type'] ?? null, ['hourly', 'salary'], 'hourly'),
             'hourly_rate'         => $this->toDecimal($data['hourly_rate'] ?? 0),
             'overtime_rate'       => $this->toDecimal($data['overtime_rate'] ?? 0),
             'billable_rate'       => $this->toDecimal($data['billable_rate'] ?? 0),
@@ -198,7 +198,7 @@ class ImportController extends Controller
             'rehire_date'         => $this->parseDate($data['rehire_date'] ?? null),
             'term_date'           => $this->parseDate($data['term_date'] ?? null),
             'term_reason'         => $this->blankToNull($data['term_reason'] ?? null),
-            'status'              => $this->blankToNull($data['status'] ?? null) ?? 'active',
+            'status'              => $this->normalizeEnum($data['status'] ?? null, ['active', 'inactive', 'terminated'], 'active'),
         ];
     }
 
@@ -990,6 +990,15 @@ class ImportController extends Controller
         $clean = preg_replace('/[\$,\s]/', '', (string) $value);
         $num = (float) $clean;
         return $num == 0 ? null : round($num, $decimals);
+    }
+
+    /** Normalize a value to match a DB enum: lowercase, replace hyphens/spaces with underscores, fallback to default. */
+    private function normalizeEnum($value, array $allowed, string $default): string
+    {
+        if ($value === null || trim((string) $value) === '') return $default;
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace(['-', ' '], '_', $normalized);
+        return in_array($normalized, $allowed, true) ? $normalized : $default;
     }
 
     private function truthy($value): bool
