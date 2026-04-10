@@ -68,14 +68,7 @@ class CraftController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'code' => 'required|unique:crafts|string|max:50',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'base_hourly_rate' => 'required|numeric|min:0',
-            'overtime_multiplier' => 'required|numeric|min:0',
-            'billable_rate' => 'required|numeric|min:0',
-        ]);
+        $validated = $request->validate($this->craftRules());
         Craft::create($validated);
         return response()->json(['message' => 'Craft created successfully']);
     }
@@ -93,14 +86,7 @@ class CraftController extends Controller
 
     public function update(Request $request, Craft $craft): JsonResponse
     {
-        $validated = $request->validate([
-            'code' => "required|unique:crafts,code,{$craft->id}|string|max:50",
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'base_hourly_rate' => 'required|numeric|min:0',
-            'overtime_multiplier' => 'required|numeric|min:0',
-            'billable_rate' => 'required|numeric|min:0',
-        ]);
+        $validated = $request->validate($this->craftRules($craft->id));
         $craft->update($validated);
         return response()->json(['message' => 'Craft updated successfully']);
     }
@@ -109,5 +95,24 @@ class CraftController extends Controller
     {
         $craft->delete();
         return response()->json(['message' => 'Craft deleted successfully']);
+    }
+
+    private function craftRules(?int $ignoreId = null): array
+    {
+        $uniqueRule = $ignoreId ? "unique:crafts,code,{$ignoreId}" : 'unique:crafts';
+        return [
+            'code' => "required|{$uniqueRule}|string|max:50",
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'base_hourly_rate' => 'required|numeric|min:0',
+            'overtime_multiplier' => 'required|numeric|min:0',
+            'billable_rate' => 'required|numeric|min:0',
+            'ot_billable_rate' => 'nullable|numeric|min:0',
+            'wc_rate' => 'nullable|numeric|min:0',
+            'fica_rate' => 'nullable|numeric|min:0',
+            'suta_rate' => 'nullable|numeric|min:0',
+            'benefits_rate' => 'nullable|numeric|min:0',
+            'overhead_rate' => 'nullable|numeric|min:0',
+        ];
     }
 }

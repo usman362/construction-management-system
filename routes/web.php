@@ -208,6 +208,9 @@ Route::middleware('auth')->group(function () {
 
     // ─── Costing ─────────────────────────────────────────────────
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
+        // Cost code import routes registered BEFORE resource so they don't collide with {cost_code}.
+        Route::get('cost-codes/import/template', [ImportController::class, 'costCodeTemplate'])->name('cost-codes.import.template');
+        Route::post('cost-codes/import', [ImportController::class, 'costCodeImport'])->name('cost-codes.import');
         Route::resource('cost-codes', CostCodeController::class);
         // Client import routes registered BEFORE resource so they don't collide with {client}.
         Route::get('clients/import/template', [ImportController::class, 'clientTemplate'])->name('clients.import.template');

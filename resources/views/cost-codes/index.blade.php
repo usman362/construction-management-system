@@ -4,16 +4,74 @@
 
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Cost Codes</h1>
-    <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-        Add Cost Code
-    </button>
+    <div class="flex items-center gap-2">
+        <a href="{{ route('cost-codes.import.template') }}" class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm border border-gray-200 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Download Template
+        </a>
+        <button onclick="openModal('importModal')" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12"/></svg>
+            Import CSV
+        </button>
+        <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            Add Cost Code
+        </button>
+    </div>
+</div>
+
+@if(session('import_result'))
+    @php $result = session('import_result'); @endphp
+    <div class="mb-4 bg-white border border-gray-200 shadow-sm rounded-lg p-4">
+        <p class="font-semibold text-gray-900">Import complete</p>
+        <p class="text-sm text-gray-600 mt-1">Created: <span class="font-semibold text-green-700">{{ $result['created'] ?? 0 }}</span>, Updated: <span class="font-semibold text-blue-700">{{ $result['updated'] ?? 0 }}</span>, Skipped: <span class="font-semibold text-amber-700">{{ $result['skipped'] ?? 0 }}</span></p>
+        @if(!empty($result['errors']))
+            <details class="mt-2"><summary class="text-xs text-red-700 cursor-pointer">Errors ({{ count($result['errors']) }})</summary>
+                <ul class="mt-1 text-xs text-red-600 max-h-40 overflow-auto">
+                    @foreach($result['errors'] as $err)
+                        <li>Row {{ $err['row'] }}: {{ $err['message'] }}</li>
+                    @endforeach
+                </ul>
+            </details>
+        @endif
+    </div>
+@endif
+
+<!-- Import Modal -->
+<div id="importModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('importModal')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 class="text-lg font-bold text-gray-900">Import Cost Codes from CSV</h3>
+            <button onclick="closeModal('importModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <form method="POST" action="{{ route('cost-codes.import') }}" enctype="multipart/form-data" class="p-6 space-y-4">
+            @csrf
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
+                <p class="font-semibold mb-1">Before importing:</p>
+                <ol class="list-decimal list-inside space-y-0.5 text-xs">
+                    <li>Download the template using the "Download Template" button.</li>
+                    <li>Fill in one row per cost code; keep the header row.</li>
+                    <li><code>code</code> and <code>name</code> are required.</li>
+                    <li>Use <code>parent_code</code> to set hierarchy (must match an existing code).</li>
+                    <li>Existing codes (matched by <code>code</code>) will be updated.</li>
+                </ol>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">CSV File *</label>
+                <input type="file" name="file" accept=".csv,.txt,.xlsx,.xls" required class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2">
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+                <button type="button" onclick="closeModal('importModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Upload & Import</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">
         <thead><tr>
-            <th>Code</th><th>Name</th><th>Category</th><th>Parent</th><th>Description</th><th class="text-center" width="100">Actions</th>
+            <th>Code</th><th>Name</th><th>Category</th><th>Cost Type</th><th>Parent</th><th>Description</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
@@ -33,8 +91,9 @@
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Category *</label><select name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="">Select...</option><option value="labor">Labor</option><option value="material">Material</option><option value="equipment">Equipment</option><option value="subcontract">Subcontract</option><option value="other">Other</option></select></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Code</label><input type="text" name="parent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label><input type="text" name="cost_type" placeholder="e.g. Direct Labor, Indirect Labor" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Code</label><input type="text" name="parent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -59,8 +118,9 @@
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Category</label><select name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"><option value="">—</option><option value="labor">Labor</option><option value="material">Material</option><option value="equipment">Equipment</option><option value="subcontract">Subcontract</option><option value="other">Other</option></select></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Code</label><input type="text" name="parent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label><input type="text" name="cost_type" placeholder="e.g. Direct Labor, Indirect Labor" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Code</label><input type="text" name="parent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('editModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -93,6 +153,7 @@ var table = $('#dataTable').DataTable({
             if (!d) return '<span class="text-gray-400">—</span>';
             return d.charAt(0).toUpperCase() + d.slice(1);
         }},
+        {data:'cost_type', render: d=>d||'<span class="text-gray-400">—</span>'},
         {data:'parent_name', render: function(d) { return d === '—' || !d ? '—' : d; }},
         {data:'description', render: d=>d||'—'},
         {data:'actions', orderable:false, searchable:false, className:'text-center',
@@ -115,6 +176,7 @@ function editCostCode(id){
         f.querySelector('[name="name"]').value=d.name;
         f.querySelector('[name="description"]').value=d.description||'';
         f.querySelector('[name="category"]').value=d.category||'';
+        f.querySelector('[name="cost_type"]').value=d.cost_type||'';
         f.querySelector('[name="parent_id"]').value=d.parent_id||'';
         document.getElementById('editSaveBtn').onclick=function(){ submitForm('editForm',window.BASE_URL+'/cost-codes/'+d.id,'PUT',table,'editModal'); };
         openModal('editModal');
@@ -126,7 +188,7 @@ function viewCostCode(id){
         document.getElementById('viewContent').innerHTML=
             '<div class="space-y-4">'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Code</p><p class="text-sm font-semibold">'+d.code+'</p></div><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div></div>'+
-            '<div><p class="text-xs text-gray-500 mb-1">Category</p><p class="text-sm">'+(d.category ? (d.category.charAt(0).toUpperCase()+d.category.slice(1)) : '—')+'</p></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Category</p><p class="text-sm">'+(d.category ? (d.category.charAt(0).toUpperCase()+d.category.slice(1)) : '—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Cost Type</p><p class="text-sm">'+(d.cost_type||'—')+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Parent</p><p class="text-sm">'+(d.parent ? d.parent.name : '—')+'</p></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Description</p><p class="text-sm">'+(d.description||'—')+'</p></div>'+
             '</div>';

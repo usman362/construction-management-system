@@ -14,6 +14,7 @@ class CostCode extends Model
         'code',
         'name',
         'category',
+        'cost_type',
         'parent_id',
         'description',
         'sort_order',

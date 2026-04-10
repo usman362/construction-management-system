@@ -183,8 +183,8 @@ class ImportController extends Controller
             'union'               => $this->blankToNull($data['union'] ?? null),
             'is_supervisor'       => $this->truthy($data['is_supervisor'] ?? false),
             'certified_pay'       => $this->truthy($data['certified_pay'] ?? false),
-            'pay_cycle'           => $this->blankToNull($data['pay_cycle'] ?? null) ?? 'weekly',
-            'pay_type'            => $this->blankToNull($data['pay_type'] ?? null) ?? 'hourly',
+            'pay_cycle'           => strtolower($this->blankToNull($data['pay_cycle'] ?? null) ?? 'weekly'),
+            'pay_type'            => strtolower($this->blankToNull($data['pay_type'] ?? null) ?? 'hourly'),
             'hourly_rate'         => $this->toDecimal($data['hourly_rate'] ?? 0),
             'overtime_rate'       => $this->toDecimal($data['overtime_rate'] ?? 0),
             'billable_rate'       => $this->toDecimal($data['billable_rate'] ?? 0),
@@ -207,7 +207,8 @@ class ImportController extends Controller
     private const CRAFT_COLUMNS = [
         'code', 'name', 'description',
         'base_hourly_rate', 'overtime_multiplier', 'billable_rate',
-        'is_active',
+        'ot_billable_rate', 'wc_rate', 'fica_rate', 'suta_rate',
+        'benefits_rate', 'overhead_rate', 'is_active',
     ];
 
     public function craftTemplate(): StreamedResponse
@@ -216,9 +217,8 @@ class ImportController extends Controller
             'crafts_import_template.csv',
             self::CRAFT_COLUMNS,
             [
-                ['CRANE-OP', 'Crane Operator', 'Licensed crane operator', '32.50', '1.5', '78.00', 'yes'],
-                ['LAB-01',   'General Laborer', '',                        '22.00', '1.5', '55.00', 'yes'],
-                ['IRON-01',  'Ironworker',      'Structural steel',        '36.00', '1.5', '85.00', 'yes'],
+                ['CRANE-OP', 'Crane Operator', 'Licensed crane operator', '32.50', '1.5', '78.00', '48.75', '0.906', '0.0765', '0.0181', '3.71', '0.10', 'yes'],
+                ['LAB-01',   'General Laborer', '',                        '22.00', '1.5', '55.00', '33.00', '0.906', '0.0765', '0.0181', '3.71', '0.10', 'yes'],
             ]
         );
     }
@@ -254,6 +254,12 @@ class ImportController extends Controller
                         'base_hourly_rate'    => $this->toDecimal($data['base_hourly_rate'] ?? 0),
                         'overtime_multiplier' => $this->toDecimal($data['overtime_multiplier'] ?? 1.5),
                         'billable_rate'       => $this->toDecimal($data['billable_rate'] ?? 0),
+                        'ot_billable_rate'    => $this->nullableDecimal($data['ot_billable_rate'] ?? null),
+                        'wc_rate'             => $this->nullableDecimal($data['wc_rate'] ?? null, 4),
+                        'fica_rate'           => $this->nullableDecimal($data['fica_rate'] ?? null, 4),
+                        'suta_rate'           => $this->nullableDecimal($data['suta_rate'] ?? null, 4),
+                        'benefits_rate'       => $this->nullableDecimal($data['benefits_rate'] ?? null),
+                        'overhead_rate'       => $this->nullableDecimal($data['overhead_rate'] ?? null, 4),
                         'is_active'           => $this->truthy($data['is_active'] ?? true),
                     ];
 
@@ -626,6 +632,93 @@ class ImportController extends Controller
         return back()->with('import_result', $result);
     }
 
+    // ─── Cost Codes ──────────────────────────────────────────────────────
+
+    private const COST_CODE_COLUMNS = [
+        'code', 'name', 'category', 'cost_type', 'parent_code', 'description', 'sort_order', 'is_active',
+    ];
+
+    public function costCodeTemplate(): StreamedResponse
+    {
+        return $this->streamCsv(
+            'cost_codes_import_template.csv',
+            self::COST_CODE_COLUMNS,
+            [
+                ['01',        'General Conditions', 'labor', '',              '',   'General conditions phase',  '1', 'yes'],
+                ['01.10.000', 'T & M Labor',        'labor', 'Direct Labor', '01', 'T & M Direct Labor',        '2', 'yes'],
+                ['02',        'Sitework',            'labor', '',              '',   'Sitework phase',            '3', 'yes'],
+                ['03',        'Materials',           'material', '',           '',   'Materials & supplies',      '4', 'yes'],
+            ]
+        );
+    }
+
+    public function costCodeImport(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+
+        $rows = $this->parseFile($request->file('file'));
+        if (empty($rows)) {
+            return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'File is empty.']]]);
+        }
+
+        $header = $this->normalizeHeader(array_shift($rows));
+
+        // First pass: create/update all codes so parent references resolve
+        DB::transaction(function () use ($rows, $header, &$result) {
+            // Pass 1: create/update all cost codes
+            foreach ($rows as $rowIndex => $row) {
+                $rowNumber = $rowIndex + 2;
+                $data = $this->combineRow($header, $row);
+
+                if (empty($data['code']) || empty($data['name'])) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing required code or name.'];
+                    continue;
+                }
+
+                try {
+                    $payload = [
+                        'name'        => $data['name'],
+                        'category'    => $this->blankToNull($data['category'] ?? null),
+                        'cost_type'   => $this->blankToNull($data['cost_type'] ?? null),
+                        'description' => $this->blankToNull($data['description'] ?? null),
+                        'sort_order'  => (int) ($data['sort_order'] ?? 0),
+                        'is_active'   => $this->truthy($data['is_active'] ?? true),
+                    ];
+
+                    $existing = CostCode::where('code', $data['code'])->first();
+                    if ($existing) {
+                        $existing->update($payload);
+                        $result['updated']++;
+                    } else {
+                        CostCode::create($payload + ['code' => $data['code']]);
+                        $result['created']++;
+                    }
+                } catch (\Throwable $e) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => $e->getMessage()];
+                }
+            }
+
+            // Pass 2: resolve parent_code references
+            foreach ($rows as $row) {
+                $data = $this->combineRow($header, $row);
+                $parentCode = $this->blankToNull($data['parent_code'] ?? null);
+                if ($parentCode && !empty($data['code'])) {
+                    $parent = CostCode::where('code', $parentCode)->first();
+                    $child = CostCode::where('code', $data['code'])->first();
+                    if ($parent && $child && $child->parent_id !== $parent->id) {
+                        $child->update(['parent_id' => $parent->id]);
+                    }
+                }
+            }
+        });
+
+        return back()->with('import_result', $result);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────
 
     /** Stream a CSV file to the browser as a download. */
@@ -810,16 +903,51 @@ class ImportController extends Controller
             // Craft
             'code'              => 'code',
             'craft code'        => 'code',
+            'craftcode'         => 'code',
             'craft name'        => 'name',
             'description'       => 'description',
             'hourly'            => 'base_hourly_rate',
             'base hourly rate'  => 'base_hourly_rate',
             'base rate'         => 'base_hourly_rate',
+            'st base wage'      => 'base_hourly_rate',
+            'payrate'           => 'base_hourly_rate',
+            'pay rate'          => 'base_hourly_rate',
             'ot multiplier'     => 'overtime_multiplier',
             'overtime multiplier' => 'overtime_multiplier',
             'multiplier'        => 'overtime_multiplier',
+            'ot billable rate'  => 'ot_billable_rate',
+            'overtime billable rate' => 'ot_billable_rate',
+            'ot base wage'      => 'ot_billable_rate',
+            'payrateot'         => 'ot_billable_rate',
+            'wc'                => 'wc_rate',
+            'wc rate'           => 'wc_rate',
+            'wc (hr)'           => 'wc_rate',
+            'workers comp'      => 'wc_rate',
+            'fica'              => 'fica_rate',
+            'fica%'             => 'fica_rate',
+            'fica rate'         => 'fica_rate',
+            'suta'              => 'suta_rate',
+            'suta%'             => 'suta_rate',
+            'suta rate'         => 'suta_rate',
+            'benefits'          => 'benefits_rate',
+            'benefits rate'     => 'benefits_rate',
+            'benefits st($/hr)' => 'benefits_rate',
+            'employee benefits st ($/hr)' => 'benefits_rate',
+            'overhead'          => 'overhead_rate',
+            'overhead rate'     => 'overhead_rate',
+            'overhead burden'   => 'overhead_rate',
             'active'            => 'is_active',
             'preferred'         => 'is_preferred',
+
+            // Cost Codes
+            'phase code'        => 'code',
+            'cost code'         => 'code',
+            'cost type'         => 'cost_type',
+            'category'          => 'category',
+            'parent'            => 'parent_code',
+            'parent code'       => 'parent_code',
+            'sort order'        => 'sort_order',
+            'sort'              => 'sort_order',
         ];
 
         return array_map(function ($h) use ($aliases) {
@@ -854,6 +982,14 @@ class ImportController extends Controller
         // Strip $ , and spaces
         $clean = preg_replace('/[\$,\s]/', '', (string) $value);
         return round((float) $clean, $decimals);
+    }
+
+    private function nullableDecimal($value, int $decimals = 2): ?float
+    {
+        if ($value === null || trim((string) $value) === '') return null;
+        $clean = preg_replace('/[\$,\s]/', '', (string) $value);
+        $num = (float) $clean;
+        return $num == 0 ? null : round($num, $decimals);
     }
 
     private function truthy($value): bool

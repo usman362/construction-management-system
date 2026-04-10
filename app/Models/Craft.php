@@ -16,6 +16,12 @@ class Craft extends Model
         'base_hourly_rate',
         'overtime_multiplier',
         'billable_rate',
+        'ot_billable_rate',
+        'wc_rate',
+        'fica_rate',
+        'suta_rate',
+        'benefits_rate',
+        'overhead_rate',
         'is_active',
     ];
 
@@ -23,6 +29,12 @@ class Craft extends Model
         'base_hourly_rate' => 'decimal:2',
         'overtime_multiplier' => 'decimal:2',
         'billable_rate' => 'decimal:2',
+        'ot_billable_rate' => 'decimal:2',
+        'wc_rate' => 'decimal:4',
+        'fica_rate' => 'decimal:4',
+        'suta_rate' => 'decimal:4',
+        'benefits_rate' => 'decimal:2',
+        'overhead_rate' => 'decimal:4',
         'is_active' => 'boolean',
     ];
 
