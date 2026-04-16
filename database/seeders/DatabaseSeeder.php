@@ -118,38 +118,48 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // 6. COST CODES (hierarchical, matching PDF)
-        $labor = CostCode::firstOrCreate(['code' => 'LABOR'], ['name' => 'LABOR', 'sort_order' => 0]);
-        $cc01  = CostCode::firstOrCreate(['code' => '01'],  ['name' => 'DIRECT LABOR', 'parent_id' => $labor->id, 'sort_order' => 1]);
-        $cc010 = CostCode::firstOrCreate(['code' => '010'], ['name' => 'INDIRECT LABOR', 'parent_id' => $labor->id, 'sort_order' => 2]);
+        // 6. COST CODES — resolve cost types by name, then create flat list
+        $ctByName = \App\Models\CostType::pluck('id', 'name')->toArray();
+        $directLaborId   = $ctByName['Direct Labor'] ?? null;
+        $indirectLaborId = $ctByName['Indirect Labor'] ?? null;
+        $materialsId     = $ctByName['Materials'] ?? null;
+        $rentalId        = $ctByName['3rd Party Rental Equipment'] ?? null;
+        $companyOwnedId  = $ctByName['Company Owned'] ?? null;
+        $fieldToolsId    = $ctByName['Field Tools and Supplies'] ?? null;
+        $subsId          = $ctByName['Subcontractors'] ?? null;
+        $perDiemId       = $ctByName['PER DIEM'] ?? null;
+        $nonReimbId      = $ctByName['Non-Reimburseable'] ?? null;
+        $salesTaxId      = $ctByName['Sales Tax'] ?? null;
 
-        $cc02 = CostCode::firstOrCreate(['code' => '02'], ['name' => 'MATERIAL', 'sort_order' => 3]);
+        $cc01  = CostCode::firstOrCreate(['code' => '01'],  ['name' => 'DIRECT LABOR',   'cost_type_id' => $directLaborId]);
+        $cc010 = CostCode::firstOrCreate(['code' => '010'], ['name' => 'INDIRECT LABOR', 'cost_type_id' => $indirectLaborId]);
+        $cc02  = CostCode::firstOrCreate(['code' => '02'],  ['name' => 'MATERIAL',       'cost_type_id' => $materialsId]);
 
-        $cc03  = CostCode::firstOrCreate(['code' => '03'],  ['name' => '3RD PARTY RENTAL', 'sort_order' => 4]);
-        $cc03a = CostCode::firstOrCreate(['code' => '03A'], ['name' => 'Welding Machine Rental', 'parent_id' => $cc03->id, 'sort_order' => 5]);
-        $cc03b = CostCode::firstOrCreate(['code' => '03B'], ['name' => 'Generator', 'parent_id' => $cc03->id, 'sort_order' => 6]);
-        $cc03c = CostCode::firstOrCreate(['code' => '03C'], ['name' => 'Fork Lift Rental', 'parent_id' => $cc03->id, 'sort_order' => 7]);
-        $cc03d = CostCode::firstOrCreate(['code' => '03D'], ['name' => 'Restrooms', 'parent_id' => $cc03->id, 'sort_order' => 8]);
-        $cc03e = CostCode::firstOrCreate(['code' => '03E'], ['name' => 'UTV', 'parent_id' => $cc03->id, 'sort_order' => 9]);
-        $cc03f = CostCode::firstOrCreate(['code' => '03F'], ['name' => 'WEEKLY', 'parent_id' => $cc03->id, 'sort_order' => 10]);
+        $cc03  = CostCode::firstOrCreate(['code' => '03'],  ['name' => '3RD PARTY RENTAL', 'cost_type_id' => $rentalId]);
+        $cc03a = CostCode::firstOrCreate(['code' => '03A'], ['name' => 'Welding Machine Rental', 'cost_type_id' => $rentalId]);
+        $cc03b = CostCode::firstOrCreate(['code' => '03B'], ['name' => 'Generator',        'cost_type_id' => $rentalId]);
+        $cc03c = CostCode::firstOrCreate(['code' => '03C'], ['name' => 'Fork Lift Rental', 'cost_type_id' => $rentalId]);
+        $cc03d = CostCode::firstOrCreate(['code' => '03D'], ['name' => 'Restrooms',        'cost_type_id' => $rentalId]);
+        $cc03e = CostCode::firstOrCreate(['code' => '03E'], ['name' => 'UTV',              'cost_type_id' => $rentalId]);
+        $cc03f = CostCode::firstOrCreate(['code' => '03F'], ['name' => 'WEEKLY',           'cost_type_id' => $rentalId]);
 
-        $cc04  = CostCode::firstOrCreate(['code' => '04'],  ['name' => 'COMPANY EQUIP', 'sort_order' => 11]);
-        $cc04a = CostCode::firstOrCreate(['code' => '04A'], ['name' => 'Tool Trailer - WEEKLY', 'parent_id' => $cc04->id, 'sort_order' => 12]);
+        $cc04  = CostCode::firstOrCreate(['code' => '04'],  ['name' => 'COMPANY EQUIP',        'cost_type_id' => $companyOwnedId]);
+        $cc04a = CostCode::firstOrCreate(['code' => '04A'], ['name' => 'Tool Trailer - WEEKLY','cost_type_id' => $companyOwnedId]);
 
-        $cc05 = CostCode::firstOrCreate(['code' => '05'], ['name' => 'CONSUMABLES TOOLS & SUPPLIES', 'sort_order' => 13]);
+        $cc05 = CostCode::firstOrCreate(['code' => '05'], ['name' => 'CONSUMABLES TOOLS & SUPPLIES', 'cost_type_id' => $fieldToolsId]);
 
-        $cc06  = CostCode::firstOrCreate(['code' => '06'],  ['name' => 'SUBCONTRACTOR', 'sort_order' => 14]);
-        $cc06a = CostCode::firstOrCreate(['code' => '06A'], ['name' => 'AI Package and Code Work Package', 'parent_id' => $cc06->id, 'sort_order' => 15]);
-        $cc06b = CostCode::firstOrCreate(['code' => '06B'], ['name' => 'WEEKLY - PT Test - Working Stright Days', 'parent_id' => $cc06->id, 'sort_order' => 16]);
-        $cc06c = CostCode::firstOrCreate(['code' => '06C'], ['name' => 'Buckhorn', 'parent_id' => $cc06->id, 'sort_order' => 17]);
-        $cc06d = CostCode::firstOrCreate(['code' => '06D'], ['name' => "Tax's", 'parent_id' => $cc06->id, 'sort_order' => 18]);
-        $cc06e = CostCode::firstOrCreate(['code' => '06E'], ['name' => 'Onboarding / Mobilization Cost', 'parent_id' => $cc06->id, 'sort_order' => 19]);
-        $cc06f = CostCode::firstOrCreate(['code' => '06F'], ['name' => 'MSHA Class', 'parent_id' => $cc06->id, 'sort_order' => 20]);
+        $cc06  = CostCode::firstOrCreate(['code' => '06'],  ['name' => 'SUBCONTRACTOR', 'cost_type_id' => $subsId]);
+        $cc06a = CostCode::firstOrCreate(['code' => '06A'], ['name' => 'AI Package and Code Work Package', 'cost_type_id' => $subsId]);
+        $cc06b = CostCode::firstOrCreate(['code' => '06B'], ['name' => 'WEEKLY - PT Test - Working Stright Days', 'cost_type_id' => $subsId]);
+        $cc06c = CostCode::firstOrCreate(['code' => '06C'], ['name' => 'Buckhorn', 'cost_type_id' => $subsId]);
+        $cc06d = CostCode::firstOrCreate(['code' => '06D'], ['name' => "Tax's", 'cost_type_id' => $subsId]);
+        $cc06e = CostCode::firstOrCreate(['code' => '06E'], ['name' => 'Onboarding / Mobilization Cost', 'cost_type_id' => $subsId]);
+        $cc06f = CostCode::firstOrCreate(['code' => '06F'], ['name' => 'MSHA Class', 'cost_type_id' => $subsId]);
 
-        $cc07 = CostCode::firstOrCreate(['code' => '07'], ['name' => 'EQUIPMENT COST', 'sort_order' => 21]);
-        $cc08 = CostCode::firstOrCreate(['code' => '08'], ['name' => 'PER DIEM', 'sort_order' => 22]);
-        $cc09 = CostCode::firstOrCreate(['code' => '09'], ['name' => 'NON-REIMBURSEABLE', 'sort_order' => 23]);
-        $cc13 = CostCode::firstOrCreate(['code' => '13'], ['name' => 'SALES TAX', 'sort_order' => 24]);
+        $cc07 = CostCode::firstOrCreate(['code' => '07'], ['name' => 'EQUIPMENT COST',    'cost_type_id' => $companyOwnedId]);
+        $cc08 = CostCode::firstOrCreate(['code' => '08'], ['name' => 'PER DIEM',          'cost_type_id' => $perDiemId]);
+        $cc09 = CostCode::firstOrCreate(['code' => '09'], ['name' => 'NON-REIMBURSEABLE', 'cost_type_id' => $nonReimbId]);
+        $cc13 = CostCode::firstOrCreate(['code' => '13'], ['name' => 'SALES TAX',         'cost_type_id' => $salesTaxId]);
 
         // 7. VENDORS
         $vendors = [];

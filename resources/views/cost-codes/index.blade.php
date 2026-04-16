@@ -52,7 +52,7 @@
                     <li>Download the template using the "Download Template" button.</li>
                     <li>Fill in one row per cost code; keep the header row.</li>
                     <li><code>code</code> and <code>name</code> are required.</li>
-                    <li>Use <code>parent_code</code> to set hierarchy (must match an existing code).</li>
+                    <li><code>cost_type</code> must match one of the names (or codes) from the Cost Types list.</li>
                     <li>Existing codes (matched by <code>code</code>) will be updated.</li>
                 </ol>
             </div>
@@ -71,7 +71,7 @@
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">
         <thead><tr>
-            <th>Code</th><th>Name</th><th>Category</th><th>Cost Type</th><th>Parent</th><th>Description</th><th class="text-center" width="100">Actions</th>
+            <th>Phase Code #</th><th>Phase Code Name</th><th>Cost Type</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
@@ -84,16 +84,29 @@
             <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="createForm" class="p-6 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Code *</label><input type="text" name="code" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code # *</label>
+                <input type="text" name="code" placeholder="e.g. 01.10.100 or 01 10 100" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
-            <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Category *</label><select name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="">Select...</option><option value="labor">Labor</option><option value="material">Material</option><option value="equipment">Equipment</option><option value="subcontract">Subcontract</option><option value="other">Other</option></select></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label><input type="text" name="cost_type" placeholder="e.g. Direct Labor, Indirect Labor" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code Name *</label>
+                <input type="text" name="name" placeholder="e.g. Mobilization / Demobilization" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Code</label><input type="text" name="parent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="">— None —</option>
+                    @foreach($costTypes as $ct)
+                        <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="inline-flex items-center gap-2">
+                    <input type="checkbox" name="is_active" value="1" checked class="rounded border-gray-300 text-blue-600">
+                    <span class="text-sm text-gray-700">Active</span>
+                </label>
+            </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -111,16 +124,29 @@
         </div>
         <form id="editForm" class="p-6 space-y-4">
             <input type="hidden" name="_id" id="edit_id">
-            <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Code *</label><input type="text" name="code" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code # *</label>
+                <input type="text" name="code" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
-            <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Category</label><select name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"><option value="">—</option><option value="labor">Labor</option><option value="material">Material</option><option value="equipment">Equipment</option><option value="subcontract">Subcontract</option><option value="other">Other</option></select></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label><input type="text" name="cost_type" placeholder="e.g. Direct Labor, Indirect Labor" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code Name *</label>
+                <input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Code</label><input type="text" name="parent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="">— None —</option>
+                    @foreach($costTypes as $ct)
+                        <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="inline-flex items-center gap-2">
+                    <input type="checkbox" name="is_active" value="1" class="rounded border-gray-300 text-blue-600">
+                    <span class="text-sm text-gray-700">Active</span>
+                </label>
+            </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('editModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -148,14 +174,9 @@
 var table = $('#dataTable').DataTable({
     ajax: '{{ route("cost-codes.index") }}',
     columns: [
-        {data:'code'}, {data:'name'},
-        {data:'category', render: function(d) {
-            if (!d) return '<span class="text-gray-400">—</span>';
-            return d.charAt(0).toUpperCase() + d.slice(1);
-        }},
-        {data:'cost_type', render: d=>d||'<span class="text-gray-400">—</span>'},
-        {data:'parent_name', render: function(d) { return d === '—' || !d ? '—' : d; }},
-        {data:'description', render: d=>d||'—'},
+        {data:'code'},
+        {data:'name'},
+        {data:'cost_type_name', render: d=>d||'<span class="text-gray-400">—</span>'},
         {data:'actions', orderable:false, searchable:false, className:'text-center',
          render: function(data) {
             return '<div class="flex items-center justify-center gap-1">'+
@@ -174,10 +195,8 @@ function editCostCode(id){
         f.querySelector('#edit_id').value=d.id;
         f.querySelector('[name="code"]').value=d.code;
         f.querySelector('[name="name"]').value=d.name;
-        f.querySelector('[name="description"]').value=d.description||'';
-        f.querySelector('[name="category"]').value=d.category||'';
-        f.querySelector('[name="cost_type"]').value=d.cost_type||'';
-        f.querySelector('[name="parent_id"]').value=d.parent_id||'';
+        f.querySelector('[name="cost_type_id"]').value=d.cost_type_id||'';
+        f.querySelector('[name="is_active"]').checked = !!d.is_active;
         document.getElementById('editSaveBtn').onclick=function(){ submitForm('editForm',window.BASE_URL+'/cost-codes/'+d.id,'PUT',table,'editModal'); };
         openModal('editModal');
     });
@@ -185,12 +204,12 @@ function editCostCode(id){
 
 function viewCostCode(id){
     $.get(window.BASE_URL+'/cost-codes/'+id, function(d){
+        var ct = d.cost_type ? (d.cost_type.code + ' — ' + d.cost_type.name) : '—';
         document.getElementById('viewContent').innerHTML=
             '<div class="space-y-4">'+
-            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Code</p><p class="text-sm font-semibold">'+d.code+'</p></div><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div></div>'+
-            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Category</p><p class="text-sm">'+(d.category ? (d.category.charAt(0).toUpperCase()+d.category.slice(1)) : '—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Cost Type</p><p class="text-sm">'+(d.cost_type||'—')+'</p></div></div>'+
-            '<div><p class="text-xs text-gray-500 mb-1">Parent</p><p class="text-sm">'+(d.parent ? d.parent.name : '—')+'</p></div>'+
-            '<div><p class="text-xs text-gray-500 mb-1">Description</p><p class="text-sm">'+(d.description||'—')+'</p></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Phase Code #</p><p class="text-sm font-semibold">'+d.code+'</p></div><div><p class="text-xs text-gray-500 mb-1">Phase Code Name</p><p class="text-sm font-semibold">'+d.name+'</p></div></div>'+
+            '<div><p class="text-xs text-gray-500 mb-1">Cost Type</p><p class="text-sm">'+ct+'</p></div>'+
+            '<div><p class="text-xs text-gray-500 mb-1">Status</p>'+(d.is_active?'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>':'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>')+'</div>'+
             '</div>';
         openModal('viewModal');
     });

@@ -642,7 +642,7 @@ class ImportController extends Controller
     // ─── Cost Codes ──────────────────────────────────────────────────────
 
     private const COST_CODE_COLUMNS = [
-        'code', 'name', 'category', 'cost_type', 'parent_code', 'description', 'sort_order', 'is_active',
+        'code', 'name', 'cost_type', 'is_active',
     ];
 
     public function costCodeTemplate(): StreamedResponse
@@ -651,10 +651,11 @@ class ImportController extends Controller
             'cost_codes_import_template.csv',
             self::COST_CODE_COLUMNS,
             [
-                ['01',        'General Conditions', 'labor', '',              '',   'General conditions phase',  '1', 'yes'],
-                ['01.10.000', 'T & M Labor',        'labor', 'Direct Labor', '01', 'T & M Direct Labor',        '2', 'yes'],
-                ['02',        'Sitework',            'labor', '',              '',   'Sitework phase',            '3', 'yes'],
-                ['03',        'Materials',           'material', '',           '',   'Materials & supplies',      '4', 'yes'],
+                ['01 00 000', 'T&M - Maintenance',              'Direct Labor',    'yes'],
+                ['01 10 100', 'Mobilization / Demobilization',  'Direct Labor',    'yes'],
+                ['03 10 000', 'Excavation',                     'Direct Labor',    'yes'],
+                ['03 40 000', 'Concrete',                       'Materials',       'yes'],
+                ['09 20 000', 'Fuel',                           'Field Tools and Supplies', 'yes'],
             ]
         );
     }
@@ -672,9 +673,13 @@ class ImportController extends Controller
 
         $header = $this->normalizeHeader(array_shift($rows));
 
-        // First pass: create/update all codes so parent references resolve
-        DB::transaction(function () use ($rows, $header, &$result) {
-            // Pass 1: create/update all cost codes
+        // Build a lookup map for cost types by code AND by lowercased name
+        $costTypesByCode = \App\Models\CostType::pluck('id', 'code')->toArray();
+        $costTypesByName = \App\Models\CostType::pluck('id', 'name')
+            ->mapWithKeys(fn($id, $name) => [strtolower(trim($name)) => $id])
+            ->toArray();
+
+        DB::transaction(function () use ($rows, $header, $costTypesByCode, $costTypesByName, &$result) {
             foreach ($rows as $rowIndex => $row) {
                 $rowNumber = $rowIndex + 2;
                 $data = $this->combineRow($header, $row);
@@ -686,13 +691,22 @@ class ImportController extends Controller
                 }
 
                 try {
+                    // Resolve cost_type (accepts either the code like "01" or name like "Direct Labor")
+                    $costTypeId = null;
+                    $costTypeValue = $this->blankToNull($data['cost_type'] ?? null);
+                    if ($costTypeValue !== null) {
+                        if (isset($costTypesByCode[$costTypeValue])) {
+                            $costTypeId = $costTypesByCode[$costTypeValue];
+                        } else {
+                            $key = strtolower(trim($costTypeValue));
+                            $costTypeId = $costTypesByName[$key] ?? null;
+                        }
+                    }
+
                     $payload = [
-                        'name'        => $data['name'],
-                        'category'    => $this->blankToNull($data['category'] ?? null),
-                        'cost_type'   => $this->blankToNull($data['cost_type'] ?? null),
-                        'description' => $this->blankToNull($data['description'] ?? null),
-                        'sort_order'  => (int) ($data['sort_order'] ?? 0),
-                        'is_active'   => $this->truthy($data['is_active'] ?? true),
+                        'name'         => $data['name'],
+                        'cost_type_id' => $costTypeId,
+                        'is_active'    => $this->truthy($data['is_active'] ?? true),
                     ];
 
                     $existing = CostCode::where('code', $data['code'])->first();
@@ -706,19 +720,6 @@ class ImportController extends Controller
                 } catch (\Throwable $e) {
                     $result['skipped']++;
                     $result['errors'][] = ['row' => $rowNumber, 'message' => $e->getMessage()];
-                }
-            }
-
-            // Pass 2: resolve parent_code references
-            foreach ($rows as $row) {
-                $data = $this->combineRow($header, $row);
-                $parentCode = $this->blankToNull($data['parent_code'] ?? null);
-                if ($parentCode && !empty($data['code'])) {
-                    $parent = CostCode::where('code', $parentCode)->first();
-                    $child = CostCode::where('code', $data['code'])->first();
-                    if ($parent && $child && $child->parent_id !== $parent->id) {
-                        $child->update(['parent_id' => $parent->id]);
-                    }
                 }
             }
         });

@@ -141,7 +141,7 @@ class ProjectController extends Controller
         $costSummary = $commitments->groupBy('cost_code_id')->map(function ($items, $key) {
             return (object) [
                 'code' => $items->first()->costCode->code ?? 'N/A',
-                'description' => $items->first()->costCode->description ?? 'N/A',
+                'description' => $items->first()->costCode->name ?? 'N/A',
                 'total' => $items->sum('amount'),
             ];
         })->values();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CostCode;
+use App\Models\CostType;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -14,12 +15,13 @@ class CostCodeController extends Controller
         if ($request->ajax()) {
             return $this->dataTable($request);
         }
-        return view('cost-codes.index');
+        $costTypes = CostType::active()->orderBy('sort_order')->get();
+        return view('cost-codes.index', compact('costTypes'));
     }
 
     private function dataTable(Request $request): JsonResponse
     {
-        $query = CostCode::with('parent');
+        $query = CostCode::with('costType');
         $totalRecords = CostCode::count();
 
         // Search
@@ -27,14 +29,13 @@ class CostCodeController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
                   ->orWhere('name', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                  ->orWhereHas('costType', fn($qt) => $qt->where('name', 'like', "%{$search}%"));
             });
         }
         $filteredRecords = $query->count();
 
         // Order
-        $columns = ['code', 'name', 'category', 'parent_id', 'description'];
+        $columns = ['code', 'name', 'cost_type_id'];
         $orderCol = $columns[$request->input('order.0.column', 0)] ?? 'code';
         $orderDir = $request->input('order.0.dir', 'asc');
         $query->orderBy($orderCol, $orderDir);
@@ -53,10 +54,8 @@ class CostCodeController extends Controller
                     'id' => $costCode->id,
                     'code' => $costCode->code,
                     'name' => $costCode->name,
-                    'category' => $costCode->category,
-                    'cost_type' => $costCode->cost_type,
-                    'description' => $costCode->description,
-                    'parent_name' => $costCode->parent?->name ?? '—',
+                    'cost_type_id' => $costCode->cost_type_id,
+                    'cost_type_name' => $costCode->costType?->name,
                     'is_active' => $costCode->is_active,
                     'actions' => $costCode->id,
                 ];
@@ -69,10 +68,7 @@ class CostCodeController extends Controller
         $validated = $request->validate([
             'code' => 'required|unique:cost_codes|string|max:50',
             'name' => 'required|string|max:255',
-            'category' => 'required|string|max:50|in:labor,material,equipment,subcontract,other',
-            'cost_type' => 'nullable|string|max:50',
-            'parent_id' => 'nullable|exists:cost_codes,id',
-            'description' => 'nullable|string',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'is_active' => 'nullable|boolean',
         ]);
 
@@ -83,29 +79,22 @@ class CostCodeController extends Controller
 
     public function show(CostCode $costCode): JsonResponse
     {
-        $costCode->load(['parent', 'children']);
+        $costCode->load('costType');
         return response()->json($costCode);
     }
 
     public function edit(CostCode $costCode): JsonResponse
     {
-        $costCode->load('parent');
+        $costCode->load('costType');
         return response()->json($costCode);
     }
 
     public function update(Request $request, CostCode $costCode): JsonResponse
     {
-        $request->merge([
-            'category' => $request->filled('category') ? $request->input('category') : null,
-        ]);
-
         $validated = $request->validate([
             'code' => "required|unique:cost_codes,code,{$costCode->id}|string|max:50",
             'name' => 'required|string|max:255',
-            'category' => 'nullable|string|max:50|in:labor,material,equipment,subcontract,other',
-            'cost_type' => 'nullable|string|max:50',
-            'parent_id' => 'nullable|exists:cost_codes,id',
-            'description' => 'nullable|string',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'is_active' => 'nullable|boolean',
         ]);
 

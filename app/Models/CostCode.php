@@ -13,11 +13,7 @@ class CostCode extends Model
     protected $fillable = [
         'code',
         'name',
-        'category',
-        'cost_type',
-        'parent_id',
-        'description',
-        'sort_order',
+        'cost_type_id',
         'is_active',
     ];
 
@@ -25,14 +21,9 @@ class CostCode extends Model
         'is_active' => 'boolean',
     ];
 
-    public function parent(): BelongsTo
+    public function costType(): BelongsTo
     {
-        return $this->belongsTo(CostCode::class, 'parent_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(CostCode::class, 'parent_id');
+        return $this->belongsTo(CostType::class);
     }
 
     public function budgetLines(): HasMany
@@ -83,10 +74,5 @@ class CostCode extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
-    }
-
-    public function scopeTopLevel($query)
-    {
-        return $query->whereNull('parent_id');
     }
 }
