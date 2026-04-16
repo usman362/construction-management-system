@@ -248,12 +248,19 @@ class ImportController extends Controller
                 }
 
                 try {
+                    // Fallback for duplicate-header CSVs where the 6th column was
+                    // accidentally labeled "base_hourly_rate" instead of "billable_rate".
+                    $billableRate = $data['billable_rate'] ?? null;
+                    if ($billableRate === null || $billableRate === '') {
+                        $billableRate = $data['base_hourly_rate_2'] ?? 0;
+                    }
+
                     $payload = [
                         'name'                => $data['name'],
                         'description'         => $this->blankToNull($data['description'] ?? null),
                         'base_hourly_rate'    => $this->toDecimal($data['base_hourly_rate'] ?? 0),
                         'overtime_multiplier' => $this->toDecimal($data['overtime_multiplier'] ?? 1.5),
-                        'billable_rate'       => $this->toDecimal($data['billable_rate'] ?? 0),
+                        'billable_rate'       => $this->toDecimal($billableRate),
                         'ot_billable_rate'    => $this->nullableDecimal($data['ot_billable_rate'] ?? null),
                         'wc_rate'             => $this->nullableDecimal($data['wc_rate'] ?? null, 4),
                         'fica_rate'           => $this->nullableDecimal($data['fica_rate'] ?? null, 4),
@@ -950,15 +957,29 @@ class ImportController extends Controller
             'sort'              => 'sort_order',
         ];
 
-        return array_map(function ($h) use ($aliases) {
-            $normalized = strtolower(trim((string) $h));
+        $normalized = array_map(function ($h) use ($aliases) {
+            $name = strtolower(trim((string) $h));
             // Direct match on alias
-            if (isset($aliases[$normalized])) {
-                return $aliases[$normalized];
+            if (isset($aliases[$name])) {
+                return $aliases[$name];
             }
             // Already snake_case canonical
-            return preg_replace('/[\s\-]+/', '_', $normalized);
+            return preg_replace('/[\s\-]+/', '_', $name);
         }, $rawHeader);
+
+        // Rename duplicate columns so both values are preserved
+        // (e.g., two "base_hourly_rate" columns → "base_hourly_rate", "base_hourly_rate_2")
+        $seen = [];
+        foreach ($normalized as $i => $col) {
+            if (isset($seen[$col])) {
+                $seen[$col]++;
+                $normalized[$i] = $col . '_' . $seen[$col];
+            } else {
+                $seen[$col] = 1;
+            }
+        }
+
+        return $normalized;
     }
 
     /** Combine a header and row into an associative array. */
@@ -979,15 +1000,16 @@ class ImportController extends Controller
     private function toDecimal($value, int $decimals = 2): float
     {
         if ($value === null || $value === '') return 0.0;
-        // Strip $ , and spaces
-        $clean = preg_replace('/[\$,\s]/', '', (string) $value);
+        // Strip everything except digits, decimal point, and minus sign
+        // (handles $, commas, spaces, "x" suffix like "1.5x", etc.)
+        $clean = preg_replace('/[^\d.\-]/', '', (string) $value);
         return round((float) $clean, $decimals);
     }
 
     private function nullableDecimal($value, int $decimals = 2): ?float
     {
         if ($value === null || trim((string) $value) === '') return null;
-        $clean = preg_replace('/[\$,\s]/', '', (string) $value);
+        $clean = preg_replace('/[^\d.\-]/', '', (string) $value);
         $num = (float) $clean;
         return $num == 0 ? null : round($num, $decimals);
     }
