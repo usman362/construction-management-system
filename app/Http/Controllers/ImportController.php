@@ -206,9 +206,13 @@ class ImportController extends Controller
 
     private const CRAFT_COLUMNS = [
         'code', 'name', 'description',
-        'base_hourly_rate', 'overtime_multiplier', 'billable_rate',
-        'ot_billable_rate', 'wc_rate', 'fica_rate', 'suta_rate',
-        'benefits_rate', 'overhead_rate', 'is_active',
+        'base_hourly_rate', 'overtime_multiplier',
+        'billable_rate', 'ot_billable_rate',
+        'fica_st_rate', 'fica_ot_rate',
+        'suta_st_rate', 'suta_ot_rate',
+        'wc_st_rate', 'wc_ot_rate',
+        'benefits_st_rate', 'benefits_ot_rate',
+        'overhead_rate', 'is_active',
     ];
 
     public function craftTemplate(): StreamedResponse
@@ -217,8 +221,9 @@ class ImportController extends Controller
             'crafts_import_template.csv',
             self::CRAFT_COLUMNS,
             [
-                ['CRANE-OP', 'Crane Operator', 'Licensed crane operator', '32.50', '1.5', '78.00', '48.75', '0.906', '0.0765', '0.0181', '3.71', '0.10', 'yes'],
-                ['LAB-01',   'General Laborer', '',                        '22.00', '1.5', '55.00', '33.00', '0.906', '0.0765', '0.0181', '3.71', '0.10', 'yes'],
+                ['SPM',  'Sr Project Manager', 'Sr Project Manager', '65.00', '1.5', '89.45',  '117.81', '0.0765', '0.0765', '0.0181', '0.0181', '0.906', '0.906', '3.71', '3.22', '0.10', 'yes'],
+                ['CRANE-OP', 'Crane Operator', '',                   '32.50', '1.5', '78.00',  '104.00', '0.0765', '0.0765', '0.0181', '0.0181', '0.906', '0.906', '3.71', '3.22', '0.10', 'yes'],
+                ['LAB-01',   'General Laborer', '',                  '22.00', '1.5', '55.00',  '73.00',  '0.0765', '0.0765', '0.0181', '0.0181', '0.906', '0.906', '3.71', '3.22', '0.10', 'yes'],
             ]
         );
     }
@@ -255,6 +260,10 @@ class ImportController extends Controller
                         $billableRate = $data['base_hourly_rate_2'] ?? 0;
                     }
 
+                    // Backwards-compatibility: if a single-value rate column was provided
+                    // (e.g. "fica_rate"), treat it as the ST variant.
+                    $fallback = fn($k) => $data[$k.'_st_rate'] ?? $data[$k.'_rate'] ?? null;
+
                     $payload = [
                         'name'                => $data['name'],
                         'description'         => $this->blankToNull($data['description'] ?? null),
@@ -262,10 +271,14 @@ class ImportController extends Controller
                         'overtime_multiplier' => $this->toDecimal($data['overtime_multiplier'] ?? 1.5),
                         'billable_rate'       => $this->toDecimal($billableRate),
                         'ot_billable_rate'    => $this->nullableDecimal($data['ot_billable_rate'] ?? null),
-                        'wc_rate'             => $this->nullableDecimal($data['wc_rate'] ?? null, 4),
-                        'fica_rate'           => $this->nullableDecimal($data['fica_rate'] ?? null, 4),
-                        'suta_rate'           => $this->nullableDecimal($data['suta_rate'] ?? null, 4),
-                        'benefits_rate'       => $this->nullableDecimal($data['benefits_rate'] ?? null),
+                        'fica_st_rate'        => $this->nullableDecimal($fallback('fica'), 4),
+                        'fica_ot_rate'        => $this->nullableDecimal($data['fica_ot_rate'] ?? null, 4),
+                        'suta_st_rate'        => $this->nullableDecimal($fallback('suta'), 4),
+                        'suta_ot_rate'        => $this->nullableDecimal($data['suta_ot_rate'] ?? null, 4),
+                        'wc_st_rate'          => $this->nullableDecimal($fallback('wc'), 4),
+                        'wc_ot_rate'          => $this->nullableDecimal($data['wc_ot_rate'] ?? null, 4),
+                        'benefits_st_rate'    => $this->nullableDecimal($fallback('benefits')),
+                        'benefits_ot_rate'    => $this->nullableDecimal($data['benefits_ot_rate'] ?? null),
                         'overhead_rate'       => $this->nullableDecimal($data['overhead_rate'] ?? null, 4),
                         'is_active'           => $this->truthy($data['is_active'] ?? true),
                     ];
@@ -927,20 +940,36 @@ class ImportController extends Controller
             'overtime billable rate' => 'ot_billable_rate',
             'ot base wage'      => 'ot_billable_rate',
             'payrateot'         => 'ot_billable_rate',
-            'wc'                => 'wc_rate',
-            'wc rate'           => 'wc_rate',
-            'wc (hr)'           => 'wc_rate',
-            'workers comp'      => 'wc_rate',
-            'fica'              => 'fica_rate',
-            'fica%'             => 'fica_rate',
-            'fica rate'         => 'fica_rate',
-            'suta'              => 'suta_rate',
-            'suta%'             => 'suta_rate',
-            'suta rate'         => 'suta_rate',
-            'benefits'          => 'benefits_rate',
-            'benefits rate'     => 'benefits_rate',
-            'benefits st($/hr)' => 'benefits_rate',
-            'employee benefits st ($/hr)' => 'benefits_rate',
+            'wc'                => 'wc_st_rate',
+            'wc rate'           => 'wc_st_rate',
+            'wc (hr)'           => 'wc_st_rate',
+            'workers comp'      => 'wc_st_rate',
+            'wc st'             => 'wc_st_rate',
+            'wc st rate'        => 'wc_st_rate',
+            'wc ot'             => 'wc_ot_rate',
+            'wc ot rate'        => 'wc_ot_rate',
+            'fica'              => 'fica_st_rate',
+            'fica%'             => 'fica_st_rate',
+            'fica rate'         => 'fica_st_rate',
+            'fica st'           => 'fica_st_rate',
+            'fica st ($/hr)'    => 'fica_st_rate',
+            'fica ot'           => 'fica_ot_rate',
+            'fica ot ($/hr)'    => 'fica_ot_rate',
+            'suta'              => 'suta_st_rate',
+            'suta%'             => 'suta_st_rate',
+            'suta rate'         => 'suta_st_rate',
+            'suta st'           => 'suta_st_rate',
+            'suta st ($/hr)'    => 'suta_st_rate',
+            'suta ot'           => 'suta_ot_rate',
+            'suta ot ($/hr)'    => 'suta_ot_rate',
+            'futa/suta st ($/hr)' => 'suta_st_rate',
+            'futa/suta ot ($/hr)' => 'suta_ot_rate',
+            'benefits'          => 'benefits_st_rate',
+            'benefits rate'     => 'benefits_st_rate',
+            'benefits st($/hr)' => 'benefits_st_rate',
+            'employee benefits st ($/hr)' => 'benefits_st_rate',
+            'benefits ot($/hr)' => 'benefits_ot_rate',
+            'employee benefits ot ($/hr)' => 'benefits_ot_rate',
             'overhead'          => 'overhead_rate',
             'overhead rate'     => 'overhead_rate',
             'overhead burden'   => 'overhead_rate',

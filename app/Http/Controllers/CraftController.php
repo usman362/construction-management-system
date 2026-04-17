@@ -108,10 +108,14 @@ class CraftController extends Controller
             'overtime_multiplier' => 'required|numeric|min:0',
             'billable_rate' => 'required|numeric|min:0',
             'ot_billable_rate' => 'nullable|numeric|min:0',
-            'wc_rate' => 'nullable|numeric|min:0',
-            'fica_rate' => 'nullable|numeric|min:0',
-            'suta_rate' => 'nullable|numeric|min:0',
-            'benefits_rate' => 'nullable|numeric|min:0',
+            'wc_st_rate' => 'nullable|numeric|min:0',
+            'wc_ot_rate' => 'nullable|numeric|min:0',
+            'fica_st_rate' => 'nullable|numeric|min:0',
+            'fica_ot_rate' => 'nullable|numeric|min:0',
+            'suta_st_rate' => 'nullable|numeric|min:0',
+            'suta_ot_rate' => 'nullable|numeric|min:0',
+            'benefits_st_rate' => 'nullable|numeric|min:0',
+            'benefits_ot_rate' => 'nullable|numeric|min:0',
             'overhead_rate' => 'nullable|numeric|min:0',
         ];
     }

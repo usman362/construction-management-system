@@ -249,6 +249,22 @@
                 </div>
 
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Default Per Diem Rate ($/day)</label>
+                    <input
+                        type="number"
+                        name="default_per_diem_rate"
+                        step="0.01"
+                        placeholder="e.g. 100.00"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 @error('default_per_diem_rate') border-red-500 @enderror"
+                        value="{{ old('default_per_diem_rate') }}"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Used as default when entering per diem on this project's timesheets.</p>
+                    @error('default_per_diem_rate')
+                        <p class="text-red-600 text-sm mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">PO Number</label>
                     <input
                         type="text"

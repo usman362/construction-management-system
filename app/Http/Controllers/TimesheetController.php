@@ -279,16 +279,24 @@ class TimesheetController extends Controller
 
     /**
      * Keep a single allocation row in sync so payroll and reports can resolve cost code by hours.
+     * Auto-fills per_diem_amount from the project's default_per_diem_rate if set.
      */
     private function syncTimesheetCostAllocation(Timesheet $timesheet): void
     {
         $timesheet->costAllocations()->delete();
         if ($timesheet->cost_code_id) {
+            $perDiem = 0;
+            if ($timesheet->project_id) {
+                $rate = $timesheet->project?->default_per_diem_rate ?? 0;
+                // Apply per diem only for days the employee actually worked (total_hours > 0)
+                $perDiem = $timesheet->total_hours > 0 ? (float) $rate : 0;
+            }
             TimesheetCostAllocation::create([
                 'timesheet_id' => $timesheet->id,
                 'cost_code_id' => $timesheet->cost_code_id,
                 'hours' => $timesheet->total_hours,
                 'cost' => $timesheet->total_cost,
+                'per_diem_amount' => $perDiem,
             ]);
         }
     }

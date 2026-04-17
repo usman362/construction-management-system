@@ -29,6 +29,7 @@ class Project extends Model
         'current_budget',
         'estimate',
         'contract_value',
+        'default_per_diem_rate',
         'po_number',
         'po_date',
     ];
@@ -42,6 +43,7 @@ class Project extends Model
         'current_budget' => 'decimal:2',
         'estimate' => 'decimal:2',
         'contract_value' => 'decimal:2',
+        'default_per_diem_rate' => 'decimal:2',
     ];
 
     /** @var list<string> */

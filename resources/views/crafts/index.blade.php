@@ -93,15 +93,37 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Multiplier *</label><input type="number" step="0.01" name="overtime_multiplier" value="1.50" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Billable Rate *</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
-            <div class="grid grid-cols-3 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Billable Rate</label><input type="number" step="0.01" name="ot_billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">WC Rate</label><input type="number" step="0.0001" name="wc_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">FICA Rate</label><input type="number" step="0.0001" name="fica_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">OT Billable Rate</label>
+                <input type="number" step="0.01" name="ot_billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
             </div>
-            <div class="grid grid-cols-3 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">SUTA Rate</label><input type="number" step="0.0001" name="suta_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Benefits $/hr</label><input type="number" step="0.01" name="benefits_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Overhead Rate</label><input type="number" step="0.0001" name="overhead_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div class="pt-2 mt-2 border-t border-gray-100">
+                <p class="text-xs font-semibold uppercase text-gray-500 mb-2">Burden Rates (ST / OT)</p>
+                <div class="grid grid-cols-3 gap-2 mb-2 text-xs font-medium text-gray-500 px-1"><div></div><div class="text-center">ST</div><div class="text-center">OT</div></div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">FICA</label>
+                    <input type="number" step="0.0001" name="fica_st_rate" placeholder="0.0765" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.0001" name="fica_ot_rate" placeholder="0.0765" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">SUTA</label>
+                    <input type="number" step="0.0001" name="suta_st_rate" placeholder="0.0181" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.0001" name="suta_ot_rate" placeholder="0.0181" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">WC</label>
+                    <input type="number" step="0.0001" name="wc_st_rate" placeholder="0.906" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.0001" name="wc_ot_rate" placeholder="0.906" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">Benefits $/hr</label>
+                    <input type="number" step="0.01" name="benefits_st_rate" placeholder="3.71" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.01" name="benefits_ot_rate" placeholder="3.22" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="mt-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Overhead Rate</label>
+                    <input type="number" step="0.0001" name="overhead_rate" placeholder="0.10" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
             </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
@@ -130,15 +152,37 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Multiplier *</label><input type="number" step="0.01" name="overtime_multiplier" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Billable Rate *</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
-            <div class="grid grid-cols-3 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Billable Rate</label><input type="number" step="0.01" name="ot_billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">WC Rate</label><input type="number" step="0.0001" name="wc_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">FICA Rate</label><input type="number" step="0.0001" name="fica_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">OT Billable Rate</label>
+                <input type="number" step="0.01" name="ot_billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
             </div>
-            <div class="grid grid-cols-3 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">SUTA Rate</label><input type="number" step="0.0001" name="suta_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Benefits $/hr</label><input type="number" step="0.01" name="benefits_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Overhead Rate</label><input type="number" step="0.0001" name="overhead_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            <div class="pt-2 mt-2 border-t border-gray-100">
+                <p class="text-xs font-semibold uppercase text-gray-500 mb-2">Burden Rates (ST / OT)</p>
+                <div class="grid grid-cols-3 gap-2 mb-2 text-xs font-medium text-gray-500 px-1"><div></div><div class="text-center">ST</div><div class="text-center">OT</div></div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">FICA</label>
+                    <input type="number" step="0.0001" name="fica_st_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.0001" name="fica_ot_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">SUTA</label>
+                    <input type="number" step="0.0001" name="suta_st_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.0001" name="suta_ot_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">WC</label>
+                    <input type="number" step="0.0001" name="wc_st_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.0001" name="wc_ot_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                    <label class="text-sm text-gray-700">Benefits $/hr</label>
+                    <input type="number" step="0.01" name="benefits_st_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <input type="number" step="0.01" name="benefits_ot_rate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                </div>
+                <div class="mt-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Overhead Rate</label>
+                    <input type="number" step="0.0001" name="overhead_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
             </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
@@ -196,10 +240,14 @@ function editCraft(id){
         f.querySelector('[name="overtime_multiplier"]').value=d.overtime_multiplier;
         f.querySelector('[name="billable_rate"]').value=d.billable_rate;
         f.querySelector('[name="ot_billable_rate"]').value=d.ot_billable_rate||'';
-        f.querySelector('[name="wc_rate"]').value=d.wc_rate||'';
-        f.querySelector('[name="fica_rate"]').value=d.fica_rate||'';
-        f.querySelector('[name="suta_rate"]').value=d.suta_rate||'';
-        f.querySelector('[name="benefits_rate"]').value=d.benefits_rate||'';
+        f.querySelector('[name="fica_st_rate"]').value=d.fica_st_rate||'';
+        f.querySelector('[name="fica_ot_rate"]').value=d.fica_ot_rate||'';
+        f.querySelector('[name="suta_st_rate"]').value=d.suta_st_rate||'';
+        f.querySelector('[name="suta_ot_rate"]').value=d.suta_ot_rate||'';
+        f.querySelector('[name="wc_st_rate"]').value=d.wc_st_rate||'';
+        f.querySelector('[name="wc_ot_rate"]').value=d.wc_ot_rate||'';
+        f.querySelector('[name="benefits_st_rate"]').value=d.benefits_st_rate||'';
+        f.querySelector('[name="benefits_ot_rate"]').value=d.benefits_ot_rate||'';
         f.querySelector('[name="overhead_rate"]').value=d.overhead_rate||'';
         document.getElementById('editSaveBtn').onclick=function(){ submitForm('editForm',window.BASE_URL+'/crafts/'+d.id,'PUT',table,'editModal'); };
         openModal('editModal');
@@ -210,13 +258,22 @@ function viewCraft(id){
     $.get(window.BASE_URL+'/crafts/'+id, function(d){
         var fmtRate = function(v){ return v ? parseFloat(v).toFixed(4) : '—'; };
         var fmtDollar = function(v){ return v ? '$'+parseFloat(v).toFixed(2) : '—'; };
+        var burdenRow = function(label, st, ot, isDollar){
+            var fmt = isDollar ? fmtDollar : fmtRate;
+            return '<div class="grid grid-cols-3 gap-2 text-sm py-1 border-b border-gray-50"><div class="text-gray-600">'+label+'</div><div class="font-medium">ST: '+fmt(st)+'</div><div class="font-medium">OT: '+fmt(ot)+'</div></div>';
+        };
         document.getElementById('viewContent').innerHTML=
             '<div class="space-y-4">'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Code</p><p class="text-sm font-semibold">'+d.code+'</p></div><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Description</p><p class="text-sm">'+(d.description||'—')+'</p></div>'+
             '<div class="grid grid-cols-3 gap-4"><div><p class="text-xs text-gray-500 mb-1">Hourly Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.base_hourly_rate).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">OT Multiplier</p><p class="text-sm font-semibold">'+parseFloat(d.overtime_multiplier).toFixed(2)+'x</p></div><div><p class="text-xs text-gray-500 mb-1">Billable Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.billable_rate).toFixed(2)+'</p></div></div>'+
-            '<div class="grid grid-cols-3 gap-4"><div><p class="text-xs text-gray-500 mb-1">OT Billable Rate</p><p class="text-sm font-semibold">'+fmtDollar(d.ot_billable_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">WC Rate</p><p class="text-sm font-semibold">'+fmtRate(d.wc_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">FICA Rate</p><p class="text-sm font-semibold">'+fmtRate(d.fica_rate)+'</p></div></div>'+
-            '<div class="grid grid-cols-3 gap-4"><div><p class="text-xs text-gray-500 mb-1">SUTA Rate</p><p class="text-sm font-semibold">'+fmtRate(d.suta_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Benefits $/hr</p><p class="text-sm font-semibold">'+fmtDollar(d.benefits_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Overhead Rate</p><p class="text-sm font-semibold">'+fmtRate(d.overhead_rate)+'</p></div></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">OT Billable Rate</p><p class="text-sm font-semibold">'+fmtDollar(d.ot_billable_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Overhead Rate</p><p class="text-sm font-semibold">'+fmtRate(d.overhead_rate)+'</p></div></div>'+
+            '<div class="pt-2 border-t border-gray-100"><p class="text-xs font-semibold uppercase text-gray-500 mb-2">Burden Rates (ST / OT)</p>'+
+                burdenRow('FICA', d.fica_st_rate, d.fica_ot_rate, false)+
+                burdenRow('SUTA', d.suta_st_rate, d.suta_ot_rate, false)+
+                burdenRow('WC',   d.wc_st_rate,   d.wc_ot_rate,   false)+
+                burdenRow('Benefits $/hr', d.benefits_st_rate, d.benefits_ot_rate, true)+
+            '</div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Status</p>'+(d.is_active?'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>':'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>')+'</div>'+
             (d.employees&&d.employees.length?'<div><p class="text-xs text-gray-500 mb-2">Employees ('+d.employees.length+')</p><div class="space-y-1">'+d.employees.map(e=>'<p class="text-sm">'+e.first_name+' '+e.last_name+'</p>').join('')+'</div></div>':'')+
             '</div>';
