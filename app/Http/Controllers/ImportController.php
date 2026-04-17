@@ -246,7 +246,23 @@ class ImportController extends Controller
                 $rowNumber = $rowIndex + 2;
                 $data = $this->combineRow($header, $row);
 
-                if (empty($data['code']) || empty($data['name'])) {
+                // Fallback: if `name` is empty, use `craft_name` (common when the header
+                // row says just "Craft" which the employee-import alias routes to craft_name).
+                $name = $this->blankToNull($data['name'] ?? null)
+                    ?? $this->blankToNull($data['craft_name'] ?? null);
+
+                // Fallback: if `code` is empty, auto-generate from name
+                // (e.g. "Sr Project Manager" → "SR-PROJECT-MANAGER")
+                $code = $this->blankToNull($data['code'] ?? null);
+                if ($code === null && $name !== null) {
+                    $code = strtoupper(preg_replace('/[^A-Z0-9]+/i', '-', $name));
+                    $code = trim($code, '-');
+                    if (strlen($code) > 50) {
+                        $code = substr($code, 0, 50);
+                    }
+                }
+
+                if (empty($code) || empty($name)) {
                     $result['skipped']++;
                     $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing required code or name.'];
                     continue;
@@ -265,7 +281,7 @@ class ImportController extends Controller
                     $fallback = fn($k) => $data[$k.'_st_rate'] ?? $data[$k.'_rate'] ?? null;
 
                     $payload = [
-                        'name'                => $data['name'],
+                        'name'                => $name,
                         'description'         => $this->blankToNull($data['description'] ?? null),
                         'base_hourly_rate'    => $this->toDecimal($data['base_hourly_rate'] ?? 0),
                         'overtime_multiplier' => $this->toDecimal($data['overtime_multiplier'] ?? 1.5),
@@ -283,12 +299,12 @@ class ImportController extends Controller
                         'is_active'           => $this->truthy($data['is_active'] ?? true),
                     ];
 
-                    $existing = Craft::where('code', $data['code'])->first();
+                    $existing = Craft::where('code', $code)->first();
                     if ($existing) {
                         $existing->update($payload);
                         $result['updated']++;
                     } else {
-                        Craft::create($payload + ['code' => $data['code']]);
+                        Craft::create($payload + ['code' => $code]);
                         $result['created']++;
                     }
                 } catch (\Throwable $e) {
