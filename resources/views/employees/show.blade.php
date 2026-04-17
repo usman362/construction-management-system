@@ -231,6 +231,128 @@
     </script>
     @endpush
 
+    <!-- Project-Specific Pay Rates -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between border-b pb-4 mb-4">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Project-Specific Pay Rates</h2>
+                <p class="text-xs text-gray-500 mt-0.5">These rates override the employee's default when working on the listed project.</p>
+            </div>
+            <button type="button" onclick="openModal('addProjectRateModal')" class="inline-flex items-center gap-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Add Rate
+            </button>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                    <tr>
+                        <th class="px-4 py-2 text-left font-semibold text-gray-700">Project</th>
+                        <th class="px-4 py-2 text-right font-semibold text-gray-700">ST Rate</th>
+                        <th class="px-4 py-2 text-right font-semibold text-gray-700">OT Rate</th>
+                        <th class="px-4 py-2 text-right font-semibold text-gray-700">Billable</th>
+                        <th class="px-4 py-2 text-right font-semibold text-gray-700">ST Burden</th>
+                        <th class="px-4 py-2 text-right font-semibold text-gray-700">OT Burden</th>
+                        <th class="px-4 py-2 text-left font-semibold text-gray-700">Effective</th>
+                        <th class="px-4 py-2 text-center font-semibold text-gray-700">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @forelse($employee->projectRates ?? [] as $rate)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 text-gray-900">
+                                <span class="font-medium">{{ $rate->project?->name ?? '—' }}</span>
+                                @if($rate->project?->project_number) <span class="font-mono text-xs text-gray-500 ml-1">({{ $rate->project->project_number }})</span> @endif
+                            </td>
+                            <td class="px-4 py-2 text-right">{{ $rate->hourly_rate ? '$' . number_format($rate->hourly_rate, 2) : '—' }}</td>
+                            <td class="px-4 py-2 text-right">{{ $rate->overtime_rate ? '$' . number_format($rate->overtime_rate, 2) : '—' }}</td>
+                            <td class="px-4 py-2 text-right">{{ $rate->billable_rate ? '$' . number_format($rate->billable_rate, 2) : '—' }}</td>
+                            <td class="px-4 py-2 text-right">{{ $rate->st_burden_rate ? '$' . number_format($rate->st_burden_rate, 2) : '—' }}</td>
+                            <td class="px-4 py-2 text-right">{{ $rate->ot_burden_rate ? '$' . number_format($rate->ot_burden_rate, 2) : '—' }}</td>
+                            <td class="px-4 py-2 text-gray-600">
+                                {{ $rate->effective_date?->format('M d, Y') ?? 'Always' }}
+                                @if($rate->end_date) → {{ $rate->end_date->format('M d, Y') }} @endif
+                            </td>
+                            <td class="px-4 py-2 text-center">
+                                <button type="button" onclick="confirmDelete(window.BASE_URL+'/employees/{{ $employee->id }}/project-rates/{{ $rate->id }}', null, window.location.href)" class="text-red-600 hover:text-red-800 text-xs">Remove</button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="px-4 py-4 text-center text-gray-500">No project-specific rates. The employee's default rates are used on every project.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Project Rate Modal -->
+    <div id="addProjectRateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('addProjectRateModal')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900">Add Project-Specific Pay Rate</h3>
+                <button onclick="closeModal('addProjectRateModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <form id="addProjectRateForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
+                    <select name="project_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="">— Select project —</option>
+                        @foreach($allProjects ?? [] as $p)
+                            <option value="{{ $p->id }}">{{ $p->name }}{{ $p->project_number ? ' (' . $p->project_number . ')' : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">ST Rate ($/hr)</label><input type="number" step="0.01" name="hourly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">OT Rate ($/hr)</label><input type="number" step="0.01" name="overtime_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Billable ($/hr)</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">ST Burden ($/hr)</label><input type="number" step="0.0001" name="st_burden_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">OT Burden ($/hr)</label><input type="number" step="0.0001" name="ot_burden_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Effective Date</label><input type="date" name="effective_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">End Date</label><input type="date" name="end_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                    <textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                </div>
+                <p class="text-xs text-gray-500">Leave any rate blank to fall back to the employee's default for that field.</p>
+            </form>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+                <button onclick="closeModal('addProjectRateModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button onclick="submitProjectRate()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save Rate</button>
+            </div>
+        </div>
+    </div>
+    @push('scripts')
+    <script>
+    function submitProjectRate() {
+        var form = document.getElementById('addProjectRateForm');
+        if (!form.reportValidity()) return;
+        $.ajax({
+            url: '{{ route("employees.project-rates.store", $employee) }}',
+            type: 'POST',
+            data: $(form).serialize(),
+            success: function(res){
+                Toast.fire({icon:'success', title: res.message || 'Rate added'});
+                setTimeout(() => window.location.reload(), 600);
+            },
+            error: function(xhr){
+                var msg = xhr.responseJSON?.message || 'Could not save rate';
+                if (xhr.responseJSON?.errors) msg = Object.values(xhr.responseJSON.errors).flat().join(' ');
+                Toast.fire({icon:'error', title: msg});
+            }
+        });
+    }
+    </script>
+    @endpush
+
     <!-- Recent Timesheets -->
     <div class="bg-white rounded-lg shadow-md p-6">
         <h2 class="text-lg font-semibold text-gray-900 border-b pb-4 mb-4">Recent Timesheets</h2>

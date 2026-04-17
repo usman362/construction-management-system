@@ -74,40 +74,51 @@
 
     <!-- Recent Projects Table -->
     <div class="bg-white rounded-lg shadow mb-8">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-bold text-gray-900">Recent Projects</h3>
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-gray-900">Projects</h3>
+            <span class="text-xs text-gray-500">{{ count($recentProjects ?? []) }} active</span>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table class="w-full">
-                <thead class="bg-gray-50 border-b border-gray-200">
+                <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Project</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Client</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Budget</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">% Committed</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Profit Margin</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Action</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Project #</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Project</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Client</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Estimate</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Budget</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">% Committed</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Profit Margin</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     @forelse($recentProjects ?? [] as $project)
                         <tr class="hover:bg-gray-50 transition">
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap font-mono text-sm font-semibold text-blue-700">{{ $project->project_number ?? '—' }}</td>
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 <p class="font-medium text-gray-900">{{ $project->name ?? 'N/A' }}</p>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-gray-600">{{ $project->client?->name ?? 'N/A' }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap text-gray-600">{{ $project->client?->name ?? 'N/A' }}</td>
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 @if(($project->status ?? null) === 'active')
                                     <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
                                 @elseif(($project->status ?? null) === 'completed')
                                     <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Completed</span>
+                                @elseif(($project->status ?? null) === 'awarded')
+                                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">Awarded</span>
+                                @elseif(($project->status ?? null) === 'bidding')
+                                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">Bidding</span>
+                                @elseif(($project->status ?? null) === 'on_hold')
+                                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">On Hold</span>
                                 @else
                                     <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{{ ucfirst($project->status ?? 'Unknown') }}</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap font-medium">${{ number_format($project->budget ?? 0, 2) }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->estimate ?? 0, 2) }}</td>
+                            <td class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->budget ?? 0, 2) }}</td>
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 <div class="flex items-center space-x-2">
                                     <div class="w-16 bg-gray-200 rounded-full h-2">
                                         <div class="bg-blue-600 h-2 rounded-full" style="width: {{ ($project->committed_percentage ?? 0) }}%"></div>
@@ -115,12 +126,12 @@
                                     <span class="text-sm text-gray-600">{{ ($project->committed_percentage ?? 0) }}%</span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 <span class="font-medium {{ ($project->profit_margin ?? 0) >= 0 ? 'text-green-600' : 'text-red-600' }}">
                                     {{ ($project->profit_margin ?? 0) >= 0 ? '+' : '' }}{{ number_format($project->profit_margin ?? 0, 1) }}%
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap text-center">
                                 <a href="{{ route('projects.show', $project) }}" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition" title="View">
                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 </a>
@@ -128,7 +139,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">No projects found. Create your first project to get started.</td>
+                            <td colspan="9" class="px-6 py-4 text-center text-gray-500">No projects found. Create your first project to get started.</td>
                         </tr>
                     @endforelse
                 </tbody>

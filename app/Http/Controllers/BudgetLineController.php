@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\BudgetLine;
 use App\Models\CostCode;
+use App\Models\CostType;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -73,6 +74,7 @@ class BudgetLineController extends Controller
     {
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'budget_amount' => 'required|numeric|min:0',
         ]);
@@ -95,6 +97,7 @@ class BudgetLineController extends Controller
     {
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'budget_amount' => 'required|numeric|min:0',
             'revised_amount' => 'required|numeric|min:0',

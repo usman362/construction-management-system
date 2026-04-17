@@ -58,6 +58,7 @@ class CraftController extends Controller
                     'base_hourly_rate' => $craft->base_hourly_rate,
                     'overtime_multiplier' => $craft->overtime_multiplier,
                     'billable_rate' => $craft->billable_rate,
+                    'ot_billable_rate' => $craft->ot_billable_rate,
                     'is_active' => $craft->is_active,
                     'employees_count' => $craft->employees_count,
                     'actions' => $craft->id,

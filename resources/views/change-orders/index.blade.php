@@ -51,6 +51,16 @@
             <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="createForm" class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">CO Number</label>
+                    <input type="text" name="co_number" placeholder="Auto-generate if blank" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Client PO #</label>
+                    <input type="text" name="client_po" placeholder="Client's PO reference" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+            </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
                 <input type="text" name="title" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
@@ -91,6 +101,16 @@
         </div>
         <form id="editForm" class="p-6 space-y-4">
             <input type="hidden" name="_id" id="edit_id">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">CO Number</label>
+                    <input type="text" name="co_number" placeholder="Auto-generate if blank" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Client PO #</label>
+                    <input type="text" name="client_po" placeholder="Client's PO reference" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+            </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
                 <input type="text" name="title" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
@@ -176,6 +196,8 @@ function editChangeOrder(id) {
     $.get(window.BASE_URL+'/projects/{{ $project->id }}/change-orders/' + id + '/edit', function(d) {
         let f = document.getElementById('editForm');
         f.querySelector('#edit_id').value = d.id;
+        f.querySelectorAll('[name="co_number"]').forEach(el => el.value = d.co_number || '');
+        f.querySelectorAll('[name="client_po"]').forEach(el => el.value = d.client_po || '');
         f.querySelector('[name="title"]').value = d.title || '';
         f.querySelector('[name="description"]').value = d.description || '';
         f.querySelector('[name="amount"]').value = d.amount || '';

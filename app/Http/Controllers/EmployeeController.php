@@ -154,6 +154,7 @@ class EmployeeController extends Controller
         $employee->load([
             'craft',
             'certifications',
+            'projectRates' => fn($q) => $q->with('project')->orderByDesc('created_at'),
             'timesheets' => function ($q) {
                 $q->with('project')->orderBy('date', 'desc')->limit(20);
             },
@@ -164,6 +165,7 @@ class EmployeeController extends Controller
 
         return view('employees.show', [
             'employee' => $employee,
+            'allProjects' => \App\Models\Project::whereNotIn('status', ['closed', 'completed'])->orderBy('name')->get(['id', 'name', 'project_number']),
             'totalHours' => $totalHours,
             'totalCost' => $totalCost,
         ]);

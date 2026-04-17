@@ -419,7 +419,7 @@ class ImportController extends Controller
     // ─── Estimate Lines ───────────────────────────────────────────────────
 
     private const ESTIMATE_LINE_COLUMNS = [
-        'cost_code', 'description', 'quantity', 'unit', 'unit_cost', 'labor_hours',
+        'cost_code', 'cost_type', 'description', 'quantity', 'unit', 'unit_cost', 'labor_hours',
     ];
 
     public function estimateLineTemplate(Project $project, Estimate $estimate): StreamedResponse
@@ -428,9 +428,9 @@ class ImportController extends Controller
             "estimate_{$estimate->id}_lines_template.csv",
             self::ESTIMATE_LINE_COLUMNS,
             [
-                ['01-100', 'Site preparation labor', '40', 'HRS', '32.50', '40'],
-                ['02-200', 'Concrete (3000 PSI)', '125', 'CY', '185.00', '0'],
-                ['04-100', 'Crane rental', '5', 'DAY', '1200.00', '0'],
+                ['01 10 100', 'Direct Labor', 'Mobilization / Demobilization', '40', 'HRS', '32.50', '40'],
+                ['03 40 000', 'Materials',    'Concrete (3000 PSI)',           '125', 'CY', '185.00', '0'],
+                ['03 10 000', 'Direct Labor', 'Excavation labor',              '80', 'HRS', '32.50', '80'],
             ]
         );
     }
@@ -448,8 +448,12 @@ class ImportController extends Controller
 
         $header = $this->normalizeHeader(array_shift($rows));
         $costCodesByCode = CostCode::pluck('id', 'code');
+        $costTypesByCode = \App\Models\CostType::pluck('id', 'code')->toArray();
+        $costTypesByName = \App\Models\CostType::pluck('id', 'name')
+            ->mapWithKeys(fn($id, $name) => [strtolower(trim($name)) => $id])
+            ->toArray();
 
-        DB::transaction(function () use ($rows, $header, $costCodesByCode, $estimate, &$result) {
+        DB::transaction(function () use ($rows, $header, $costCodesByCode, $costTypesByCode, $costTypesByName, $estimate, &$result) {
             foreach ($rows as $rowIndex => $row) {
                 $rowNumber = $rowIndex + 2;
                 $data = $this->combineRow($header, $row);
@@ -463,12 +467,21 @@ class ImportController extends Controller
                         }
                     }
 
+                    // Resolve cost_type (by code "01" or name "Direct Labor")
+                    $costTypeId = null;
+                    $costTypeValue = $this->blankToNull($data['cost_type'] ?? null);
+                    if ($costTypeValue !== null) {
+                        $costTypeId = $costTypesByCode[$costTypeValue]
+                            ?? ($costTypesByName[strtolower(trim($costTypeValue))] ?? null);
+                    }
+
                     $quantity = $this->toDecimal($data['quantity'] ?? 0);
                     $unitCost = $this->toDecimal($data['unit_cost'] ?? 0);
 
                     EstimateLine::create([
                         'estimate_id' => $estimate->id,
                         'cost_code_id' => $costCodeId,
+                        'cost_type_id' => $costTypeId,
                         'description' => $this->blankToNull($data['description'] ?? null),
                         'quantity' => $quantity,
                         'unit' => $this->blankToNull($data['unit'] ?? null),

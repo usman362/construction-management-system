@@ -228,4 +228,94 @@ class PayrollController extends Controller
             ? response()->json(['message' => $message])
             : redirect()->route('payroll.show', $payrollPeriod)->with('success', $message);
     }
+
+    /**
+     * Export a payroll period to CSV with all legacy employee info + hours + per diem.
+     * Columns match what the client typically uploads into payroll software.
+     */
+    public function export(PayrollPeriod $payrollPeriod): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $entries = PayrollEntry::with(['employee.craft', 'project', 'costCode'])
+            ->where('payroll_period_id', $payrollPeriod->id)
+            ->orderBy('employee_id')
+            ->get();
+
+        // Group entries by employee to get total per-diem days + unique projects
+        $perDiemDaysByEmployee = $entries->groupBy('employee_id')->map(function ($rows) {
+            return $rows->where('per_diem', '>', 0)->count();
+        });
+        $projectsByEmployee = $entries->groupBy('employee_id')->map(function ($rows) {
+            return $rows->pluck('project.project_number')->filter()->unique()->implode(', ');
+        });
+
+        $header = [
+            'Employee Number', 'Legacy ID', 'First Name', 'Middle Name', 'Last Name',
+            'Craft', 'Classification', 'Department', 'Union',
+            'Pay Cycle', 'Pay Type',
+            'Hourly Rate', 'Overtime Rate', 'ST Burden', 'OT Burden',
+            'Work Comp Code', 'SUTA State', 'State Tax', 'City Tax',
+            'Hire Date',
+            'Project #', 'Phase Code',
+            'Regular Hours', 'OT Hours', 'DT Hours',
+            'Regular Pay', 'OT Pay', 'DT Pay', 'Total Pay',
+            'Per Diem Amount', 'Per Diem Days', 'Billable Amount',
+        ];
+
+        $filename = 'payroll_' . str_replace(' ', '_', $payrollPeriod->name ?? ('period_' . $payrollPeriod->id)) . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'no-cache, must-revalidate',
+            'Expires' => '0',
+        ];
+
+        return response()->streamDownload(function () use ($entries, $header, $perDiemDaysByEmployee, $projectsByEmployee) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM for Excel
+            fputcsv($out, $header);
+
+            foreach ($entries as $e) {
+                $emp = $e->employee;
+                if (!$emp) continue;
+
+                fputcsv($out, [
+                    $emp->employee_number,
+                    $emp->legacy_employee_id,
+                    $emp->first_name,
+                    $emp->middle_name,
+                    $emp->last_name,
+                    $emp->craft?->name,
+                    $emp->classification,
+                    $emp->department,
+                    $emp->union,
+                    $emp->pay_cycle,
+                    $emp->pay_type,
+                    $emp->hourly_rate,
+                    $emp->overtime_rate,
+                    $emp->st_burden_rate,
+                    $emp->ot_burden_rate,
+                    $emp->work_comp_code,
+                    $emp->suta_state,
+                    $emp->state_tax,
+                    $emp->city_tax,
+                    optional($emp->hire_date)->format('Y-m-d'),
+                    $e->project?->project_number,
+                    $e->costCode?->code,
+                    $e->regular_hours,
+                    $e->overtime_hours,
+                    $e->double_time_hours,
+                    $e->regular_pay,
+                    $e->overtime_pay,
+                    $e->double_time_pay,
+                    $e->total_pay,
+                    $e->per_diem,
+                    $perDiemDaysByEmployee[$emp->id] ?? 0,
+                    $e->billable_amount,
+                ]);
+            }
+            fclose($out);
+        }, $filename, $headers);
+    }
 }

@@ -88,6 +88,11 @@ class Employee extends Model
         return $this->hasMany(Timesheet::class);
     }
 
+    public function projectRates(): HasMany
+    {
+        return $this->hasMany(EmployeeProjectRate::class);
+    }
+
     public function crewMemberships(): HasMany
     {
         return $this->hasMany(CrewMember::class);

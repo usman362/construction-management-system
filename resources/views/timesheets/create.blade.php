@@ -128,6 +128,50 @@
                 </div>
             </div>
 
+            <!-- Site-Specific Fields -->
+            <div class="mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <h2 class="text-xl font-semibold mb-4">Site-Specific Fields</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Gate Log Hours (Nucor)</label>
+                        <input type="number" step="0.25" name="gate_log_hours" value="{{ old('gate_log_hours') }}" placeholder="e.g. 10.5" class="w-full border-gray-300 rounded-lg shadow-sm">
+                        <p class="text-xs text-gray-500 mt-1">From the Nucor gate log sheet.</p>
+                    </div>
+                    <div class="flex items-center pt-6">
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" name="work_through_lunch" value="1" class="rounded border-gray-300 text-blue-600" {{ old('work_through_lunch') ? 'checked' : '' }}>
+                            <span class="text-sm font-medium text-gray-700">Worked through lunch (Nucor)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Sign-Off -->
+            <div class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200" x-data="{ sigOpen: false }">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xl font-semibold">Client Sign-Off</h2>
+                    <button type="button" @click="sigOpen = !sigOpen" class="text-sm text-indigo-700 hover:text-indigo-900 font-medium">
+                        <span x-text="sigOpen ? 'Close' : 'Capture Signature'"></span>
+                    </button>
+                </div>
+                <div x-show="sigOpen" x-cloak class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Client Name / Representative</label>
+                        <input type="text" name="client_signature_name" placeholder="Printed name" class="w-full border-gray-300 rounded-lg shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Signature</label>
+                        <canvas id="sigCanvas" class="bg-white border border-gray-300 rounded-lg w-full" style="height:120px;touch-action:none"></canvas>
+                        <div class="flex gap-2 mt-2">
+                            <button type="button" onclick="sigClear()" class="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">Clear</button>
+                            <button type="button" onclick="sigSave()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded">Attach to Timesheet</button>
+                            <span id="sigStatus" class="text-xs text-gray-500 self-center"></span>
+                        </div>
+                        <input type="hidden" name="client_signature" id="client_signature_input">
+                    </div>
+                </div>
+            </div>
+
             <!-- Notes Section -->
             <div class="mb-6 p-4 bg-gray-50 rounded-lg">
                 <h2 class="text-xl font-semibold mb-4">Notes</h2>
@@ -140,6 +184,50 @@
                     @enderror
                 </div>
             </div>
+
+            <script>
+            // Minimal signature pad (mouse + touch). Saves as base64 data URL
+            // into a hidden input the backend accepts.
+            (function(){
+                var canvas = document.getElementById('sigCanvas');
+                if (!canvas) return;
+                var ctx = canvas.getContext('2d');
+                var drawing = false, last = null;
+                function resize(){
+                    var r = canvas.getBoundingClientRect();
+                    canvas.width = r.width; canvas.height = r.height;
+                    ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                }
+                window.addEventListener('resize', resize);
+                setTimeout(resize, 150);
+                function pos(e){
+                    var r = canvas.getBoundingClientRect();
+                    var t = e.touches ? e.touches[0] : e;
+                    return { x: t.clientX - r.left, y: t.clientY - r.top };
+                }
+                function down(e){ drawing = true; last = pos(e); e.preventDefault(); }
+                function move(e){
+                    if (!drawing) return;
+                    var p = pos(e);
+                    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+                    last = p; e.preventDefault();
+                }
+                function up(){ drawing = false; last = null; }
+                canvas.addEventListener('mousedown', down); canvas.addEventListener('mousemove', move);
+                canvas.addEventListener('mouseup', up);    canvas.addEventListener('mouseout', up);
+                canvas.addEventListener('touchstart', down); canvas.addEventListener('touchmove', move);
+                canvas.addEventListener('touchend', up);
+                window.sigClear = function(){
+                    ctx.clearRect(0,0,canvas.width,canvas.height);
+                    document.getElementById('client_signature_input').value = '';
+                    document.getElementById('sigStatus').textContent = '';
+                };
+                window.sigSave = function(){
+                    document.getElementById('client_signature_input').value = canvas.toDataURL('image/png');
+                    document.getElementById('sigStatus').textContent = '✓ Signature attached';
+                };
+            })();
+            </script>
 
             <!-- Form Actions -->
             <div class="flex gap-4">

@@ -148,6 +148,10 @@ class TimesheetController extends Controller
             'regular_hours' => 'required|numeric|min:0',
             'overtime_hours' => 'nullable|numeric|min:0',
             'double_time_hours' => 'nullable|numeric|min:0',
+            'gate_log_hours' => 'nullable|numeric|min:0',
+            'work_through_lunch' => 'nullable|boolean',
+            'client_signature' => 'nullable|string',
+            'client_signature_name' => 'nullable|string|max:150',
             'notes' => 'nullable|string',
         ]);
 
@@ -164,6 +168,11 @@ class TimesheetController extends Controller
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
+            'gate_log_hours' => $validated['gate_log_hours'] ?? null,
+            'work_through_lunch' => $request->boolean('work_through_lunch'),
+            'client_signature' => $validated['client_signature'] ?? null,
+            'client_signature_name' => $validated['client_signature_name'] ?? null,
+            'signed_at' => !empty($validated['client_signature']) ? now() : null,
             'regular_hours' => $reg,
             'overtime_hours' => $ot,
             'double_time_hours' => $dt,
@@ -238,6 +247,10 @@ class TimesheetController extends Controller
             'regular_hours' => 'required|numeric|min:0',
             'overtime_hours' => 'nullable|numeric|min:0',
             'double_time_hours' => 'nullable|numeric|min:0',
+            'gate_log_hours' => 'nullable|numeric|min:0',
+            'work_through_lunch' => 'nullable|boolean',
+            'client_signature' => 'nullable|string',
+            'client_signature_name' => 'nullable|string|max:150',
             'notes' => 'nullable|string',
         ]);
 
@@ -254,6 +267,11 @@ class TimesheetController extends Controller
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
+            'gate_log_hours' => $validated['gate_log_hours'] ?? null,
+            'work_through_lunch' => $request->boolean('work_through_lunch'),
+            'client_signature' => $validated['client_signature'] ?? $timesheet->client_signature,
+            'client_signature_name' => $validated['client_signature_name'] ?? $timesheet->client_signature_name,
+            'signed_at' => !empty($validated['client_signature']) && $timesheet->signed_at === null ? now() : $timesheet->signed_at,
             'regular_hours' => $reg,
             'overtime_hours' => $ot,
             'double_time_hours' => $dt,
@@ -391,9 +409,18 @@ class TimesheetController extends Controller
             'entries.*.regular_hours' => 'required|numeric|min:0',
             'entries.*.overtime_hours' => 'required|numeric|min:0',
             'entries.*.double_time_hours' => 'required|numeric|min:0',
+            'entries.*.gate_log_hours' => 'nullable|numeric|min:0',
+            'entries.*.per_diem' => 'nullable|boolean',
+            'entries.*.per_diem_amount' => 'nullable|numeric|min:0',
+            'entries.*.work_through_lunch' => 'nullable|boolean',
         ]);
 
         $timesheets = [];
+
+        // Default per diem rate for this project (used when the row checkbox
+        // is ticked but the user didn't type a specific amount).
+        $project = \App\Models\Project::find($validated['project_id']);
+        $projectPerDiem = (float) ($project->default_per_diem_rate ?? 0);
 
         foreach ($validated['entries'] as $entry) {
             $employee = Employee::findOrFail($entry['employee_id']);
@@ -413,6 +440,8 @@ class TimesheetController extends Controller
                 'overtime_hours' => $ot,
                 'double_time_hours' => $dt,
                 'total_hours' => $totals['total_hours'],
+                'gate_log_hours' => $entry['gate_log_hours'] ?? null,
+                'work_through_lunch' => !empty($entry['work_through_lunch']),
                 'regular_rate' => $totals['regular_rate'],
                 'overtime_rate' => $totals['overtime_rate'],
                 'total_cost' => $totals['total_cost'],
@@ -424,6 +453,12 @@ class TimesheetController extends Controller
             ]);
 
             $this->syncTimesheetCostAllocation($timesheet->fresh());
+
+            // Override per_diem on the allocation if user supplied one for this row
+            if (!empty($entry['per_diem']) || !empty($entry['per_diem_amount'])) {
+                $amount = (float) ($entry['per_diem_amount'] ?? $projectPerDiem);
+                $timesheet->costAllocations()->update(['per_diem_amount' => $amount]);
+            }
 
             $timesheets[] = $timesheet;
         }
@@ -496,11 +531,28 @@ class TimesheetController extends Controller
     {
         $totalHours = $regularHours + $overtimeHours + $doubleTimeHours;
 
-        // ── COST (always from the employee, includes burden) ──────────────
-        $stBurden = (float) ($employee->st_burden_rate ?? 0);
-        $otBurden = (float) ($employee->ot_burden_rate ?? 0);
-        $stWage   = (float) $employee->hourly_rate;
-        $otWage   = (float) $employee->overtime_rate;
+        // ── COST (employee's rate, or a project-specific override if one exists) ──
+        // Per-project pay rates take precedence so an employee can be paid
+        // different wages on different jobs.
+        $projRate = null;
+        if ($projectId) {
+            $projRate = \App\Models\EmployeeProjectRate::where('project_id', $projectId)
+                ->where('employee_id', $employee->id)
+                ->when($date, function ($q) use ($date) {
+                    $q->where(function ($qq) use ($date) {
+                        $qq->whereNull('effective_date')->orWhere('effective_date', '<=', $date);
+                    })->where(function ($qq) use ($date) {
+                        $qq->whereNull('end_date')->orWhere('end_date', '>=', $date);
+                    });
+                })
+                ->orderByDesc('effective_date')
+                ->first();
+        }
+
+        $stWage   = (float) ($projRate->hourly_rate   ?? $employee->hourly_rate);
+        $otWage   = (float) ($projRate->overtime_rate ?? $employee->overtime_rate);
+        $stBurden = (float) ($projRate->st_burden_rate ?? $employee->st_burden_rate ?? 0);
+        $otBurden = (float) ($projRate->ot_burden_rate ?? $employee->ot_burden_rate ?? 0);
 
         $regularCost = $regularHours * ($stWage + $stBurden);
         $otCost      = $overtimeHours * ($otWage + $otBurden);
@@ -533,7 +585,7 @@ class TimesheetController extends Controller
             ];
         }
 
-        $bRate = (float) ($employee->billable_rate ?? $employee->hourly_rate);
+        $bRate = (float) ($projRate->billable_rate ?? $employee->billable_rate ?? $employee->hourly_rate);
         $billableAmount = ($regularHours * $bRate)
             + ($overtimeHours * $bRate * 1.5)
             + ($doubleTimeHours * $bRate * 2);

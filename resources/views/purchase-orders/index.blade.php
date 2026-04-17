@@ -55,11 +55,31 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
                     <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                        <option value="">Select cost code</option>
+                        <option value="">Select phase code</option>
                         @foreach($costCodes as $cc)
-                            <option value="{{ $cc->id }}">{{ $cc->code }}</option>
+                            <option value="{{ $cc->id }}">{{ $cc->code }}{{ $cc->name ? ' — ' . $cc->name : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                    <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None —</option>
+                        @foreach($costTypes ?? [] as $ct)
+                            <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent PO (for CO amendments)</label>
+                    <select name="parent_po_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None (standalone PO) —</option>
+                        @foreach($parentPOs ?? [] as $po)
+                            <option value="{{ $po->id }}">{{ $po->po_number }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -172,11 +192,31 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
                     <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                        <option value="">Select cost code</option>
+                        <option value="">Select phase code</option>
                         @foreach($costCodes as $cc)
-                            <option value="{{ $cc->id }}">{{ $cc->code }}</option>
+                            <option value="{{ $cc->id }}">{{ $cc->code }}{{ $cc->name ? ' — ' . $cc->name : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                    <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None —</option>
+                        @foreach($costTypes ?? [] as $ct)
+                            <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent PO (for CO amendments)</label>
+                    <select name="parent_po_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None (standalone PO) —</option>
+                        @foreach($parentPOs ?? [] as $po)
+                            <option value="{{ $po->id }}">{{ $po->po_number }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -435,10 +475,14 @@ function submitCreateForm() {
 
     var poNumber = form.querySelector('[name="po_number"]').value.trim();
     var costCodeVal = form.querySelector('[name="cost_code_id"]').value;
+    var costTypeVal = form.querySelector('[name="cost_type_id"]')?.value;
+    var parentPoVal = form.querySelector('[name="parent_po_id"]')?.value;
     var data = {
         project_id: form.querySelector('[name="project_id"]').value,
         vendor_id: form.querySelector('[name="vendor_id"]').value,
         cost_code_id: costCodeVal || null,
+        cost_type_id: costTypeVal || null,
+        parent_po_id: parentPoVal || null,
         date: form.querySelector('[name="date"]').value,
         delivery_date: form.querySelector('[name="delivery_date"]').value || null,
         description: form.querySelector('[name="description"]').value,
@@ -488,6 +532,10 @@ function editPO(id) {
             document.querySelector('#editForm [name="project_id"]').value = po.project_id;
             document.querySelector('#editForm [name="vendor_id"]').value = po.vendor_id;
             document.querySelector('#editForm [name="cost_code_id"]').value = po.cost_code_id || '';
+            var costTypeEl = document.querySelector('#editForm [name="cost_type_id"]');
+            if (costTypeEl) costTypeEl.value = po.cost_type_id || '';
+            var parentPoEl = document.querySelector('#editForm [name="parent_po_id"]');
+            if (parentPoEl) parentPoEl.value = po.parent_po_id || '';
             document.querySelector('#editForm [name="date"]').value = po.date;
             document.querySelector('#editForm [name="delivery_date"]').value = po.delivery_date || '';
             document.querySelector('#editForm [name="description"]').value = po.description || '';
@@ -543,10 +591,14 @@ function submitEditForm() {
     }
 
     var costCodeVal = form.querySelector('[name="cost_code_id"]').value;
+    var costTypeVal = form.querySelector('[name="cost_type_id"]')?.value;
+    var parentPoVal = form.querySelector('[name="parent_po_id"]')?.value;
     var data = {
         project_id: form.querySelector('[name="project_id"]').value,
         vendor_id: form.querySelector('[name="vendor_id"]').value,
         cost_code_id: costCodeVal || null,
+        cost_type_id: costTypeVal || null,
+        parent_po_id: parentPoVal || null,
         date: form.querySelector('[name="date"]').value,
         delivery_date: form.querySelector('[name="delivery_date"]').value || null,
         description: form.querySelector('[name="description"]').value,

@@ -14,6 +14,7 @@ class ChangeOrder extends Model
     protected $fillable = [
         'project_id',
         'co_number',
+        'client_po',
         'title',
         'date',
         'description',

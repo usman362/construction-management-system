@@ -120,7 +120,14 @@
                 :class="{ 'border-b-2 border-blue-600 text-blue-600': activeTab === 'costs', 'text-gray-700 hover:text-gray-900': activeTab !== 'costs' }"
                 class="px-6 py-4 font-medium transition"
             >
-                Costs
+                Committed Costs
+            </button>
+            <button
+                @click="activeTab = 'client-billing'"
+                :class="{ 'border-b-2 border-blue-600 text-blue-600': activeTab === 'client-billing', 'text-gray-700 hover:text-gray-900': activeTab !== 'client-billing' }"
+                class="px-6 py-4 font-medium transition"
+            >
+                Client Billing
             </button>
             <button
                 @click="activeTab = 'reports'"
@@ -137,6 +144,7 @@
             <a href="{{ route('projects.change-orders.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Change Orders</a>
             <a href="{{ route('projects.estimates.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Estimates</a>
             <a href="{{ route('projects.commitments.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Commitments</a>
+            <a href="{{ route('purchase-orders.index', ['project_id' => $project->id]) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Purchase Orders</a>
             <a href="{{ route('projects.manhour-budgets.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Manhour Budgets</a>
             <a href="{{ route('projects.billable-rates.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition text-gray-700 font-medium">Billable Rates</a>
             <a href="{{ route('projects.daily-logs.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Daily Logs</a>
@@ -193,7 +201,8 @@
             <!-- Budget Tab -->
             <div x-show="activeTab === 'budget'" class="space-y-4">
                 <div class="flex justify-end mb-4">
-                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    <button type="button" onclick="document.getElementById('addBudgetModal').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                         Add Budget Line
                     </button>
                 </div>
@@ -202,8 +211,9 @@
                     <table class="w-full text-sm">
                         <thead class="bg-gray-100 border-b border-gray-200">
                             <tr>
-                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Code</th>
-                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Name</th>
+                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Phase Code</th>
+                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Cost Type</th>
+                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Description</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Budget</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Revised</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Committed</th>
@@ -215,8 +225,9 @@
                         <tbody class="divide-y divide-gray-200">
                             @forelse($budgetLines as $line)
                                 <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-2 text-gray-900">{{ $line->cost_code ?? 'N/A' }}</td>
-                                    <td class="px-4 py-2 text-gray-900">{{ $line->name ?? 'N/A' }}</td>
+                                    <td class="px-4 py-2 text-gray-900 font-mono text-xs">{{ $line->costCode?->code ?? '—' }}</td>
+                                    <td class="px-4 py-2 text-gray-900">{{ $line->costType?->name ?? '—' }}</td>
+                                    <td class="px-4 py-2 text-gray-900">{{ $line->description ?? '—' }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->budget_amount ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->revised_amount ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->committed ?? 0, 2) }}</td>
@@ -226,12 +237,78 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-4 py-4 text-center text-gray-500">No budget lines.</td>
+                                    <td colspan="9" class="px-4 py-4 text-center text-gray-500">No budget lines.</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Add Budget Line Modal -->
+                <div id="addBudgetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5)" onclick="if(event.target===this)this.classList.add('hidden')">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <h3 class="text-lg font-bold text-gray-900">Add Budget Line</h3>
+                            <button type="button" onclick="document.getElementById('addBudgetModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <form id="addBudgetForm" class="p-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
+                                <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">— None —</option>
+                                    @foreach($allCostCodes ?? [] as $cc)
+                                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                                <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">— None —</option>
+                                    @foreach($allCostTypes ?? [] as $ct)
+                                        <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                                <input type="text" name="description" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+                                <input type="number" step="0.01" name="budget_amount" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </form>
+                        <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+                            <button type="button" onclick="document.getElementById('addBudgetModal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                            <button type="button" onclick="submitBudgetLine()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save Budget Line</button>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                function submitBudgetLine() {
+                    var form = document.getElementById('addBudgetForm');
+                    if (!form.reportValidity()) return;
+                    $.ajax({
+                        url: '{{ route("projects.budget.store", $project) }}',
+                        type: 'POST',
+                        data: $(form).serialize(),
+                        success: function(res) {
+                            Toast.fire({icon:'success', title: res.message || 'Budget line added'});
+                            setTimeout(() => window.location.reload(), 600);
+                        },
+                        error: function(xhr) {
+                            var msg = xhr.responseJSON?.message || 'Could not save budget line';
+                            if (xhr.responseJSON?.errors) {
+                                msg = Object.values(xhr.responseJSON.errors).flat().join(' ');
+                            }
+                            Toast.fire({icon:'error', title: msg});
+                        }
+                    });
+                }
+                </script>
             </div>
 
             <!-- Change Orders Tab -->
@@ -332,28 +409,130 @@
                 </div>
             </div>
 
-            <!-- Costs Tab -->
-            <div x-show="activeTab === 'costs'" class="space-y-4">
+            <!-- Committed Costs Tab (PO-style columns per client) -->
+            <div x-show="activeTab === 'costs'" class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-gray-900">Purchase Orders</h3>
+                    <a href="{{ route('purchase-orders.index', ['project_id' => $project->id]) }}" class="text-sm text-blue-600 hover:text-blue-800">Manage Purchase Orders →</a>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead class="bg-gray-100 border-b border-gray-200">
                             <tr>
-                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Cost Code</th>
-                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Description</th>
-                                <th class="px-4 py-2 text-right font-semibold text-gray-700">Total Committed</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">PO #</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Vendor</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Phase Code</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Cost Type</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Description</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Date</th>
+                                <th class="px-3 py-2 text-right font-semibold text-gray-700">Amount</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
-                            @forelse($costSummary as $cost)
+                            @forelse($purchaseOrders ?? [] as $po)
                                 <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-2 text-gray-900">{{ $cost->code ?? 'N/A' }}</td>
-                                    <td class="px-4 py-2 text-gray-700">{{ $cost->description ?? 'N/A' }}</td>
-                                    <td class="px-4 py-2 text-right text-gray-900 font-medium">${{ number_format($cost->total ?? 0, 2) }}</td>
+                                    <td class="px-3 py-2 text-gray-900 font-mono text-xs">
+                                        {{ $po->po_number }}
+                                        @if($po->parent) <span class="text-gray-400 text-xs">(CO of {{ $po->parent->po_number }})</span> @endif
+                                    </td>
+                                    <td class="px-3 py-2 text-gray-900">{{ $po->vendor?->name ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-gray-700 font-mono text-xs">{{ $po->costCode?->code ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-gray-700">{{ $po->costType?->name ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-gray-700">{{ \Illuminate\Support\Str::limit($po->description, 60) }}</td>
+                                    <td class="px-3 py-2 text-gray-600 text-xs">{{ optional($po->date)->format('M d, Y') }}</td>
+                                    <td class="px-3 py-2 text-right text-gray-900 font-medium">${{ number_format($po->total_amount ?? 0, 2) }}</td>
+                                    <td class="px-3 py-2 text-center">
+                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
+                                            @if($po->status === 'received') bg-green-100 text-green-700
+                                            @elseif($po->status === 'partial') bg-amber-100 text-amber-700
+                                            @elseif($po->status === 'issued') bg-blue-100 text-blue-700
+                                            @elseif($po->status === 'cancelled') bg-red-100 text-red-700
+                                            @else bg-gray-100 text-gray-700 @endif">{{ ucfirst($po->status) }}</span>
+                                    </td>
                                 </tr>
                             @empty
+                                <tr><td colspan="8" class="px-3 py-4 text-center text-gray-500">No purchase orders yet.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pt-4">
+                    <h3 class="text-base font-semibold text-gray-900 mb-2">Committed Costs Summary (by Cost Code)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
                                 <tr>
-                                    <td colspan="3" class="px-4 py-4 text-center text-gray-500">No cost data available.</td>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-700">Phase Code</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-700">Name</th>
+                                    <th class="px-3 py-2 text-right font-semibold text-gray-700">Total Committed</th>
                                 </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                @forelse($costSummary as $cost)
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-3 py-2 text-gray-900 font-mono text-xs">{{ $cost->code ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-gray-700">{{ $cost->description ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-right text-gray-900 font-medium">${{ number_format($cost->total ?? 0, 2) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="3" class="px-3 py-4 text-center text-gray-500">No cost data available.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Billing Tab -->
+            <div x-show="activeTab === 'client-billing'" class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Client Billing</h3>
+                        <p class="text-xs text-gray-500">Invoices sent to the client for this project.</p>
+                    </div>
+                    @if(Route::has('billing-invoices.create'))
+                        <a href="{{ route('billing-invoices.create', ['project_id' => $project->id]) }}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                            New Invoice
+                        </a>
+                    @endif
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 border-b border-gray-200">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Invoice #</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Date</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Due</th>
+                                <th class="px-3 py-2 text-right font-semibold text-gray-700">Amount</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Status</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            @forelse($billingInvoices ?? [] as $inv)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-3 py-2 font-mono text-xs">{{ $inv->invoice_number ?? $inv->number ?? ('#' . $inv->id) }}</td>
+                                    <td class="px-3 py-2 text-gray-700">{{ optional($inv->invoice_date ?? $inv->date)->format('M d, Y') }}</td>
+                                    <td class="px-3 py-2 text-gray-700">{{ optional($inv->due_date)->format('M d, Y') }}</td>
+                                    <td class="px-3 py-2 text-right text-gray-900 font-medium">${{ number_format($inv->total_amount ?? $inv->amount ?? 0, 2) }}</td>
+                                    <td class="px-3 py-2 text-center">
+                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
+                                            @if(in_array($inv->status ?? '', ['paid'])) bg-green-100 text-green-700
+                                            @elseif(in_array($inv->status ?? '', ['sent','issued'])) bg-blue-100 text-blue-700
+                                            @elseif(in_array($inv->status ?? '', ['overdue'])) bg-red-100 text-red-700
+                                            @else bg-gray-100 text-gray-700 @endif">{{ ucfirst($inv->status ?? 'draft') }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 text-center">
+                                        @if(Route::has('billing-invoices.show'))
+                                            <a href="{{ route('billing-invoices.show', $inv) }}" class="text-blue-600 hover:text-blue-800 text-xs">View</a>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">No invoices billed to the client yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

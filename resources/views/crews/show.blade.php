@@ -90,17 +90,29 @@
     <div class="bg-white rounded-lg shadow-md p-6">
         <h2 class="text-lg font-semibold text-gray-900 border-b pb-4 mb-4">Add Member to Crew</h2>
 
-        <form action="{{ route('crews.add-member', $crew) }}" method="POST" class="space-y-4">
+        @php
+            $assignedIds = collect($crew->members ?? [])->pluck('employee_id')->all();
+            $availableEmployees = collect($employees ?? [])->reject(fn($e) => in_array($e->id, $assignedIds));
+        @endphp
+
+        <form id="addMemberForm" action="{{ route('crews.add-member', $crew) }}" method="POST" class="space-y-4">
             @csrf
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Select Employee</label>
                 <select
                     name="employee_id"
+                    required
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                    <option value="">Choose an employee</option>
-                    <option value="">-- Available Employees --</option>
+                    <option value="">-- Choose an employee --</option>
+                    @forelse($availableEmployees as $emp)
+                        <option value="{{ $emp->id }}">
+                            {{ $emp->employee_number }} — {{ $emp->first_name }} {{ $emp->last_name }}@if($emp->craft) ({{ $emp->craft->name }})@endif
+                        </option>
+                    @empty
+                        <option value="" disabled>No available employees to add</option>
+                    @endforelse
                 </select>
             </div>
 
@@ -121,4 +133,22 @@
 
 @push('scripts')
 @include('crews.partials.crew-edit-script')
+<script>
+$('#addMemberForm').on('submit', function(e){
+    e.preventDefault();
+    var form = this;
+    $.ajax({
+        url: form.action,
+        type: 'POST',
+        data: $(form).serialize(),
+        success: function(res){
+            Toast.fire({icon:'success', title: res.message || 'Member added'});
+            setTimeout(() => window.location.reload(), 700);
+        },
+        error: function(xhr){
+            Toast.fire({icon:'error', title: xhr.responseJSON?.message || 'Could not add member'});
+        }
+    });
+});
+</script>
 @endpush

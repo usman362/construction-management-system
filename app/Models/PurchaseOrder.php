@@ -13,10 +13,13 @@ class PurchaseOrder extends Model
 
     protected $fillable = [
         'project_id',
+        'parent_po_id',
+        'change_order_id',
         'vendor_id',
         'po_number',
         'description',
         'cost_code_id',
+        'cost_type_id',
         'date',
         'delivery_date',
         'subtotal',
@@ -68,6 +71,28 @@ class PurchaseOrder extends Model
     public function costCode(): BelongsTo
     {
         return $this->belongsTo(CostCode::class);
+    }
+
+    public function costType(): BelongsTo
+    {
+        return $this->belongsTo(CostType::class);
+    }
+
+    /** The PO this one is a change order against, if any. */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'parent_po_id');
+    }
+
+    /** Child / amendment POs hanging off this one (CO-style). */
+    public function children(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class, 'parent_po_id');
+    }
+
+    public function changeOrder(): BelongsTo
+    {
+        return $this->belongsTo(ChangeOrder::class);
     }
 
     /**

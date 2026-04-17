@@ -67,6 +67,8 @@ class ChangeOrderController extends Controller
     public function store(Request $request, Project $project): JsonResponse
     {
         $validated = $request->validate([
+            'co_number' => 'nullable|string|max:50',
+            'client_po' => 'nullable|string|max:100',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'scope_of_work' => 'nullable|string',
@@ -77,13 +79,19 @@ class ChangeOrderController extends Controller
             'status' => 'required|in:pending,approved,rejected',
         ]);
 
-        $maxId = (int) ($project->changeOrders()->max('id') ?? 0);
-        $coNumber = 'CO-' . str_pad($maxId + 1, 4, '0', STR_PAD_LEFT);
+        // If the user didn't supply a number, auto-generate based on project
+        // number (e.g. BM-5400 → BM-5400-01, -02, -03 ...).
+        $coNumber = trim($validated['co_number'] ?? '');
+        if ($coNumber === '') {
+            $existingCount = (int) $project->changeOrders()->count();
+            $prefix = $project->project_number ?: ('P' . $project->id);
+            $coNumber = $prefix . '-' . str_pad($existingCount + 1, 2, '0', STR_PAD_LEFT);
+        }
+        $validated['co_number'] = $coNumber;
 
         $project->changeOrders()->create([
             ...$validated,
             'date' => $validated['date'] ?? now()->toDateString(),
-            'co_number' => $coNumber,
         ]);
 
         return response()->json(['message' => 'Change order created successfully']);
@@ -118,6 +126,8 @@ class ChangeOrderController extends Controller
     public function update(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
     {
         $validated = $request->validate([
+            'co_number' => 'nullable|string|max:50',
+            'client_po' => 'nullable|string|max:100',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'scope_of_work' => 'nullable|string',

@@ -86,36 +86,52 @@
                 <table class="w-full">
                     <thead class="bg-gray-100 border-b">
                         <tr>
-                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
-                            <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Regular Hours</th>
-                            <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Overtime Hours</th>
-                            <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Double Time Hours</th>
-                            <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Total</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Reg</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">OT</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">DT</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Gate Log</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Lunch?</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Per Diem</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Per Diem $</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($crewMembers ?? [] as $employee)
                             <tr class="border-b hover:bg-gray-50">
-                                <td class="px-6 py-4 text-sm text-gray-900 font-medium">
+                                <td class="px-4 py-3 text-sm text-gray-900 font-medium">
                                     {{ $employee->first_name }} {{ $employee->last_name }}
                                     <input type="hidden" name="entries[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}">
                                 </td>
-                                <td class="px-6 py-4 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][regular_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                <td class="px-2 py-3 text-center">
+                                    <input type="number" name="entries[{{ $loop->index }}][regular_hours]" step="0.5" value="0" class="w-16 border-gray-300 rounded text-center" onchange="updateTotal(this)">
                                 </td>
-                                <td class="px-6 py-4 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][overtime_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                <td class="px-2 py-3 text-center">
+                                    <input type="number" name="entries[{{ $loop->index }}][overtime_hours]" step="0.5" value="0" class="w-16 border-gray-300 rounded text-center" onchange="updateTotal(this)">
                                 </td>
-                                <td class="px-6 py-4 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][double_time_hours]" step="0.5" value="0" class="w-full border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                <td class="px-2 py-3 text-center">
+                                    <input type="number" name="entries[{{ $loop->index }}][double_time_hours]" step="0.5" value="0" class="w-16 border-gray-300 rounded text-center" onchange="updateTotal(this)">
                                 </td>
-                                <td class="px-6 py-4 text-center text-sm font-semibold text-gray-900">
+                                <td class="px-2 py-3 text-center">
+                                    <input type="number" name="entries[{{ $loop->index }}][gate_log_hours]" step="0.25" placeholder="—" class="w-16 border-gray-300 rounded text-center text-xs">
+                                </td>
+                                <td class="px-2 py-3 text-center">
+                                    <input type="checkbox" name="entries[{{ $loop->index }}][work_through_lunch]" value="1" class="rounded border-gray-300 text-blue-600">
+                                </td>
+                                <td class="px-2 py-3 text-center">
+                                    <input type="checkbox" name="entries[{{ $loop->index }}][per_diem]" value="1" class="rounded border-gray-300 text-blue-600">
+                                </td>
+                                <td class="px-2 py-3 text-center">
+                                    <input type="number" name="entries[{{ $loop->index }}][per_diem_amount]" step="0.01" placeholder="default" class="w-20 border-gray-300 rounded text-center text-xs">
+                                </td>
+                                <td class="px-3 py-3 text-center text-sm font-semibold text-gray-900">
                                     <span class="total">0</span> hrs
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                <td colspan="9" class="px-6 py-4 text-center text-gray-500">
                                     Select a crew to view members
                                 </td>
                             </tr>

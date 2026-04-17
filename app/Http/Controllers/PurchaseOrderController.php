@@ -29,7 +29,9 @@ class PurchaseOrderController extends Controller
         return view('purchase-orders.index', [
             'vendors' => Vendor::query()->orderBy('name')->get(['id', 'name']),
             'projects' => Project::query()->orderBy('name')->get(['id', 'name', 'project_number']),
-            'costCodes' => CostCode::query()->orderBy('code')->get(['id', 'code']),
+            'costCodes' => CostCode::query()->orderBy('code')->get(['id', 'code', 'name']),
+            'costTypes' => \App\Models\CostType::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']),
+            'parentPOs' => PurchaseOrder::whereNull('parent_po_id')->orderBy('po_number')->get(['id', 'po_number']),
         ]);
     }
 
@@ -128,6 +130,9 @@ class PurchaseOrderController extends Controller
             'project_id' => 'required|exists:projects,id',
             'vendor_id' => 'required|exists:vendors,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
+            'parent_po_id' => 'nullable|exists:purchase_orders,id',
+            'change_order_id' => 'nullable|exists:change_orders,id',
             'po_number' => 'nullable|string|max:50|unique:purchase_orders,po_number',
             'description' => 'required|string|max:500',
             'date' => 'required|date',
@@ -181,8 +186,11 @@ class PurchaseOrderController extends Controller
             ) {
                 $po = PurchaseOrder::create([
                     'project_id' => $validated['project_id'],
+                    'parent_po_id' => $validated['parent_po_id'] ?? null,
+                    'change_order_id' => $validated['change_order_id'] ?? null,
                     'vendor_id' => $validated['vendor_id'],
                     'cost_code_id' => $validated['cost_code_id'] ?? null,
+                    'cost_type_id' => $validated['cost_type_id'] ?? null,
                     'po_number' => $poNumber,
                     'description' => $validated['description'],
                     'date' => $validated['date'],
@@ -345,6 +353,9 @@ class PurchaseOrderController extends Controller
             'project_id' => 'required|exists:projects,id',
             'vendor_id' => 'required|exists:vendors,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
+            'parent_po_id' => 'nullable|exists:purchase_orders,id',
+            'change_order_id' => 'nullable|exists:change_orders,id',
             'description' => 'required|string|max:500',
             'date' => 'required|date',
             'delivery_date' => 'nullable|date|after_or_equal:date',
@@ -389,8 +400,11 @@ class PurchaseOrderController extends Controller
                 // Update PO
                 $purchaseOrder->update([
                     'project_id' => $validated['project_id'],
+                    'parent_po_id' => $validated['parent_po_id'] ?? null,
+                    'change_order_id' => $validated['change_order_id'] ?? null,
                     'vendor_id' => $validated['vendor_id'],
                     'cost_code_id' => $validated['cost_code_id'] ?? null,
+                    'cost_type_id' => $validated['cost_type_id'] ?? null,
                     'description' => $validated['description'],
                     'date' => $validated['date'],
                     'delivery_date' => $validated['delivery_date'] ?? null,

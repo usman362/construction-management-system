@@ -119,13 +119,28 @@ class ProjectController extends Controller
         $project->load([
             'client',
             'phases',
-            'budgetLines',
+            'budgetLines.costCode',
+            'budgetLines.costType',
             'changeOrders',
-            'commitments',
-            'invoices',
+            'commitments.vendor',
+            'commitments.costCode',
+            'commitments.costType',
+            'invoices.vendor',
+            'invoices.costCode',
             'timesheets.employee',
             'documents.uploader',
         ]);
+
+        // Purchase orders + billing invoices live on their own tables — load
+        // them here so the Costs and Client Billing tabs can read them.
+        $purchaseOrders = \App\Models\PurchaseOrder::with(['vendor', 'costCode', 'costType', 'parent'])
+            ->where('project_id', $project->id)
+            ->orderByDesc('date')
+            ->get();
+
+        $billingInvoices = class_exists(\App\Models\BillingInvoice::class)
+            ? \App\Models\BillingInvoice::where('project_id', $project->id)->orderByDesc('id')->get()
+            : collect();
 
         $budgetLines = $project->budgetLines;
         $changeOrders = $project->changeOrders;
@@ -170,12 +185,16 @@ class ProjectController extends Controller
             'invoices' => $invoices,
             'timesheets' => $timesheets,
             'costSummary' => $costSummary,
+            'purchaseOrders' => $purchaseOrders,
+            'billingInvoices' => $billingInvoices,
             'budgetTotal' => $budgetTotal,
             'committedTotal' => $committedTotal,
             'invoicedTotal' => $invoicedTotal,
             'coTotal' => $coTotal,
             'balance' => ($budgetTotal + $coTotal) - $committedTotal,
             'percentComplete' => $percentComplete,
+            'allCostCodes' => \App\Models\CostCode::active()->orderBy('code')->get(['id', 'code', 'name']),
+            'allCostTypes' => \App\Models\CostType::active()->orderBy('sort_order')->get(['id', 'code', 'name']),
         ]);
     }
 

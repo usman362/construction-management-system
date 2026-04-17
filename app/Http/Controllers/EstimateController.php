@@ -76,13 +76,15 @@ class EstimateController extends Controller
 
     public function show(Project $project, Estimate $estimate): View
     {
-        $estimate->load('lines.costCode');
+        $estimate->load(['lines.costCode', 'lines.costType']);
         $costCodes = CostCode::orderBy('code')->get();
+        $costTypes = \App\Models\CostType::active()->orderBy('sort_order')->get();
 
         return view('estimates.show', [
             'project' => $project,
             'estimate' => $estimate,
             'costCodes' => $costCodes,
+            'costTypes' => $costTypes,
         ]);
     }
 
@@ -113,6 +115,7 @@ class EstimateController extends Controller
     {
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'quantity' => 'required|numeric|min:0',
             'unit_cost' => 'required|numeric|min:0',
@@ -130,6 +133,7 @@ class EstimateController extends Controller
     {
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'quantity' => 'required|numeric|min:0',
             'unit_cost' => 'required|numeric|min:0',

@@ -105,7 +105,8 @@
             <table class="w-full">
                 <thead class="bg-gray-100 border-b">
                     <tr>
-                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Cost Code</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Phase Code</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Cost Type</th>
                         <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
                         <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Qty</th>
                         <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Unit</th>
@@ -118,7 +119,8 @@
                 <tbody>
                     @forelse ($estimate->lines as $item)
                         <tr class="border-b hover:bg-gray-50">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $item->costCode?->code ?? 'N/A' }}</td>
+                            <td class="px-6 py-4 text-sm font-mono text-gray-900">{{ $item->costCode?->code ?? '—' }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ $item->costType?->name ?? '—' }}</td>
                             <td class="px-6 py-4 text-sm text-gray-900">{{ $item->description }}</td>
                             <td class="px-6 py-4 text-sm text-center text-gray-900">{{ $item->quantity }}</td>
                             <td class="px-6 py-4 text-sm text-center text-gray-900">{{ $item->unit }}</td>
@@ -131,7 +133,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">No line items found.</td>
+                            <td colspan="9" class="px-6 py-4 text-center text-gray-500">No line items found.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -216,11 +218,20 @@
         <h2 class="text-2xl font-bold mb-6">Add Line Item</h2>
         <form id="addLineForm">
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Cost Code *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Phase Code *</label>
                 <select name="cost_code_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    <option value="">Select Cost Code</option>
+                    <option value="">Select Phase Code</option>
                     @foreach ($costCodes ?? [] as $code)
                         <option value="{{ $code->id }}">{{ $code->code }} - {{ $code->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Cost Type</label>
+                <select name="cost_type_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <option value="">— None —</option>
+                    @foreach ($costTypes ?? [] as $ct)
+                        <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
                     @endforeach
                 </select>
             </div>

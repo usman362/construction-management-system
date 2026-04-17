@@ -17,13 +17,14 @@ class DashboardController extends Controller
         $pendingTimesheets = Timesheet::where('status', 'pending')->count();
         $openChangeOrders = ChangeOrder::where('status', 'pending')->count();
 
-        $recentProjects = Project::where('status', 'active')
+        // Show all non-closed projects, newest first (was: active + limit 5, which
+        // meant newly-created projects weren't visible once 5 older ones existed).
+        $recentProjects = Project::whereNotIn('status', ['closed', 'completed'])
             ->with(['client', 'budgetLines', 'commitments', 'invoices'])
             ->orderBy('created_at', 'desc')
-            ->limit(5)
             ->get();
 
-        $allProjects = Project::where('status', 'active')
+        $allProjects = Project::whereNotIn('status', ['closed', 'completed'])
             ->orderBy('name')
             ->get(['id', 'name', 'project_number']);
 

@@ -15,6 +15,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\CraftController;
 use App\Http\Controllers\CrewController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\RotationGroupController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\TimesheetController;
 use App\Http\Controllers\VendorController;
@@ -78,6 +79,11 @@ Route::middleware('auth')->group(function () {
     Route::post('employees/{employee}/certifications', [EmployeeCertificationController::class, 'store'])->name('employees.certifications.store');
     Route::put('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'update'])->name('employees.certifications.update');
     Route::delete('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'destroy'])->name('employees.certifications.destroy');
+
+    // Per-project pay rates for an employee
+    Route::post('employees/{employee}/project-rates', [\App\Http\Controllers\EmployeeProjectRateController::class, 'store'])->name('employees.project-rates.store');
+    Route::put('employees/{employee}/project-rates/{projectRate}', [\App\Http\Controllers\EmployeeProjectRateController::class, 'update'])->name('employees.project-rates.update');
+    Route::delete('employees/{employee}/project-rates/{projectRate}', [\App\Http\Controllers\EmployeeProjectRateController::class, 'destroy'])->name('employees.project-rates.destroy');
     Route::get('certifications/{certification}/download', [EmployeeCertificationController::class, 'download'])->name('certifications.download');
 
     // ─── Projects — everyone can view, PM+ can manage ────────────
@@ -177,6 +183,7 @@ Route::middleware('auth')->group(function () {
         Route::post('crafts/import', [ImportController::class, 'craftImport'])->name('crafts.import');
         Route::resource('crafts', CraftController::class);
         Route::resource('shifts', ShiftController::class);
+        Route::resource('rotation-groups', RotationGroupController::class)->parameters(['rotation-groups' => 'rotationGroup']);
     });
 
     Route::middleware('role:admin,project_manager,field')->group(function () {
@@ -204,6 +211,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('payroll/{payrollPeriod}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
         Route::post('payroll/{payrollPeriod}/generate', [PayrollController::class, 'generate'])->name('payroll.generate');
         Route::post('payroll/{payrollPeriod}/process', [PayrollController::class, 'process'])->name('payroll.process');
+        Route::get('payroll/{payrollPeriod}/export', [PayrollController::class, 'export'])->name('payroll.export');
     });
 
     // ─── Costing ─────────────────────────────────────────────────

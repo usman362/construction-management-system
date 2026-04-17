@@ -38,6 +38,9 @@
                 <h3 class="text-sm font-semibold text-gray-700 mb-1">CHANGE ORDER</h3>
                 <p class="text-lg font-bold text-gray-900">{{ $changeOrder->co_number }}</p>
                 <p class="text-sm text-gray-600">{{ $changeOrder->date->format('M d, Y') }}</p>
+                @if($changeOrder->client_po)
+                    <p class="text-xs text-gray-500 mt-1">Client PO: <span class="font-semibold text-gray-700">{{ $changeOrder->client_po }}</span></p>
+                @endif
             </div>
         </div>
     </div>

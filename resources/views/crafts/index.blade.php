@@ -70,7 +70,7 @@
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">
         <thead><tr>
-            <th>Code</th><th>Name</th><th>Hourly Rate</th><th>OT Multiplier</th><th>Billable Rate</th><th>Employees</th><th>Status</th><th class="text-center" width="100">Actions</th>
+            <th>Code</th><th>Name</th><th>Hourly Rate</th><th>ST Bill Rate</th><th>OT Bill Rate</th><th>Employees</th><th>Status</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
@@ -213,8 +213,8 @@ var table = $('#dataTable').DataTable({
     columns: [
         {data:'code'}, {data:'name'},
         {data:'base_hourly_rate', render: d=>'$'+parseFloat(d).toFixed(2)},
-        {data:'overtime_multiplier', render: d=>parseFloat(d).toFixed(2)+'x'},
         {data:'billable_rate', render: d=>'$'+parseFloat(d).toFixed(2)},
+        {data:'ot_billable_rate', render: d=>d?'$'+parseFloat(d).toFixed(2):'<span class="text-gray-400">—</span>'},
         {data:'employees_count', className:'text-center'},
         {data:'is_active', className:'text-center', render: d=>d?'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>':'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>'},
         {data:'actions', orderable:false, searchable:false, className:'text-center',

@@ -13,6 +13,7 @@ class BudgetLine extends Model
     protected $fillable = [
         'project_id',
         'cost_code_id',
+        'cost_type_id',
         'description',
         'budget_amount',
         'revised_amount',
@@ -31,6 +32,11 @@ class BudgetLine extends Model
     public function costCode(): BelongsTo
     {
         return $this->belongsTo(CostCode::class);
+    }
+
+    public function costType(): BelongsTo
+    {
+        return $this->belongsTo(CostType::class);
     }
 
     public function getCurrentAmountAttribute()
