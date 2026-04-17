@@ -88,10 +88,10 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
-            <div class="grid grid-cols-3 gap-4">
+            <input type="hidden" name="overtime_multiplier" value="1.50">
+            <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Hourly Rate *</label><input type="number" step="0.01" name="base_hourly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Multiplier *</label><input type="number" step="0.01" name="overtime_multiplier" value="1.50" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Billable Rate *</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">ST Billable Rate *</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">OT Billable Rate</label>
@@ -147,10 +147,10 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
-            <div class="grid grid-cols-3 gap-4">
+            <input type="hidden" name="overtime_multiplier" value="1.50">
+            <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Hourly Rate *</label><input type="number" step="0.01" name="base_hourly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Multiplier *</label><input type="number" step="0.01" name="overtime_multiplier" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Billable Rate *</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">ST Billable Rate *</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">OT Billable Rate</label>
@@ -266,7 +266,7 @@ function viewCraft(id){
             '<div class="space-y-4">'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Code</p><p class="text-sm font-semibold">'+d.code+'</p></div><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Description</p><p class="text-sm">'+(d.description||'—')+'</p></div>'+
-            '<div class="grid grid-cols-3 gap-4"><div><p class="text-xs text-gray-500 mb-1">Hourly Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.base_hourly_rate).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">OT Multiplier</p><p class="text-sm font-semibold">'+parseFloat(d.overtime_multiplier).toFixed(2)+'x</p></div><div><p class="text-xs text-gray-500 mb-1">Billable Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.billable_rate).toFixed(2)+'</p></div></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Hourly Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.base_hourly_rate).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">ST Billable Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.billable_rate).toFixed(2)+'</p></div></div>'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">OT Billable Rate</p><p class="text-sm font-semibold">'+fmtDollar(d.ot_billable_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Overhead Rate</p><p class="text-sm font-semibold">'+fmtRate(d.overhead_rate)+'</p></div></div>'+
             '<div class="pt-2 border-t border-gray-100"><p class="text-xs font-semibold uppercase text-gray-500 mb-2">Burden Rates (ST / OT)</p>'+
                 burdenRow('FICA', d.fica_st_rate, d.fica_ot_rate, false)+

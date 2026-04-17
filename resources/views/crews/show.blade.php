@@ -69,11 +69,9 @@
                             <td class="px-4 py-2 text-gray-700">{{ $member->craft?->name ?? 'N/A' }}</td>
                             <td class="px-4 py-2 text-gray-700">{{ $member->pivot?->assigned_date?->format('M d, Y') ?? 'N/A' }}</td>
                             <td class="px-4 py-2">
-                                <form id="remove-member-{{ $member->id }}" action="{{ route('crews.remove-member', [$crew, $member]) }}" method="POST" class="inline">
-                                    @csrf
-                                    @method('DELETE')
-                                </form>
-                                <button type="button" onclick="confirmDelete('remove-member-{{ $member->id }}')" class="text-red-600 hover:text-red-900">Remove</button>
+                                <button type="button"
+                                        onclick="confirmDelete('{{ route('crews.remove-member', [$crew, $member]) }}', null, window.location.href)"
+                                        class="text-red-600 hover:text-red-900">Remove</button>
                             </td>
                         </tr>
                     @empty

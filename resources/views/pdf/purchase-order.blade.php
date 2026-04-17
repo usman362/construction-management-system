@@ -155,7 +155,7 @@
             @if($purchaseOrder->costCode)
                 <div class="detail-row">
                     <div class="detail-label">Cost Code</div>
-                    <div class="detail-value">{{ $purchaseOrder->costCode->code }} - {{ $purchaseOrder->costCode->description }}</div>
+                    <div class="detail-value">{{ $purchaseOrder->costCode->code }} - {{ $purchaseOrder->costCode->name }}</div>
                 </div>
             @endif
 

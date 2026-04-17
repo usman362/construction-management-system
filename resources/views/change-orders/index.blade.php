@@ -16,14 +16,18 @@
     </div>
 
     <!-- Summary Cards -->
+    @php
+        $approvedTotal = \App\Models\ChangeOrder::where('project_id', $project->id)->where('status', 'approved')->sum('amount');
+        $pendingTotal  = \App\Models\ChangeOrder::where('project_id', $project->id)->where('status', 'pending')->sum('amount');
+    @endphp
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Total Approved CO Amount</h3>
-            <p class="text-3xl font-bold text-green-600">$0.00</p>
+            <p class="text-3xl font-bold text-green-600">${{ number_format($approvedTotal, 2) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Total Pending</h3>
-            <p class="text-3xl font-bold text-yellow-600">$0.00</p>
+            <p class="text-3xl font-bold text-yellow-600">${{ number_format($pendingTotal, 2) }}</p>
         </div>
     </div>
 

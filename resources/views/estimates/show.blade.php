@@ -139,7 +139,7 @@
                 </tbody>
                 <tfoot class="bg-gray-50 border-t-2">
                     <tr>
-                        <td colspan="5" class="px-6 py-4 text-right text-sm font-semibold text-gray-900">TOTAL:</td>
+                        <td colspan="6" class="px-6 py-4 text-right text-sm font-semibold text-gray-900">TOTAL:</td>
                         <td class="px-6 py-4 text-sm font-bold text-gray-900 text-right">${{ number_format($estimate->lines->sum('amount') ?? 0, 2) }}</td>
                         <td colspan="2"></td>
                     </tr>

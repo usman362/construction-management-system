@@ -20,12 +20,15 @@
         <table id="dataTable" class="w-full">
             <thead class="bg-gray-100 border-b">
                 <tr>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">#</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Vendor</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
-                    <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Commit #</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">PO #</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Vendor</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phase Code</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cost Type</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
             </thead>
         </table>
@@ -69,14 +72,25 @@
                     </select>
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code</label>
-                <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                    <option value="">Select Cost Code (optional)</option>
-                    @foreach($costCodes as $cc)
-                        <option value="{{ $cc->id }}">{{ $cc->code }} - {{ $cc->name }}</option>
-                    @endforeach
-                </select>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
+                    <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">— None —</option>
+                        @foreach($costCodes as $cc)
+                            <option value="{{ $cc->id }}">{{ $cc->code }} - {{ $cc->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                    <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">— None —</option>
+                        @foreach($costTypes ?? [] as $ct)
+                            <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
@@ -168,7 +182,10 @@ $(document).ready(function() {
         ajax: '{{ route("projects.commitments.index", $project) }}',
         columns: [
             {data:'commitment_number', name:'commitment_number'},
+            {data:'po_number', name:'po_number', render: function(d){return d||'<span class="text-gray-400">—</span>';}},
             {data:'vendor', name:'vendor'},
+            {data:'cost_code', name:'cost_code', render: function(d){return d?'<span class="font-mono text-xs">'+d+'</span>':'<span class="text-gray-400">—</span>';}},
+            {data:'cost_type', name:'cost_type', render: function(d){return d||'<span class="text-gray-400">—</span>';}},
             {data:'description', name:'description', render: function(d){return d||'—';}},
             {data:'amount', name:'amount', render: function(d){return '$'+parseFloat(d).toFixed(2);}, className:'text-right'},
             {data:'status', name:'status', render: function(d) {

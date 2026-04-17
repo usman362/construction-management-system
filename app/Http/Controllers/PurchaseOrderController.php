@@ -263,7 +263,7 @@ class PurchaseOrderController extends Controller
      */
     public function show(PurchaseOrder $purchaseOrder): JsonResponse
     {
-        $purchaseOrder->load(['project', 'vendor', 'costCode', 'items.material']);
+        $purchaseOrder->load(['project', 'vendor', 'costCode', 'costType', 'parent', 'changeOrder', 'items.material']);
 
         return response()->json([
             'id' => $purchaseOrder->id,
@@ -276,6 +276,11 @@ class PurchaseOrderController extends Controller
             'vendor' => $purchaseOrder->vendor?->name,
             'cost_code_id' => $purchaseOrder->cost_code_id,
             'cost_code' => $purchaseOrder->costCode?->code,
+            'cost_type_id' => $purchaseOrder->cost_type_id,
+            'cost_type' => $purchaseOrder->costType?->name,
+            'parent_po_id' => $purchaseOrder->parent_po_id,
+            'parent_po_number' => $purchaseOrder->parent?->po_number,
+            'change_order_id' => $purchaseOrder->change_order_id,
             'description' => $purchaseOrder->description,
             'notes' => $purchaseOrder->notes,
             'subtotal' => $purchaseOrder->subtotal,
@@ -319,6 +324,9 @@ class PurchaseOrderController extends Controller
             'project_id' => $purchaseOrder->project_id,
             'vendor_id' => $purchaseOrder->vendor_id,
             'cost_code_id' => $purchaseOrder->cost_code_id,
+            'cost_type_id' => $purchaseOrder->cost_type_id,
+            'parent_po_id' => $purchaseOrder->parent_po_id,
+            'change_order_id' => $purchaseOrder->change_order_id,
             'description' => $purchaseOrder->description,
             'notes' => $purchaseOrder->notes,
             'tax_rate' => $purchaseOrder->tax_rate * 100,

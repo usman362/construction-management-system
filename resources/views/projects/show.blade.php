@@ -63,7 +63,7 @@
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Current Budget</p>
-            <p class="text-2xl font-bold text-gray-900">${{ number_format($project->estimate, 0) }}</p>
+            <p class="text-2xl font-bold text-gray-900">${{ number_format($project->current_budget ?? 0, 0) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Committed</p>

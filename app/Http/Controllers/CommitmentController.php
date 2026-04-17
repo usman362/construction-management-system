@@ -19,16 +19,18 @@ class CommitmentController extends Controller
         }
         $vendors = Vendor::orderBy('name')->get(['id', 'name']);
         $costCodes = CostCode::orderBy('code')->get(['id', 'code', 'name']);
+        $costTypes = \App\Models\CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']);
         return view('commitments.index', [
             'project' => $project,
             'vendors' => $vendors,
             'costCodes' => $costCodes,
+            'costTypes' => $costTypes,
         ]);
     }
 
     private function dataTable(Project $project, Request $request): JsonResponse
     {
-        $query = $project->commitments()->with(['vendor']);
+        $query = $project->commitments()->with(['vendor', 'costCode', 'costType']);
         $totalRecords = $project->commitments()->count();
 
         // Search
@@ -62,7 +64,10 @@ class CommitmentController extends Controller
                 return [
                     'id' => $comm->id,
                     'commitment_number' => $comm->commitment_number,
+                    'po_number' => $comm->po_number,
                     'vendor' => $comm->vendor?->name ?? '—',
+                    'cost_code' => $comm->costCode?->code,
+                    'cost_type' => $comm->costType?->name,
                     'description' => $comm->description,
                     'amount' => $comm->amount,
                     'status' => $comm->status,
@@ -81,6 +86,7 @@ class CommitmentController extends Controller
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
             'po_number' => 'nullable|string|max:100',
@@ -123,6 +129,7 @@ class CommitmentController extends Controller
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
             'po_number' => 'nullable|string|max:100',

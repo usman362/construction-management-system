@@ -12,6 +12,7 @@ class Commitment extends Model
         'project_id',
         'vendor_id',
         'cost_code_id',
+        'cost_type_id',
         'commitment_number',
         'po_number',
         'description',
@@ -39,6 +40,11 @@ class Commitment extends Model
     public function costCode(): BelongsTo
     {
         return $this->belongsTo(CostCode::class);
+    }
+
+    public function costType(): BelongsTo
+    {
+        return $this->belongsTo(CostType::class);
     }
 
     public function invoices(): HasMany
