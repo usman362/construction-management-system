@@ -477,49 +477,62 @@ class TimesheetController extends Controller
     }
 
     /**
+     * Compute timesheet totals.
+     *
+     * Architecture (per client):
+     *   - COST (what we pay, used in budgets/cost reports)
+     *     = (wage + burden) × hours, always sourced from the employee:
+     *         ST cost = (hourly_rate + st_burden_rate) × regular_hours
+     *         OT cost = (overtime_rate + ot_burden_rate) × overtime_hours
+     *         DT cost = (hourly_rate × 2 + ot_burden_rate) × dt_hours
+     *
+     *   - BILLABLE (what we charge the client)
+     *     = Project Billable Rate if one exists for this project+employee/craft+date,
+     *       otherwise falls back to employee's billable_rate × multipliers.
+     *
      * @return array{total_hours: float, total_cost: float, regular_rate: string|float, overtime_rate: string|float, billable_rate: string|float, billable_amount: float, rate_type: string, project_billable_rate_id: int|null}
      */
     private function computeLaborTotals(Employee $employee, float $regularHours, float $overtimeHours, float $doubleTimeHours, int $projectId = 0, string $date = ''): array
     {
         $totalHours = $regularHours + $overtimeHours + $doubleTimeHours;
 
-        // Check for project-based loaded billable rate
+        // ── COST (always from the employee, includes burden) ──────────────
+        $stBurden = (float) ($employee->st_burden_rate ?? 0);
+        $otBurden = (float) ($employee->ot_burden_rate ?? 0);
+        $stWage   = (float) $employee->hourly_rate;
+        $otWage   = (float) $employee->overtime_rate;
+
+        $regularCost = $regularHours * ($stWage + $stBurden);
+        $otCost      = $overtimeHours * ($otWage + $otBurden);
+        $dtCost      = $doubleTimeHours * (($stWage * 2) + $otBurden);
+        $totalCost   = $regularCost + $otCost + $dtCost;
+
+        // ── BILLABLE (project rate if set, else employee billable_rate) ───
         $projectRate = null;
         if ($projectId && $date) {
             $projectRate = $this->findProjectBillableRate($projectId, $employee, $date);
         }
 
         if ($projectRate) {
-            // Use loaded billable rates from project configuration
             $stRate = (float) $projectRate->straight_time_rate;
             $otRate = (float) $projectRate->overtime_rate;
             $dtRate = (float) $projectRate->double_time_rate;
-
-            $regularCost = $regularHours * $stRate;
-            $otCost = $overtimeHours * $otRate;
-            $dtCost = $doubleTimeHours * $dtRate;
-            $totalCost = $regularCost + $otCost + $dtCost;
+            $billableAmount = ($regularHours * $stRate)
+                + ($overtimeHours * $otRate)
+                + ($doubleTimeHours * $dtRate);
 
             return [
                 'total_hours' => $totalHours,
                 'total_cost' => $totalCost,
-                'regular_rate' => $stRate,
-                'overtime_rate' => $otRate,
+                'regular_rate' => $stWage,
+                'overtime_rate' => $otWage,
                 'billable_rate' => $stRate,
-                'billable_amount' => $totalCost,
+                'billable_amount' => $billableAmount,
                 'rate_type' => 'loaded',
                 'project_billable_rate_id' => $projectRate->id,
             ];
         }
 
-        // Fallback: use employee's standard rates
-        $regularCost = $regularHours * (float) $employee->hourly_rate;
-        $otCost = $overtimeHours * (float) $employee->overtime_rate;
-        $dtCost = $doubleTimeHours * ((float) $employee->hourly_rate * 2);
-        $totalCost = $regularCost + $otCost + $dtCost;
-
-        // Billable amount = client-facing rate (with markup) × hours
-        // OT billed at 1.5x billable_rate, DT at 2x billable_rate
         $bRate = (float) ($employee->billable_rate ?? $employee->hourly_rate);
         $billableAmount = ($regularHours * $bRate)
             + ($overtimeHours * $bRate * 1.5)

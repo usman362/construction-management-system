@@ -222,10 +222,20 @@
                 @endforeach
             </select>
         </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Burden Rate (%)</label>
-            <input type="number" step="0.01" name="burden_rate" value="{{ $val('burden_rate') }}" placeholder="0.00"
+            <label class="block text-sm font-medium text-gray-700 mb-1">ST Burden ($/hr)</label>
+            <input type="number" step="0.0001" name="st_burden_rate" value="{{ $val('st_burden_rate') }}" placeholder="0.0000"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <p class="text-[11px] text-gray-500 mt-1">Pooled hourly burden on straight time (SUTA + FICA + WC + Benefits + Overhead).</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">OT Burden ($/hr)</label>
+            <input type="number" step="0.0001" name="ot_burden_rate" value="{{ $val('ot_burden_rate') }}" placeholder="0.0000"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <p class="text-[11px] text-gray-500 mt-1">Pooled hourly burden on overtime.</p>
         </div>
     </div>
 
