@@ -11,7 +11,7 @@
         <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
             <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0 overflow-hidden">
                 @if($companyLogo)
-                    <img src="{{ $companyLogo }}" class="w-full h-full object-contain" alt="{{ $companyName }}">
+                    <img src="{{ asset($companyLogo) }}" class="w-full h-full object-contain" alt="{{ $companyName }}">
                 @else
                     {{ strtoupper(substr($companyName, 0, 2)) }}
                 @endif

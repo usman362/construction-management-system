@@ -8,7 +8,7 @@
     <script>window.BASE_URL = '{{ url('/') }}';</script>
     @php $appFavicon = \App\Models\Setting::get('favicon'); @endphp
     @if($appFavicon)
-    <link rel="icon" href="{{ $appFavicon }}" type="image/png">
+    <link rel="icon" href="{{ asset($appFavicon) }}" type="image/png">
     @endif
     <title>@yield('title', 'CMS') - {{ \App\Models\Setting::get('company_name', 'BuildTrack') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>

@@ -11,7 +11,7 @@
     @endphp
     <title>Login - {{ $companyName }}</title>
     @if($appFavicon)
-    <link rel="icon" href="{{ $appFavicon }}" type="image/png">
+    <link rel="icon" href="{{ asset($appFavicon) }}" type="image/png">
     @endif
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -22,7 +22,7 @@
         <div class="text-center mb-8">
             <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 overflow-hidden">
                 @if($companyLogo)
-                    <img src="{{ $companyLogo }}" class="w-full h-full object-contain p-1" alt="{{ $companyName }}">
+                    <img src="{{ asset($companyLogo) }}" class="w-full h-full object-contain p-1" alt="{{ $companyName }}">
                 @else
                     <span class="text-2xl font-bold text-white">{{ strtoupper(substr($companyName, 0, 2)) }}</span>
                 @endif
