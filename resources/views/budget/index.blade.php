@@ -22,11 +22,12 @@
         <table id="budgetTable" class="w-full">
             <thead class="bg-gray-100 border-b">
                 <tr>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Cost Code</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
-                    <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Original Amount</th>
-                    <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Current Amount</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phase Code</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cost Type</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Original Amount</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Current Amount</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -44,11 +45,21 @@
             @csrf
 
             <div class="mb-4">
-                <label for="create_cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Code</label>
+                <label for="create_cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Phase Code</label>
                 <select name="cost_code_id" id="create_cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
-                    <option value="">Select Cost Code</option>
+                    <option value="">Select Phase Code</option>
                     @foreach($costCodes as $cc)
                         <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label for="create_cost_type_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Type</label>
+                <select name="cost_type_id" id="create_cost_type_id" class="w-full border-gray-300 rounded-lg shadow-sm">
+                    <option value="">— None —</option>
+                    @foreach($costTypes ?? [] as $ct)
+                        <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -85,11 +96,21 @@
             @method('PUT')
 
             <div class="mb-4">
-                <label for="edit_cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Code</label>
+                <label for="edit_cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Phase Code</label>
                 <select name="cost_code_id" id="edit_cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
-                    <option value="">Select Cost Code</option>
+                    <option value="">Select Phase Code</option>
                     @foreach($costCodes as $cc)
                         <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label for="edit_cost_type_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Type</label>
+                <select name="cost_type_id" id="edit_cost_type_id" class="w-full border-gray-300 rounded-lg shadow-sm">
+                    <option value="">— None —</option>
+                    @foreach($costTypes ?? [] as $ct)
+                        <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -128,8 +149,13 @@
 
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
                 <p id="view_cost_code" class="text-gray-900">—</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                <p id="view_cost_type" class="text-gray-900">—</p>
             </div>
 
             <div>
@@ -207,6 +233,7 @@
         currentBudgetId = id;
         $.get(`${window.BASE_URL}/projects/${projectId}/budget/${id}/edit`, function(data) {
             $('#edit_cost_code_id').val(data.cost_code_id || '');
+            $('#edit_cost_type_id').val(data.cost_type_id || '');
             $('#edit_description').val(data.description || '');
             $('#edit_budget_amount').val(data.budget_amount || '');
             $('#edit_revised_amount').val(data.revised_amount || '');
@@ -218,6 +245,7 @@
     function viewBudgetLine(id) {
         $.get(`${window.BASE_URL}/projects/${projectId}/budget/${id}/edit`, function(data) {
             $('#view_cost_code').text(data.cost_code?.code || '—');
+            $('#view_cost_type').text(data.cost_type?.name || '—');
             $('#view_description').text(data.description || '—');
             $('#view_original_amount').text('$' + parseFloat(data.budget_amount || 0).toFixed(2));
             $('#view_current_amount').text('$' + parseFloat(data.revised_amount || data.budget_amount || 0).toFixed(2));
@@ -250,7 +278,8 @@
             type: 'GET'
         },
         columns: [
-            { data: 'cost_code', name: 'cost_code' },
+            { data: 'cost_code', name: 'cost_code', render: function(d){ return d || '<span class="text-gray-400">—</span>'; } },
+            { data: 'cost_type', name: 'cost_type', render: function(d){ return d || '<span class="text-gray-400">—</span>'; } },
             { data: 'description', name: 'description' },
             {
                 data: 'original_amount',

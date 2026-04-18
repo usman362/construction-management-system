@@ -18,12 +18,17 @@ class BudgetLineController extends Controller
             return $this->dataTable($project, $request);
         }
         $costCodes = CostCode::orderBy('code')->get(['id', 'code', 'name']);
-        return view('budget.index', ['project' => $project, 'costCodes' => $costCodes]);
+        $costTypes = CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']);
+        return view('budget.index', [
+            'project' => $project,
+            'costCodes' => $costCodes,
+            'costTypes' => $costTypes,
+        ]);
     }
 
     private function dataTable(Project $project, Request $request): JsonResponse
     {
-        $query = $project->budgetLines()->with(['costCode']);
+        $query = $project->budgetLines()->with(['costCode', 'costType']);
         $totalRecords = $project->budgetLines()->count();
 
         // Search
@@ -61,6 +66,7 @@ class BudgetLineController extends Controller
                 return [
                     'id' => $line->id,
                     'cost_code' => $line->costCode?->code ?? '—',
+                    'cost_type' => $line->costType?->name ?? '—',
                     'description' => $line->description,
                     'original_amount' => $line->budget_amount,
                     'current_amount' => $line->current_amount,
@@ -85,12 +91,12 @@ class BudgetLineController extends Controller
 
     public function show(Project $project, BudgetLine $budgetLine): JsonResponse
     {
-        return response()->json($budgetLine->load('costCode'));
+        return response()->json($budgetLine->load(['costCode', 'costType']));
     }
 
     public function edit(Project $project, BudgetLine $budgetLine): JsonResponse
     {
-        return response()->json($budgetLine->load('costCode'));
+        return response()->json($budgetLine->load(['costCode', 'costType']));
     }
 
     public function update(Request $request, Project $project, BudgetLine $budgetLine): JsonResponse
