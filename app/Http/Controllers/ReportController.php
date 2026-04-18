@@ -180,8 +180,9 @@ class ReportController extends Controller
         $dateTo = $validated['end_date'] ?? $validated['date_to'] ?? null;
         $groupBy = $validated['group_by'] ?? 'employee';
 
+        // Include all timesheets (drafts included) — reports should reflect
+        // actual entered work, not just approved rows.
         $query = Timesheet::where('project_id', $project->id)
-            ->whereIn('status', ['submitted', 'approved'])
             ->with(['employee.craft', 'costCode']);
 
         if ($dateFrom) {
@@ -286,8 +287,9 @@ class ReportController extends Controller
 
         $groupBy = $validated['group_by'] ?? 'employee';
 
-        $query = Timesheet::whereIn('status', ['submitted', 'approved'])
-            ->with(['employee', 'project']);
+        // Include all timesheets (including drafts) — client needs to see
+        // everything entered, regardless of approval status.
+        $query = Timesheet::with(['employee', 'project']);
 
         if ($validated['employee_id'] ?? null) {
             $query->where('employee_id', $validated['employee_id']);
@@ -534,7 +536,6 @@ class ReportController extends Controller
         $normalizeCcKey = static fn ($id): string => $id === null ? '_null_' : (string) $id;
 
         $query = Timesheet::where('project_id', $project->id)
-            ->whereIn('status', ['submitted', 'approved'])
             ->with('costCode');
 
         if ($filters['date_from'] ?? null) {
@@ -636,8 +637,7 @@ class ReportController extends Controller
 
     protected function getTimesheetsForPeriod(Project $project, array $filters): \Illuminate\Support\Collection
     {
-        $query = Timesheet::where('project_id', $project->id)
-            ->whereIn('status', ['submitted', 'approved']);
+        $query = Timesheet::where('project_id', $project->id);
 
         if ($filters['date_from'] ?? null) {
             $query->whereDate('date', '>=', $filters['date_from']);
@@ -815,7 +815,7 @@ class ReportController extends Controller
         ]);
 
         $groupBy = $validated['group_by'] ?? 'employee';
-        $query = Timesheet::whereIn('status', ['submitted', 'approved'])->with(['employee', 'project']);
+        $query = Timesheet::with(['employee', 'project']);
 
         if ($validated['employee_id'] ?? null) $query->where('employee_id', $validated['employee_id']);
         if ($validated['project_id'] ?? null) $query->where('project_id', $validated['project_id']);

@@ -38,6 +38,12 @@
                 <h3 class="text-sm font-semibold text-gray-700 mb-1">CHANGE ORDER</h3>
                 <p class="text-lg font-bold text-gray-900">{{ $changeOrder->co_number }}</p>
                 <p class="text-sm text-gray-600">{{ $changeOrder->date->format('M d, Y') }}</p>
+                @php $pricingLabel = ($changeOrder->pricing_type ?? 'lump_sum') === 't_and_m' ? 'T & M' : 'Lump Sum'; @endphp
+                <p class="text-xs mt-1">
+                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold {{ ($changeOrder->pricing_type ?? 'lump_sum') === 't_and_m' ? 'bg-purple-100 text-purple-800' : 'bg-indigo-100 text-indigo-800' }}">
+                        {{ $pricingLabel }}
+                    </span>
+                </p>
                 @if($changeOrder->client_po)
                     <p class="text-xs text-gray-500 mt-1">Client PO: <span class="font-semibold text-gray-700">{{ $changeOrder->client_po }}</span></p>
                 @endif

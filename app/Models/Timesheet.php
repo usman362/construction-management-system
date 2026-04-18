@@ -30,6 +30,7 @@ class Timesheet extends Model
         'total_cost',
         'billable_rate',
         'billable_amount',
+        'is_billable',
         'rate_type',
         'project_billable_rate_id',
         'status',
@@ -52,6 +53,7 @@ class Timesheet extends Model
         'total_cost' => 'decimal:2',
         'billable_rate' => 'decimal:2',
         'billable_amount' => 'decimal:2',
+        'is_billable' => 'boolean',
         'approved_at' => 'datetime',
     ];
 

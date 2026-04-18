@@ -152,6 +152,7 @@ class TimesheetController extends Controller
             'double_time_hours' => 'nullable|numeric|min:0',
             'gate_log_hours' => 'nullable|numeric|min:0',
             'work_through_lunch' => 'nullable|boolean',
+            'is_billable' => 'nullable|boolean',
             'client_signature' => 'nullable|string',
             'client_signature_name' => 'nullable|string|max:150',
             'notes' => 'nullable|string',
@@ -162,6 +163,8 @@ class TimesheetController extends Controller
         $ot = (float) ($validated['overtime_hours'] ?? 0);
         $dt = (float) ($validated['double_time_hours'] ?? 0);
         $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt, (int) $validated['project_id'], $validated['date']);
+        // Billable flag: default true on create (hours exist to bill), honor explicit unchecked box
+        $isBillable = $request->has('is_billable') ? $request->boolean('is_billable') : true;
 
         $timesheet = Timesheet::create([
             'employee_id' => $validated['employee_id'],
@@ -184,7 +187,8 @@ class TimesheetController extends Controller
             'overtime_rate' => $totals['overtime_rate'],
             'total_cost' => $totals['total_cost'],
             'billable_rate' => $totals['billable_rate'],
-            'billable_amount' => $totals['billable_amount'],
+            'billable_amount' => $isBillable ? $totals['billable_amount'] : 0,
+            'is_billable' => $isBillable,
             'rate_type' => $totals['rate_type'],
             'project_billable_rate_id' => $totals['project_billable_rate_id'],
             'status' => 'draft',
@@ -255,6 +259,7 @@ class TimesheetController extends Controller
             'double_time_hours' => 'nullable|numeric|min:0',
             'gate_log_hours' => 'nullable|numeric|min:0',
             'work_through_lunch' => 'nullable|boolean',
+            'is_billable' => 'nullable|boolean',
             'client_signature' => 'nullable|string',
             'client_signature_name' => 'nullable|string|max:150',
             'notes' => 'nullable|string',
@@ -265,6 +270,11 @@ class TimesheetController extends Controller
         $ot = (float) ($validated['overtime_hours'] ?? 0);
         $dt = (float) ($validated['double_time_hours'] ?? 0);
         $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt, (int) $validated['project_id'], $validated['date']);
+        // Honor the "Billable" checkbox the user explicitly sent. If the field
+        // wasn't submitted at all (e.g. a partial update), keep the previous value.
+        $isBillable = $request->has('is_billable')
+            ? $request->boolean('is_billable')
+            : (bool) $timesheet->is_billable;
 
         $timesheet->update([
             'employee_id' => $validated['employee_id'],
@@ -287,7 +297,8 @@ class TimesheetController extends Controller
             'overtime_rate' => $totals['overtime_rate'],
             'total_cost' => $totals['total_cost'],
             'billable_rate' => $totals['billable_rate'],
-            'billable_amount' => $totals['billable_amount'],
+            'billable_amount' => $isBillable ? $totals['billable_amount'] : 0,
+            'is_billable' => $isBillable,
             'rate_type' => $totals['rate_type'],
             'project_billable_rate_id' => $totals['project_billable_rate_id'],
             'notes' => $validated['notes'] ?? null,

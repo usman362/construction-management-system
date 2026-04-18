@@ -39,6 +39,7 @@
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">CO #</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Title</th>
                     <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
+                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Type</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
                     <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
@@ -73,10 +74,17 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea name="description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
                     <input type="number" name="amount" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Pricing Type *</label>
+                    <select name="pricing_type" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                        <option value="lump_sum">Lump Sum</option>
+                        <option value="t_and_m">T &amp; M</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
@@ -123,10 +131,17 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea name="description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
                     <input type="number" name="amount" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Pricing Type *</label>
+                    <select name="pricing_type" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                        <option value="lump_sum">Lump Sum</option>
+                        <option value="t_and_m">T &amp; M</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
@@ -159,6 +174,10 @@ $(document).ready(function() {
             {data:'co_number', name:'co_number'},
             {data:'title', name:'title', render: d=>d||'—'},
             {data:'amount', name:'amount', render: d=>'$'+parseFloat(d).toFixed(2), className:'text-right'},
+            {data:'pricing_type', name:'pricing_type', orderable:false, className:'text-center', render: function(d) {
+                if (d === 't_and_m') return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">T &amp; M</span>';
+                return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">Lump Sum</span>';
+            }},
             {data:'status', name:'status', render: function(d) {
                 const statusColors = {
                     'pending': 'bg-yellow-100 text-yellow-800',
@@ -206,6 +225,7 @@ function editChangeOrder(id) {
         f.querySelector('[name="description"]').value = d.description || '';
         f.querySelector('[name="amount"]').value = d.amount || '';
         f.querySelector('[name="status"]').value = d.status || '';
+        f.querySelector('[name="pricing_type"]').value = d.pricing_type || 'lump_sum';
         document.getElementById('editSaveBtn').onclick = function() {
             submitForm('editForm', window.BASE_URL+'/projects/{{ $project->id }}/change-orders/' + d.id, 'PUT', table, 'editModal');
         };

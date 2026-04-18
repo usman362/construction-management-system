@@ -37,7 +37,7 @@
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="bg-blue-100 border border-gray-300">
-                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Cost Code</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Phase Code</th>
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Name</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Revenue</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Cost</th>
@@ -89,10 +89,10 @@
             </table>
         </div>
 
-        <!-- P&L Bar Chart: Revenue vs Cost vs Profit per Cost Code -->
+        <!-- P&L Bar Chart: Revenue vs Cost vs Profit per Phase Code -->
         <div class="bg-white border border-gray-200 rounded-lg p-6 mb-10 shadow-sm">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-800">Revenue vs Cost vs Profit — by Cost Code</h3>
+                <h3 class="text-lg font-semibold text-gray-800">Revenue vs Cost vs Profit — by Phase Code</h3>
                 <div class="flex items-center gap-4 text-xs text-gray-500">
                     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-blue-500"></span>Revenue</span>
                     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-red-500"></span>Cost</span>

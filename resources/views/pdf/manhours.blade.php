@@ -29,7 +29,7 @@
             <tr>
                 <th>Employee</th>
                 <th>Craft</th>
-                <th>Cost Code</th>
+                <th>Phase Code</th>
                 <th class="text-right">Regular Hrs</th>
                 <th class="text-right">OT Hrs</th>
                 <th class="text-right">DT Hrs</th>

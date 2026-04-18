@@ -56,7 +56,7 @@
     <table>
         <thead>
             <tr>
-                <th>Cost Code</th>
+                <th>Phase Code</th>
                 <th>Description</th>
                 <th class="text-right">Cost</th>
                 <th class="text-center">% of Total</th>

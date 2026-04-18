@@ -51,7 +51,7 @@
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="bg-blue-100 border border-gray-300">
-                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Cost Code</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Phase Code</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Budget Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Actual Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Earned Hrs</th>

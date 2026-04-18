@@ -92,12 +92,42 @@
                 </div>
             </div>
 
+            <!-- Quick fill toolbar: applies hours/per-diem to the whole crew at once -->
+            <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm font-semibold text-blue-900 mb-3">Quick fill (apply to all rows below)</p>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-blue-900 mb-1">Hours worked</label>
+                        <input type="number" id="bulk_hours_worked" step="0.25" min="0" placeholder="e.g. 10" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
+                        <p class="text-[11px] text-blue-700 mt-1">Splits into 8 Reg + excess OT (or &gt;16 → 8 Reg + 8 OT + DT)</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-blue-900 mb-1">Per diem (all)</label>
+                        <select id="bulk_per_diem" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
+                            <option value="">— No change —</option>
+                            <option value="1">Yes — pay per diem</option>
+                            <option value="0">No — skip per diem</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-blue-900 mb-1">Per diem amount ($)</label>
+                        <input type="number" id="bulk_per_diem_amount" step="0.01" min="0" placeholder="default from project" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" onclick="applyBulkFill()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-sm">
+                            Apply to all rows
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Crew Members Table -->
             <div class="overflow-x-auto mb-6">
                 <table class="w-full">
                     <thead class="bg-gray-100 border-b">
                         <tr>
                             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Enter hours worked. System splits into Reg/OT/DT automatically.">Hours Worked</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Reg</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">OT</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">DT</th>
@@ -115,6 +145,10 @@
                                 <td class="px-4 py-3 text-sm text-gray-900 font-medium">
                                     {{ $employee->first_name }} {{ $employee->last_name }}
                                     <input type="hidden" name="entries[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}">
+                                </td>
+                                <td class="px-2 py-3 text-center">
+                                    {{-- Hours worked: typing a single number (e.g. 10) auto-distributes into Reg/OT/DT --}}
+                                    <input type="number" step="0.25" min="0" placeholder="0" class="hours-worked w-20 border-gray-300 rounded text-center font-semibold" onchange="distributeHours(this)">
                                 </td>
                                 <td class="px-2 py-3 text-center">
                                     <input type="number" name="entries[{{ $loop->index }}][regular_hours]" step="0.5" value="0" class="w-16 border-gray-300 rounded text-center" onchange="updateTotal(this)">
@@ -151,7 +185,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="px-6 py-4 text-center text-gray-500">
+                                <td colspan="11" class="px-6 py-4 text-center text-gray-500">
                                     Select a crew to view members
                                 </td>
                             </tr>
@@ -190,6 +224,56 @@
         const doubleTimeHours = parseFloat(row.querySelector('input[name*="double_time_hours"]').value) || 0;
         const total = regularHours + overtimeHours + doubleTimeHours;
         row.querySelector('.total').textContent = total.toFixed(2);
+    }
+
+    // Split a "hours worked" number into Reg (≤8) + OT (8–16) + DT (>16)
+    // Example: 10 → 8 Reg + 2 OT.  6 → 6 Reg.  18 → 8 Reg + 8 OT + 2 DT.
+    function splitHours(h) {
+        h = parseFloat(h) || 0;
+        const reg = Math.min(h, 8);
+        const ot  = Math.max(0, Math.min(h, 16) - 8);
+        const dt  = Math.max(0, h - 16);
+        return { reg, ot, dt };
+    }
+
+    function distributeHours(input) {
+        const row = input.closest('tr');
+        const { reg, ot, dt } = splitHours(input.value);
+        row.querySelector('input[name*="regular_hours"]').value     = reg;
+        row.querySelector('input[name*="overtime_hours"]').value    = ot;
+        row.querySelector('input[name*="double_time_hours"]').value = dt;
+        updateTotal(input);
+    }
+
+    // Apply a single hours value / per-diem toggle to EVERY row in the table.
+    function applyBulkFill() {
+        const hoursWorked = document.getElementById('bulk_hours_worked').value;
+        const perDiemSel  = document.getElementById('bulk_per_diem').value;
+        const perDiemAmt  = document.getElementById('bulk_per_diem_amount').value;
+        let touched = 0;
+
+        document.querySelectorAll('.hours-worked').forEach((input) => {
+            if (hoursWorked !== '') {
+                input.value = hoursWorked;
+                distributeHours(input);
+                touched++;
+            }
+        });
+
+        document.querySelectorAll('input[name*="[per_diem]"]').forEach((cb) => {
+            if (perDiemSel === '1') cb.checked = true;
+            else if (perDiemSel === '0') cb.checked = false;
+        });
+
+        if (perDiemAmt !== '') {
+            document.querySelectorAll('input[name*="[per_diem_amount]"]').forEach((inp) => {
+                inp.value = perDiemAmt;
+            });
+        }
+
+        if (typeof Toast !== 'undefined') {
+            Toast.fire({icon:'success', title:'Applied to all rows'});
+        }
     }
 </script>
 @endsection

@@ -147,9 +147,9 @@
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
                 <select name="cost_code_id" id="edit_cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                    <option value="">Select Cost Code (optional)</option>
+                    <option value="">Select Phase Code (optional)</option>
                     @foreach($costCodes as $cc)
                         <option value="{{ $cc->id }}">{{ $cc->code }} - {{ $cc->name }}</option>
                     @endforeach

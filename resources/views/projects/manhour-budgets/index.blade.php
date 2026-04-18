@@ -37,7 +37,7 @@
         <table class="w-full">
             <thead class="bg-gray-100 border-b">
                 <tr>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Cost Code</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Phase Code</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Category</th>
                     <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Budget Hours</th>
                     <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Earned Hours</th>
@@ -93,9 +93,9 @@
         <form id="createForm" method="POST" action="{{ route('projects.manhour-budgets.store', $project) }}" class="p-6 space-y-4">
             @csrf
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code *</label>
                 <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
-                    <option value="">Select Cost Code</option>
+                    <option value="">Select Phase Code</option>
                     @foreach(\App\Models\CostCode::orderBy('code')->get() as $cc)
                         <option value="{{ $cc->id }}">{{ $cc->code }} - {{ $cc->name }}</option>
                     @endforeach
@@ -134,9 +134,9 @@
             @csrf
             @method('PUT')
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code *</label>
                 <select name="cost_code_id" id="edit_cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
-                    <option value="">Select Cost Code</option>
+                    <option value="">Select Phase Code</option>
                     @foreach(\App\Models\CostCode::orderBy('code')->get() as $cc)
                         <option value="{{ $cc->id }}">{{ $cc->code }} - {{ $cc->name }}</option>
                     @endforeach

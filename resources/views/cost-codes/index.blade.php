@@ -1,9 +1,9 @@
 @extends('layouts.app')
-@section('title', 'Cost Codes')
+@section('title', 'Phase Codes')
 @section('content')
 
 <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Cost Codes</h1>
+    <h1 class="text-2xl font-bold text-gray-900">Phase Codes</h1>
     <div class="flex items-center gap-2">
         <a href="{{ route('cost-codes.import.template') }}" class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm border border-gray-200 transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -15,7 +15,7 @@
         </button>
         <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-            Add Cost Code
+            Add Phase Code
         </button>
     </div>
 </div>
@@ -41,7 +41,7 @@
 <div id="importModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('importModal')">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h3 class="text-lg font-bold text-gray-900">Import Cost Codes from CSV</h3>
+            <h3 class="text-lg font-bold text-gray-900">Import Phase Codes from CSV</h3>
             <button onclick="closeModal('importModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form method="POST" action="{{ route('cost-codes.import') }}" enctype="multipart/form-data" class="p-6 space-y-4">
@@ -50,7 +50,7 @@
                 <p class="font-semibold mb-1">Before importing:</p>
                 <ol class="list-decimal list-inside space-y-0.5 text-xs">
                     <li>Download the template using the "Download Template" button.</li>
-                    <li>Fill in one row per cost code; keep the header row.</li>
+                    <li>Fill in one row per phase code; keep the header row.</li>
                     <li><code>code</code> and <code>name</code> are required.</li>
                     <li><code>cost_type</code> must match one of the names (or codes) from the Cost Types list.</li>
                     <li>Existing codes (matched by <code>code</code>) will be updated.</li>
@@ -80,7 +80,7 @@
 <div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('createModal')">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h3 class="text-lg font-bold text-gray-900">Add New Cost Code</h3>
+            <h3 class="text-lg font-bold text-gray-900">Add New Phase Code</h3>
             <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="createForm" class="p-6 space-y-4">
@@ -110,7 +110,7 @@
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onclick="submitForm('createForm','{{ route("cost-codes.store") }}','POST',table,'createModal')" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save Cost Code</button>
+            <button onclick="submitForm('createForm','{{ route("cost-codes.store") }}','POST',table,'createModal')" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save Phase Code</button>
         </div>
     </div>
 </div>
@@ -119,7 +119,7 @@
 <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editModal')">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h3 class="text-lg font-bold text-gray-900">Edit Cost Code</h3>
+            <h3 class="text-lg font-bold text-gray-900">Edit Phase Code</h3>
             <button onclick="closeModal('editModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="editForm" class="p-6 space-y-4">
@@ -150,7 +150,7 @@
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('editModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button id="editSaveBtn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Update Cost Code</button>
+            <button id="editSaveBtn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Update Phase Code</button>
         </div>
     </div>
 </div>
@@ -159,7 +159,7 @@
 <div id="viewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('viewModal')">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h3 class="text-lg font-bold text-gray-900">Cost Code Details</h3>
+            <h3 class="text-lg font-bold text-gray-900">Phase Code Details</h3>
             <button onclick="closeModal('viewModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <div id="viewContent" class="p-6">Loading...</div>

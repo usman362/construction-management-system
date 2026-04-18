@@ -105,8 +105,34 @@ class CostCodeController extends Controller
 
     public function destroy(CostCode $costCode): JsonResponse
     {
-        $costCode->delete();
+        // Check for dependent rows so we return a helpful message instead of a 500
+        $usage = [
+            'budget lines'          => $costCode->budgetLines()->count(),
+            'commitments'           => $costCode->commitments()->count(),
+            'cost entries'          => $costCode->costEntries()->count(),
+            'timesheet allocations' => $costCode->timesheetAllocations()->count(),
+            'invoices'              => $costCode->invoices()->count(),
+            'change order items'    => $costCode->changeOrderItems()->count(),
+            'estimate lines'        => $costCode->estimateLines()->count(),
+            'material usages'       => $costCode->materialUsages()->count(),
+            'manhour budgets'       => $costCode->manhourBudgets()->count(),
+        ];
+        $inUse = collect($usage)->filter(fn($n) => $n > 0);
+        if ($inUse->isNotEmpty()) {
+            $parts = $inUse->map(fn($n, $k) => "$n $k")->implode(', ');
+            return response()->json([
+                'message' => "Cannot delete this phase code — it is currently used by: {$parts}. Mark it inactive instead, or remove the linked records first.",
+            ], 422);
+        }
 
-        return response()->json(['message' => 'Cost code deleted successfully']);
+        try {
+            $costCode->delete();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Could not delete phase code: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json(['message' => 'Phase code deleted successfully']);
     }
 }

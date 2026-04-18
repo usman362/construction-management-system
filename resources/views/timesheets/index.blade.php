@@ -21,7 +21,7 @@
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">
         <thead><tr>
-            <th>Date</th><th>Employee</th><th>Project</th><th>Cost code</th><th>Crew</th><th>Regular</th><th>OT</th><th>DT</th><th>Total</th><th>Cost</th><th>Status</th><th class="text-center" width="100">Actions</th>
+            <th>Date</th><th>Employee</th><th>Project</th><th>Phase code</th><th>Crew</th><th>Regular</th><th>OT</th><th>DT</th><th>Total</th><th>Cost</th><th>Status</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
@@ -67,7 +67,7 @@
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cost code</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phase code</label>
                 <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
                     <option value="">— Optional —</option>
                     @foreach($costCodes ?? [] as $cc)
@@ -90,7 +90,8 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <label class="flex items-center gap-2"><input type="checkbox" name="is_billable" class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Billable</span></label>
+                <input type="hidden" name="is_billable" value="0">
+                <label class="flex items-center gap-2"><input type="checkbox" name="is_billable" value="1" checked class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Billable</span></label>
             </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">

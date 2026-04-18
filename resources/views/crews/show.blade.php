@@ -63,14 +63,15 @@
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     @forelse($crew->members ?? [] as $member)
+                        @php $emp = $member->employee; @endphp
                         <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-2 text-gray-900 font-medium">{{ $member->employee_number }}</td>
-                            <td class="px-4 py-2 text-gray-900">{{ $member->first_name }} {{ $member->last_name }}</td>
-                            <td class="px-4 py-2 text-gray-700">{{ $member->craft?->name ?? 'N/A' }}</td>
-                            <td class="px-4 py-2 text-gray-700">{{ $member->pivot?->assigned_date?->format('M d, Y') ?? 'N/A' }}</td>
+                            <td class="px-4 py-2 text-gray-900 font-medium">{{ $emp?->employee_number ?? 'N/A' }}</td>
+                            <td class="px-4 py-2 text-gray-900">{{ $emp ? trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? '')) : 'N/A' }}</td>
+                            <td class="px-4 py-2 text-gray-700">{{ $emp?->craft?->name ?? 'N/A' }}</td>
+                            <td class="px-4 py-2 text-gray-700">{{ $member->assigned_date?->format('M d, Y') ?? 'N/A' }}</td>
                             <td class="px-4 py-2">
                                 <button type="button"
-                                        onclick="confirmDelete('{{ route('crews.remove-member', [$crew, $member]) }}', null, window.location.href)"
+                                        onclick="confirmDelete('{{ route('crews.remove-member', [$crew, $member->id]) }}', null, window.location.href)"
                                         class="text-red-600 hover:text-red-900">Remove</button>
                             </td>
                         </tr>

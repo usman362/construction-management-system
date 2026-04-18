@@ -47,12 +47,12 @@
         </div>
     </div>
 
-    {{-- Forecast by Cost Code --}}
-    <div class="section-title">Forecast by Cost Code</div>
+    {{-- Forecast by Phase Code --}}
+    <div class="section-title">Forecast by Phase Code</div>
     <table>
         <thead>
             <tr>
-                <th style="width: 10%">Cost Code</th>
+                <th style="width: 10%">Phase Code</th>
                 <th style="width: 18%">Description</th>
                 <th class="text-right" style="width: 12%">Original Budget</th>
                 <th class="text-right" style="width: 12%">Forecast Budget</th>

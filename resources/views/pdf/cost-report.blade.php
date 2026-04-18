@@ -87,11 +87,11 @@
     </div>
 
     {{-- Cost Breakdown by Cost Type --}}
-    <div class="section-title">Cost Breakdown by Cost Code</div>
+    <div class="section-title">Cost Breakdown by Phase Code</div>
     <table>
         <thead>
             <tr>
-                <th style="width: 10%">Cost Code</th>
+                <th style="width: 10%">Phase Code</th>
                 <th style="width: 22%">Description</th>
                 <th class="text-right" style="width: 12%">Original Budget</th>
                 <th class="text-right" style="width: 12%">Revised Budget</th>
@@ -170,7 +170,7 @@
     </table>
     @endif
 
-    {{-- Manhour Summary (per cost code rows; totals below) --}}
+    {{-- Manhour Summary (per phase code rows; totals below) --}}
     @php
         $mhRows = is_array($manhourData) ? array_values($manhourData) : [];
         $mhTotalBudget = collect($mhRows)->sum('budget_hours');

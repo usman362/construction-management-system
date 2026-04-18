@@ -97,7 +97,7 @@
             </div>
 
             <div class="bg-gray-50 rounded-lg p-4">
-                <p class="text-sm text-gray-600 mb-1">Billable Rate</p>
+                <p class="text-sm text-gray-600 mb-1">OT Billable Rate</p>
                 <p class="text-2xl font-bold text-gray-900">${{ number_format($employee->billable_rate, 2) }}</p>
             </div>
         </div>
@@ -251,7 +251,7 @@
                         <th class="px-4 py-2 text-left font-semibold text-gray-700">Project</th>
                         <th class="px-4 py-2 text-right font-semibold text-gray-700">ST Rate</th>
                         <th class="px-4 py-2 text-right font-semibold text-gray-700">OT Rate</th>
-                        <th class="px-4 py-2 text-right font-semibold text-gray-700">Billable</th>
+                        <th class="px-4 py-2 text-right font-semibold text-gray-700">OT Billable</th>
                         <th class="px-4 py-2 text-right font-semibold text-gray-700">ST Burden</th>
                         <th class="px-4 py-2 text-right font-semibold text-gray-700">OT Burden</th>
                         <th class="px-4 py-2 text-left font-semibold text-gray-700">Effective</th>
@@ -308,7 +308,7 @@
                 <div class="grid grid-cols-3 gap-3">
                     <div><label class="block text-xs font-medium text-gray-600 mb-1">ST Rate ($/hr)</label><input type="number" step="0.01" name="hourly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
                     <div><label class="block text-xs font-medium text-gray-600 mb-1">OT Rate ($/hr)</label><input type="number" step="0.01" name="overtime_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
-                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Billable ($/hr)</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">OT Billable ($/hr)</label><input type="number" step="0.01" name="billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div><label class="block text-xs font-medium text-gray-600 mb-1">ST Burden ($/hr)</label><input type="number" step="0.0001" name="st_burden_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>

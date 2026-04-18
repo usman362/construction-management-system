@@ -30,9 +30,9 @@
             </div>
 
             <div class="mb-4">
-                <label for="cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Code *</label>
+                <label for="cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Phase Code *</label>
                 <select name="cost_code_id" id="cost_code_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('cost_code_id') border-red-500 @enderror">
-                    <option value="">Select Cost Code</option>
+                    <option value="">Select Phase Code</option>
                     @foreach ($costCodes as $code)
                         <option value="{{ $code->id }}" {{ old('cost_code_id') == $code->id ? 'selected' : '' }}>
                             {{ $code->code }} - {{ $code->name }}

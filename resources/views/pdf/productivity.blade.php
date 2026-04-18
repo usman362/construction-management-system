@@ -28,11 +28,11 @@
         </div>
     </div>
 
-    <div class="section-title">Productivity by Cost Code</div>
+    <div class="section-title">Productivity by Phase Code</div>
     <table>
         <thead>
             <tr>
-                <th>Cost Code</th>
+                <th>Phase Code</th>
                 <th class="text-right">Earned Hours</th>
                 <th class="text-right">Actual Hours</th>
                 <th class="text-center">Productivity %</th>

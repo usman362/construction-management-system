@@ -28,7 +28,7 @@
             </div>
             <div class="p-2 rounded bg-green-50 border border-green-100">
                 <span class="font-bold text-green-800">Accountant</span>
-                <p class="text-green-600 mt-1">Payroll, billing, invoices, cost codes, timesheets</p>
+                <p class="text-green-600 mt-1">Payroll, billing, invoices, phase codes, timesheets</p>
             </div>
             <div class="p-2 rounded bg-amber-50 border border-amber-100">
                 <span class="font-bold text-amber-800">Field Staff</span>

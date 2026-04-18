@@ -16,7 +16,11 @@ function editTimesheet(id, dt) {
         f.querySelector('[name="regular_hours"]').value = d.regular_hours;
         f.querySelector('[name="overtime_hours"]').value = d.overtime_hours ?? '';
         f.querySelector('[name="double_time_hours"]').value = d.double_time_hours ?? '';
-        f.querySelector('[name="is_billable"]').checked = parseFloat(d.billable_amount || 0) > 0;
+        // Honor the stored is_billable flag (falls back to billable_amount>0 for legacy rows)
+        var billable = (typeof d.is_billable !== 'undefined' && d.is_billable !== null)
+            ? !!d.is_billable
+            : parseFloat(d.billable_amount || 0) > 0;
+        f.querySelector('[name="is_billable"]').checked = billable;
         document.getElementById('editSaveBtn').onclick = function() {
             submitForm('editForm', window.BASE_URL+'/timesheets/' + d.id, 'PUT', dt, 'editModal');
         };

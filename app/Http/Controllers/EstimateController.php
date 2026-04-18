@@ -113,18 +113,36 @@ class EstimateController extends Controller
 
     public function addLine(Request $request, Project $project, Estimate $estimate): JsonResponse
     {
+        // Per client (04.19.26): "Estimate entry needs Phase code, Cost type, Description, and Amount."
+        // We now accept a direct amount; quantity/unit_cost are optional. If quantity & unit_cost
+        // are both provided (non-zero), they win over the direct amount so existing imports keep working.
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
-            'quantity' => 'required|numeric|min:0',
-            'unit_cost' => 'required|numeric|min:0',
+            'quantity' => 'nullable|numeric|min:0',
+            'unit_cost' => 'nullable|numeric|min:0',
+            'amount' => 'nullable|numeric|min:0',
             'unit' => 'nullable|string|max:50',
             'labor_hours' => 'nullable|numeric|min:0',
         ]);
 
-        $amount = $validated['quantity'] * $validated['unit_cost'];
-        $estimate->lines()->create($validated + ['amount' => $amount]);
+        $qty = (float) ($validated['quantity'] ?? 0);
+        $unitCost = (float) ($validated['unit_cost'] ?? 0);
+        $amount = ($qty > 0 && $unitCost > 0)
+            ? $qty * $unitCost
+            : (float) ($validated['amount'] ?? 0);
+
+        $estimate->lines()->create([
+            'cost_code_id' => $validated['cost_code_id'] ?? null,
+            'cost_type_id' => $validated['cost_type_id'] ?? null,
+            'description'  => $validated['description'],
+            'quantity'     => $qty,
+            'unit_cost'    => $unitCost,
+            'unit'         => $validated['unit'] ?? null,
+            'labor_hours'  => $validated['labor_hours'] ?? null,
+            'amount'       => $amount,
+        ]);
 
         return response()->json(['message' => 'Line item added to estimate']);
     }
@@ -135,14 +153,29 @@ class EstimateController extends Controller
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
-            'quantity' => 'required|numeric|min:0',
-            'unit_cost' => 'required|numeric|min:0',
+            'quantity' => 'nullable|numeric|min:0',
+            'unit_cost' => 'nullable|numeric|min:0',
+            'amount' => 'nullable|numeric|min:0',
             'unit' => 'nullable|string|max:50',
             'labor_hours' => 'nullable|numeric|min:0',
         ]);
 
-        $amount = $validated['quantity'] * $validated['unit_cost'];
-        $estimateLine->update($validated + ['amount' => $amount]);
+        $qty = (float) ($validated['quantity'] ?? 0);
+        $unitCost = (float) ($validated['unit_cost'] ?? 0);
+        $amount = ($qty > 0 && $unitCost > 0)
+            ? $qty * $unitCost
+            : (float) ($validated['amount'] ?? 0);
+
+        $estimateLine->update([
+            'cost_code_id' => $validated['cost_code_id'] ?? null,
+            'cost_type_id' => $validated['cost_type_id'] ?? null,
+            'description'  => $validated['description'],
+            'quantity'     => $qty,
+            'unit_cost'    => $unitCost,
+            'unit'         => $validated['unit'] ?? null,
+            'labor_hours'  => $validated['labor_hours'] ?? null,
+            'amount'       => $amount,
+        ]);
 
         return response()->json(['message' => 'Line item updated']);
     }

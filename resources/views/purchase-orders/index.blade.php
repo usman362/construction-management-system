@@ -64,7 +64,7 @@
                     </select>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
                     <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
@@ -80,6 +80,15 @@
                         <option value="">— None (standalone PO) —</option>
                         @foreach($parentPOs ?? [] as $po)
                             <option value="{{ $po->id }}">{{ $po->po_number }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Linked Change Order (e.g. BM-6625-01)</label>
+                    <select name="change_order_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None —</option>
+                        @foreach($changeOrders ?? [] as $co)
+                            <option value="{{ $co->id }}">{{ $co->co_number }}{{ $co->title ? ' — ' . \Illuminate\Support\Str::limit($co->title, 40) : '' }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -201,7 +210,7 @@
                     </select>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
                     <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
@@ -217,6 +226,15 @@
                         <option value="">— None (standalone PO) —</option>
                         @foreach($parentPOs ?? [] as $po)
                             <option value="{{ $po->id }}">{{ $po->po_number }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Linked Change Order (e.g. BM-6625-01)</label>
+                    <select name="change_order_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None —</option>
+                        @foreach($changeOrders ?? [] as $co)
+                            <option value="{{ $co->id }}">{{ $co->co_number }}{{ $co->title ? ' — ' . \Illuminate\Support\Str::limit($co->title, 40) : '' }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -318,7 +336,7 @@
                     <p class="text-sm font-medium text-gray-900 mt-1" id="viewVendor">—</p>
                 </div>
                 <div>
-                    <label class="text-xs font-semibold text-gray-500 uppercase">Cost Code</label>
+                    <label class="text-xs font-semibold text-gray-500 uppercase">Phase Code</label>
                     <p class="text-sm font-medium text-gray-900 mt-1" id="viewCostCode">—</p>
                 </div>
             </div>
@@ -477,12 +495,14 @@ function submitCreateForm() {
     var costCodeVal = form.querySelector('[name="cost_code_id"]').value;
     var costTypeVal = form.querySelector('[name="cost_type_id"]')?.value;
     var parentPoVal = form.querySelector('[name="parent_po_id"]')?.value;
+    var changeOrderVal = form.querySelector('[name="change_order_id"]')?.value;
     var data = {
         project_id: form.querySelector('[name="project_id"]').value,
         vendor_id: form.querySelector('[name="vendor_id"]').value,
         cost_code_id: costCodeVal || null,
         cost_type_id: costTypeVal || null,
         parent_po_id: parentPoVal || null,
+        change_order_id: changeOrderVal || null,
         date: form.querySelector('[name="date"]').value,
         delivery_date: form.querySelector('[name="delivery_date"]').value || null,
         description: form.querySelector('[name="description"]').value,
@@ -536,6 +556,8 @@ function editPO(id) {
             if (costTypeEl) costTypeEl.value = po.cost_type_id || '';
             var parentPoEl = document.querySelector('#editForm [name="parent_po_id"]');
             if (parentPoEl) parentPoEl.value = po.parent_po_id || '';
+            var changeOrderEl = document.querySelector('#editForm [name="change_order_id"]');
+            if (changeOrderEl) changeOrderEl.value = po.change_order_id || '';
             document.querySelector('#editForm [name="date"]').value = po.date;
             document.querySelector('#editForm [name="delivery_date"]').value = po.delivery_date || '';
             document.querySelector('#editForm [name="description"]').value = po.description || '';
@@ -593,12 +615,14 @@ function submitEditForm() {
     var costCodeVal = form.querySelector('[name="cost_code_id"]').value;
     var costTypeVal = form.querySelector('[name="cost_type_id"]')?.value;
     var parentPoVal = form.querySelector('[name="parent_po_id"]')?.value;
+    var changeOrderVal = form.querySelector('[name="change_order_id"]')?.value;
     var data = {
         project_id: form.querySelector('[name="project_id"]').value,
         vendor_id: form.querySelector('[name="vendor_id"]').value,
         cost_code_id: costCodeVal || null,
         cost_type_id: costTypeVal || null,
         parent_po_id: parentPoVal || null,
+        change_order_id: changeOrderVal || null,
         date: form.querySelector('[name="date"]').value,
         delivery_date: form.querySelector('[name="delivery_date"]').value || null,
         description: form.querySelector('[name="description"]').value,

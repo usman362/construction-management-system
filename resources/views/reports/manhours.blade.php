@@ -18,11 +18,11 @@
                     </div>
                 </div>
 
-                <!-- Cost Code -->
+                <!-- Phase Code -->
                 <div class="flex-1 min-w-[12rem]">
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Cost Code</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Phase Code</label>
                     <select name="cost_code_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">All cost codes</option>
+                        <option value="">All phase codes</option>
                         @foreach($costCodesForFilter ?? [] as $cc)
                             <option value="{{ $cc->id }}" {{ (string) request('cost_code_id') === (string) $cc->id ? 'selected' : '' }}>{{ $cc->code }} — {{ $cc->name }}</option>
                         @endforeach
@@ -43,7 +43,7 @@
                         </label>
                         <label class="flex items-center">
                             <input type="radio" name="group_by" value="cost_code" {{ ($groupBy ?? 'employee') === 'cost_code' ? 'checked' : '' }} class="w-4 h-4">
-                            <span class="ml-2 text-sm text-gray-700">Cost Code</span>
+                            <span class="ml-2 text-sm text-gray-700">Phase Code</span>
                         </label>
                     </div>
                 </div>
@@ -63,7 +63,7 @@
                     <tr class="bg-blue-100 border border-gray-300">
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Employee Name</th>
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Craft</th>
-                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Cost Code</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Phase Code</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Regular Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">OT Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">DT Hrs</th>
@@ -164,13 +164,13 @@
             </table>
         </div>
 
-        <!-- Table: By Cost Code -->
+        <!-- Table: By Phase Code -->
         @else
         <div class="overflow-x-auto">
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="bg-blue-100 border border-gray-300">
-                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Cost Code</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Phase Code</th>
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Name</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Budget Hrs</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Actual Hrs</th>

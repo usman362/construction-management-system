@@ -58,6 +58,7 @@ class ChangeOrderController extends Controller
                     'title' => $co->title ?? '—',
                     'amount' => $co->amount,
                     'status' => $co->status,
+                    'pricing_type' => $co->pricing_type ?? 'lump_sum',
                     'actions' => $co->id,
                 ];
             }),
@@ -77,6 +78,7 @@ class ChangeOrderController extends Controller
             'new_completion_date' => 'nullable|date',
             'amount' => 'required|numeric|min:0',
             'status' => 'required|in:pending,approved,rejected',
+            'pricing_type' => 'nullable|in:lump_sum,t_and_m',
         ]);
 
         // If the user didn't supply a number, auto-generate based on project
@@ -136,6 +138,7 @@ class ChangeOrderController extends Controller
             'new_completion_date' => 'nullable|date',
             'amount' => 'required|numeric|min:0',
             'status' => 'required|in:pending,approved,rejected',
+            'pricing_type' => 'nullable|in:lump_sum,t_and_m',
         ]);
 
         $changeOrder->update($validated);

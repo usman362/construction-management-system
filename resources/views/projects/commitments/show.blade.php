@@ -28,7 +28,7 @@
                 <p class="text-gray-900 mt-1 font-semibold">${{ number_format((float) $commitment->amount, 2) }}</p>
             </div>
             <div>
-                <p class="text-xs font-semibold text-gray-500 uppercase">Cost code</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase">Phase code</p>
                 <p class="text-gray-900 mt-1">
                     @if($commitment->costCode)
                         {{ $commitment->costCode->code }} — {{ $commitment->costCode->name }}

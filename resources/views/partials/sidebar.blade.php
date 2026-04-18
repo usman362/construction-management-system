@@ -138,7 +138,7 @@
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5l-3.9 19.5m-2.1-19.5l-3.9 19.5"/>
                     </svg>
-                    <span>Cost Codes</span>
+                    <span>Phase Codes</span>
                 </a>
                 @endif
                 @if(Auth::user()->canAccess('clients'))

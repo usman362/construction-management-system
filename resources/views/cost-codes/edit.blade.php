@@ -1,15 +1,15 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Cost Code')
+@section('title', 'Edit Phase Code')
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
     <div class="mb-6">
-        <a href="{{ route('cost-codes.index') }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Cost Codes</a>
+        <a href="{{ route('cost-codes.index') }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Phase Codes</a>
     </div>
 
     <div class="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto">
-        <h1 class="text-3xl font-bold mb-6">Edit Cost Code</h1>
+        <h1 class="text-3xl font-bold mb-6">Edit Phase Code</h1>
 
         <form method="POST" action="{{ route('cost-codes.update', $costCode) }}">
             @csrf
@@ -55,7 +55,7 @@
 
             <div class="flex gap-4">
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">
-                    Update Cost Code
+                    Update Phase Code
                 </button>
                 <a href="{{ route('cost-codes.index') }}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded">
                     Cancel

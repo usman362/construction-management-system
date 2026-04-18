@@ -465,7 +465,7 @@
                 </div>
 
                 <div class="pt-4">
-                    <h3 class="text-base font-semibold text-gray-900 mb-2">Committed Costs Summary (by Cost Code)</h3>
+                    <h3 class="text-base font-semibold text-gray-900 mb-2">Committed Costs Summary (by Phase Code)</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-50 border-b border-gray-200">

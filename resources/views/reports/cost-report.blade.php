@@ -262,7 +262,7 @@
                         </tr>
                     </tbody>
                 </table>
-                <p class="text-xs text-gray-500 mt-2">Blended hourly cost across all crafts and cost codes (Total Labor Cost ÷ Total Manhours).</p>
+                <p class="text-xs text-gray-500 mt-2">Blended hourly cost across all crafts and phase codes (Total Labor Cost ÷ Total Manhours).</p>
             </div>
         </div>
 

@@ -36,7 +36,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Cost code</label>
+                        <label class="block text-sm font-medium text-gray-700">Phase code</label>
                         <p class="text-lg text-gray-900 mt-1">{{ $timesheet->costCode?->code ?? '—' }}</p>
                     </div>
 
@@ -172,7 +172,7 @@
                 </tbody>
             </table>
         @else
-            <p class="text-gray-600">No cost code assigned. Edit the timesheet and choose a cost code to allocate labor.</p>
+            <p class="text-gray-600">No phase code assigned. Edit the timesheet and choose a phase code to allocate labor.</p>
         @endif
     </div>
 </div>

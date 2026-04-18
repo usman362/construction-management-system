@@ -32,6 +32,7 @@ class PurchaseOrderController extends Controller
             'costCodes' => CostCode::query()->orderBy('code')->get(['id', 'code', 'name']),
             'costTypes' => \App\Models\CostType::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']),
             'parentPOs' => PurchaseOrder::whereNull('parent_po_id')->orderBy('po_number')->get(['id', 'po_number']),
+            'changeOrders' => \App\Models\ChangeOrder::orderBy('co_number')->get(['id', 'co_number', 'title', 'project_id']),
         ]);
     }
 

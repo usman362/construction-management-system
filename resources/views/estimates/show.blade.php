@@ -85,7 +85,7 @@
                         <p class="font-semibold mb-1">CSV format</p>
                         <ul class="list-disc list-inside space-y-0.5">
                             <li>Columns: cost_code, description, quantity, unit, unit_cost, labor_hours</li>
-                            <li>cost_code must match an existing Cost Code.</li>
+                            <li>cost_code must match an existing Phase Code.</li>
                             <li>Amount is calculated as quantity × unit_cost.</li>
                         </ul>
                     </div>
@@ -240,20 +240,31 @@
                 <input type="text" name="description" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Qty *</label>
-                <input type="number" name="quantity" step="0.01" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Amount *</label>
+                <input type="number" name="amount" step="0.01" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
+                <p class="text-[11px] text-gray-500 mt-1">Enter the estimated dollar amount for this line.</p>
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Unit *</label>
-                <input type="text" name="unit" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Unit Cost *</label>
-                <input type="number" name="unit_cost" step="0.01" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-            </div>
+            <details class="mb-4">
+                <summary class="text-sm font-medium text-blue-700 cursor-pointer">Advanced: break down by Qty × Unit Cost</summary>
+                <div class="grid grid-cols-3 gap-3 mt-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Qty</label>
+                        <input type="number" name="quantity" step="0.01" min="0" placeholder="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Unit</label>
+                        <input type="text" name="unit" placeholder="ea, lf, sf…" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Unit Cost ($)</label>
+                        <input type="number" name="unit_cost" step="0.01" min="0" placeholder="0.00" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-2">If Qty and Unit Cost are both filled, they override the Amount above.</p>
+            </details>
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Labor Hours</label>
-                <input type="number" name="labor_hours" step="0.5" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Labor Hours (Manhours)</label>
+                <input type="number" name="labor_hours" step="0.5" min="0" placeholder="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
             <div class="flex gap-4">
                 <button type="button" onclick="submitAddLine()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1">Add Item</button>

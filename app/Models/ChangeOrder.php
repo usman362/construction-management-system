@@ -20,6 +20,7 @@ class ChangeOrder extends Model
         'description',
         'scope_of_work',
         'status',
+        'pricing_type',
         'amount',
         'contract_time_change_days',
         'new_completion_date',
