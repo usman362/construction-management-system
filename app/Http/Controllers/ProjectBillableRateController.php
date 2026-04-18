@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Craft;
+use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectBillableRate;
 use Illuminate\Http\Request;
@@ -15,7 +17,13 @@ class ProjectBillableRateController extends Controller
         if ($request->ajax()) {
             return $this->dataTable($project, $request);
         }
-        return view('project-billable-rates.index', ['project' => $project]);
+        return view('project-billable-rates.index', [
+            'project' => $project,
+            'crafts' => Craft::active()->orderBy('name')->get(['id', 'code', 'name']),
+            'employees' => Employee::where('status', 'active')
+                ->orderBy('first_name')->orderBy('last_name')
+                ->get(['id', 'employee_number', 'first_name', 'last_name']),
+        ]);
     }
 
     private function dataTable(Project $project, Request $request): JsonResponse
@@ -93,6 +101,13 @@ class ProjectBillableRateController extends Controller
             'consumables_rate' => 'nullable|numeric|min:0|max:1',
             'overhead_rate' => 'nullable|numeric|min:0|max:1',
             'profit_rate' => 'nullable|numeric|min:0|max:1',
+            'payroll_tax_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'burden_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'insurance_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'job_expenses_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'consumables_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'overhead_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'profit_ot_rate' => 'nullable|numeric|min:0|max:1',
             'effective_date' => 'required|date',
             'notes' => 'nullable|string|max:1000',
         ]);
@@ -128,6 +143,13 @@ class ProjectBillableRateController extends Controller
             'consumables_rate' => 'nullable|numeric|min:0|max:1',
             'overhead_rate' => 'nullable|numeric|min:0|max:1',
             'profit_rate' => 'nullable|numeric|min:0|max:1',
+            'payroll_tax_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'burden_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'insurance_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'job_expenses_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'consumables_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'overhead_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'profit_ot_rate' => 'nullable|numeric|min:0|max:1',
             'effective_date' => 'required|date',
             'notes' => 'nullable|string|max:1000',
         ]);

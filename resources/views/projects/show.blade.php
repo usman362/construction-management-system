@@ -216,6 +216,7 @@
                                 <th class="px-4 py-2 text-left font-semibold text-gray-700">Description</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Budget</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Revised</th>
+                                <th class="px-4 py-2 text-right font-semibold text-gray-700">Manhours</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Committed</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Invoiced</th>
                                 <th class="px-4 py-2 text-right font-semibold text-gray-700">Balance</th>
@@ -230,6 +231,7 @@
                                     <td class="px-4 py-2 text-gray-900">{{ $line->description ?? '—' }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->budget_amount ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->revised_amount ?? 0, 2) }}</td>
+                                    <td class="px-4 py-2 text-right text-gray-900">{{ number_format($line->labor_hours ?? 0, 2) }} hrs</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->committed ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->invoiced ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format(($line->revised_amount ?? 0) - ($line->committed ?? 0), 2) }}</td>
@@ -237,7 +239,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="px-4 py-4 text-center text-gray-500">No budget lines.</td>
+                                    <td colspan="10" class="px-4 py-4 text-center text-gray-500">No budget lines.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -279,6 +281,10 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
                                 <input type="number" step="0.01" name="budget_amount" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Labor Hours (Manhours)</label>
+                                <input type="number" step="0.5" min="0" name="labor_hours" placeholder="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
                         </form>
                         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">

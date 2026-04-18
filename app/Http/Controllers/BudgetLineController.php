@@ -70,6 +70,7 @@ class BudgetLineController extends Controller
                     'description' => $line->description,
                     'original_amount' => $line->budget_amount,
                     'current_amount' => $line->current_amount,
+                    'labor_hours' => $line->labor_hours,
                     'actions' => $line->id,
                 ];
             }),
@@ -83,6 +84,7 @@ class BudgetLineController extends Controller
             'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'budget_amount' => 'required|numeric|min:0',
+            'labor_hours' => 'nullable|numeric|min:0',
         ]);
 
         $project->budgetLines()->create($validated + ['revised_amount' => $validated['budget_amount']]);
@@ -106,6 +108,7 @@ class BudgetLineController extends Controller
             'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'budget_amount' => 'required|numeric|min:0',
+            'labor_hours' => 'nullable|numeric|min:0',
             'revised_amount' => 'required|numeric|min:0',
         ]);
 

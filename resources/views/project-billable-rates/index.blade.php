@@ -106,6 +106,9 @@
                     <label for="create_craft_id" class="block text-sm font-medium text-gray-700 mb-2">Craft</label>
                     <select name="craft_id" id="create_craft_id" class="w-full border-gray-300 rounded-lg shadow-sm">
                         <option value="">Select Craft (Optional)</option>
+                        @foreach($crafts ?? [] as $craft)
+                            <option value="{{ $craft->id }}">{{ $craft->code }} — {{ $craft->name }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -113,6 +116,9 @@
                     <label for="create_employee_id" class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
                     <select name="employee_id" id="create_employee_id" class="w-full border-gray-300 rounded-lg shadow-sm">
                         <option value="">Select Employee (Optional)</option>
+                        @foreach($employees ?? [] as $employee)
+                            <option value="{{ $employee->id }}">{{ $employee->employee_number }} — {{ $employee->first_name }} {{ $employee->last_name }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -126,42 +132,24 @@
                     <input type="date" name="effective_date" id="create_effective_date" required class="w-full border-gray-300 rounded-lg shadow-sm">
                 </div>
 
-                <!-- Markup Rate Fields -->
-                <div>
-                    <label for="create_payroll_tax_rate" class="block text-sm font-medium text-gray-700 mb-2">Payroll Tax %</label>
-                    <input type="number" name="payroll_tax_rate" id="create_payroll_tax_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.00" data-rate="payroll_tax_rate">
-                </div>
-
-                <div>
-                    <label for="create_burden_rate" class="block text-sm font-medium text-gray-700 mb-2">Burden %</label>
-                    <input type="number" name="burden_rate" id="create_burden_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.00" data-rate="burden_rate">
-                </div>
-
-                <div>
-                    <label for="create_insurance_rate" class="block text-sm font-medium text-gray-700 mb-2">Insurance %</label>
-                    <input type="number" name="insurance_rate" id="create_insurance_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.00" data-rate="insurance_rate">
-                </div>
-
-                <div>
-                    <label for="create_job_expenses_rate" class="block text-sm font-medium text-gray-700 mb-2">Job Expenses %</label>
-                    <input type="number" name="job_expenses_rate" id="create_job_expenses_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.00" data-rate="job_expenses_rate">
-                </div>
-
-                <div>
-                    <label for="create_consumables_rate" class="block text-sm font-medium text-gray-700 mb-2">Consumables %</label>
-                    <input type="number" name="consumables_rate" id="create_consumables_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.00" data-rate="consumables_rate">
-                </div>
-
-                <div>
-                    <label for="create_overhead_rate" class="block text-sm font-medium text-gray-700 mb-2">Overhead %</label>
-                    <input type="number" name="overhead_rate" id="create_overhead_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.00" data-rate="overhead_rate">
-                </div>
-
-                <div>
-                    <label for="create_profit_rate" class="block text-sm font-medium text-gray-700 mb-2">Profit %</label>
-                    <input type="number" name="profit_rate" id="create_profit_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.00" data-rate="profit_rate">
-                </div>
             </div>
+
+            <!-- Markup Rates (ST / OT) -->
+            <div class="mt-6 border-t border-gray-200 pt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-900">Markup Rates</h3>
+                    <p class="text-xs text-gray-500">Enter as decimal (e.g. 0.0765 for 7.65%)</p>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
+                </div>
+                @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
+                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                        <label class="text-sm text-gray-700">{{ $label }}</label>
+                        <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                        <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm" placeholder="0.0000">
+                    </div>
+                @endforeach
 
             <!-- Auto-calculated Preview -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
@@ -208,6 +196,9 @@
                     <label for="edit_craft_id" class="block text-sm font-medium text-gray-700 mb-2">Craft</label>
                     <select name="craft_id" id="edit_craft_id" class="w-full border-gray-300 rounded-lg shadow-sm">
                         <option value="">Select Craft (Optional)</option>
+                        @foreach($crafts ?? [] as $craft)
+                            <option value="{{ $craft->id }}">{{ $craft->code }} — {{ $craft->name }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -215,6 +206,9 @@
                     <label for="edit_employee_id" class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
                     <select name="employee_id" id="edit_employee_id" class="w-full border-gray-300 rounded-lg shadow-sm">
                         <option value="">Select Employee (Optional)</option>
+                        @foreach($employees ?? [] as $employee)
+                            <option value="{{ $employee->id }}">{{ $employee->employee_number }} — {{ $employee->first_name }} {{ $employee->last_name }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -229,41 +223,24 @@
                 </div>
 
                 <!-- Markup Rate Fields -->
-                <div>
-                    <label for="edit_payroll_tax_rate" class="block text-sm font-medium text-gray-700 mb-2">Payroll Tax %</label>
-                    <input type="number" name="payroll_tax_rate" id="edit_payroll_tax_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.00" data-rate="payroll_tax_rate">
-                </div>
-
-                <div>
-                    <label for="edit_burden_rate" class="block text-sm font-medium text-gray-700 mb-2">Burden %</label>
-                    <input type="number" name="burden_rate" id="edit_burden_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.00" data-rate="burden_rate">
-                </div>
-
-                <div>
-                    <label for="edit_insurance_rate" class="block text-sm font-medium text-gray-700 mb-2">Insurance %</label>
-                    <input type="number" name="insurance_rate" id="edit_insurance_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.00" data-rate="insurance_rate">
-                </div>
-
-                <div>
-                    <label for="edit_job_expenses_rate" class="block text-sm font-medium text-gray-700 mb-2">Job Expenses %</label>
-                    <input type="number" name="job_expenses_rate" id="edit_job_expenses_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.00" data-rate="job_expenses_rate">
-                </div>
-
-                <div>
-                    <label for="edit_consumables_rate" class="block text-sm font-medium text-gray-700 mb-2">Consumables %</label>
-                    <input type="number" name="consumables_rate" id="edit_consumables_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.00" data-rate="consumables_rate">
-                </div>
-
-                <div>
-                    <label for="edit_overhead_rate" class="block text-sm font-medium text-gray-700 mb-2">Overhead %</label>
-                    <input type="number" name="overhead_rate" id="edit_overhead_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.00" data-rate="overhead_rate">
-                </div>
-
-                <div>
-                    <label for="edit_profit_rate" class="block text-sm font-medium text-gray-700 mb-2">Profit %</label>
-                    <input type="number" name="profit_rate" id="edit_profit_rate" step="0.0001" min="0" max="1" class="w-full border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.00" data-rate="profit_rate">
-                </div>
             </div>
+
+            <!-- Markup Rates (ST / OT) -->
+            <div class="mt-6 border-t border-gray-200 pt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-900">Markup Rates</h3>
+                    <p class="text-xs text-gray-500">Enter as decimal (e.g. 0.0765 for 7.65%)</p>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
+                </div>
+                @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
+                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                        <label class="text-sm text-gray-700">{{ $label }}</label>
+                        <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                        <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm" placeholder="0.0000">
+                    </div>
+                @endforeach
 
             <!-- Auto-calculated Preview -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
@@ -407,43 +384,11 @@
         if (e.target === this) closeViewModal();
     });
 
-    // Load craft and employee options for create modal
-    function loadCreateSelectOptions() {
-        $.get(window.BASE_URL+'/crafts', function(data) {
-            let options = '<option value="">Select Craft (Optional)</option>';
-            data.forEach(function(craft) {
-                options += `<option value="${craft.id}">${craft.name}</option>`;
-            });
-            $('#create_craft_id').html(options);
-        });
-
-        $.get(window.BASE_URL+'/employees', function(data) {
-            let options = '<option value="">Select Employee (Optional)</option>';
-            data.forEach(function(employee) {
-                options += `<option value="${employee.id}">${employee.first_name} ${employee.last_name}</option>`;
-            });
-            $('#create_employee_id').html(options);
-        });
-    }
-
-    // Load craft and employee options for edit modal
-    function loadEditSelectOptions() {
-        $.get(window.BASE_URL+'/crafts', function(data) {
-            let options = '<option value="">Select Craft (Optional)</option>';
-            data.forEach(function(craft) {
-                options += `<option value="${craft.id}">${craft.name}</option>`;
-            });
-            $('#edit_craft_id').html(options);
-        });
-
-        $.get(window.BASE_URL+'/employees', function(data) {
-            let options = '<option value="">Select Employee (Optional)</option>';
-            data.forEach(function(employee) {
-                options += `<option value="${employee.id}">${employee.first_name} ${employee.last_name}</option>`;
-            });
-            $('#edit_employee_id').html(options);
-        });
-    }
+    // Craft + employee options are now rendered server-side in the <select>
+    // tags, so these functions are retained only as no-ops for backwards
+    // compatibility with any callers that still invoke them.
+    function loadCreateSelectOptions() {}
+    function loadEditSelectOptions() {}
 
     // Calculate and update preview rates for create form
     function updateCreatePreview() {
@@ -519,6 +464,14 @@
             $('#edit_consumables_rate').val(parseFloat(data.consumables_rate || 0).toFixed(4));
             $('#edit_overhead_rate').val(parseFloat(data.overhead_rate || 0).toFixed(4));
             $('#edit_profit_rate').val(parseFloat(data.profit_rate || 0).toFixed(4));
+            // OT rates (populate if present)
+            $('#edit_payroll_tax_ot_rate').val(parseFloat(data.payroll_tax_ot_rate || 0).toFixed(4));
+            $('#edit_burden_ot_rate').val(parseFloat(data.burden_ot_rate || 0).toFixed(4));
+            $('#edit_insurance_ot_rate').val(parseFloat(data.insurance_ot_rate || 0).toFixed(4));
+            $('#edit_job_expenses_ot_rate').val(parseFloat(data.job_expenses_ot_rate || 0).toFixed(4));
+            $('#edit_consumables_ot_rate').val(parseFloat(data.consumables_ot_rate || 0).toFixed(4));
+            $('#edit_overhead_ot_rate').val(parseFloat(data.overhead_ot_rate || 0).toFixed(4));
+            $('#edit_profit_ot_rate').val(parseFloat(data.profit_ot_rate || 0).toFixed(4));
             $('#edit_effective_date').val(data.effective_date);
 
             updateEditPreview();

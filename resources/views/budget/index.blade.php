@@ -27,6 +27,7 @@
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
                     <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Original Amount</th>
                     <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Current Amount</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Manhours</th>
                     <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
             </thead>
@@ -69,9 +70,15 @@
                 <input type="text" name="description" id="create_description" required class="w-full border-gray-300 rounded-lg shadow-sm">
             </div>
 
-            <div class="mb-4">
-                <label for="create_budget_amount" class="block text-sm font-medium text-gray-700 mb-2">Budget Amount *</label>
-                <input type="number" name="budget_amount" id="create_budget_amount" step="0.01" required class="w-full border-gray-300 rounded-lg shadow-sm">
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="create_budget_amount" class="block text-sm font-medium text-gray-700 mb-2">Budget Amount *</label>
+                    <input type="number" name="budget_amount" id="create_budget_amount" step="0.01" required class="w-full border-gray-300 rounded-lg shadow-sm">
+                </div>
+                <div>
+                    <label for="create_labor_hours" class="block text-sm font-medium text-gray-700 mb-2">Labor Hours (Manhours)</label>
+                    <input type="number" name="labor_hours" id="create_labor_hours" step="0.5" min="0" placeholder="0" class="w-full border-gray-300 rounded-lg shadow-sm">
+                </div>
             </div>
 
             <div class="flex gap-4">
@@ -125,9 +132,15 @@
                 <input type="number" name="budget_amount" id="edit_budget_amount" step="0.01" required class="w-full border-gray-300 rounded-lg shadow-sm">
             </div>
 
-            <div class="mb-6">
-                <label for="edit_revised_amount" class="block text-sm font-medium text-gray-700 mb-2">Revised Amount *</label>
-                <input type="number" name="revised_amount" id="edit_revised_amount" step="0.01" required class="w-full border-gray-300 rounded-lg shadow-sm">
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label for="edit_revised_amount" class="block text-sm font-medium text-gray-700 mb-2">Revised Amount *</label>
+                    <input type="number" name="revised_amount" id="edit_revised_amount" step="0.01" required class="w-full border-gray-300 rounded-lg shadow-sm">
+                </div>
+                <div>
+                    <label for="edit_labor_hours" class="block text-sm font-medium text-gray-700 mb-2">Labor Hours (Manhours)</label>
+                    <input type="number" name="labor_hours" id="edit_labor_hours" step="0.5" min="0" class="w-full border-gray-300 rounded-lg shadow-sm">
+                </div>
             </div>
 
             <div class="flex gap-4">
@@ -171,6 +184,11 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Current Amount</label>
                 <p id="view_current_amount" class="text-gray-900 font-semibold">—</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Labor Hours (Manhours)</label>
+                <p id="view_labor_hours" class="text-gray-900 font-semibold">—</p>
             </div>
         </div>
 
@@ -237,6 +255,7 @@
             $('#edit_description').val(data.description || '');
             $('#edit_budget_amount').val(data.budget_amount || '');
             $('#edit_revised_amount').val(data.revised_amount || '');
+            $('#edit_labor_hours').val(data.labor_hours || '');
             openEditModal();
         });
     }
@@ -249,6 +268,7 @@
             $('#view_description').text(data.description || '—');
             $('#view_original_amount').text('$' + parseFloat(data.budget_amount || 0).toFixed(2));
             $('#view_current_amount').text('$' + parseFloat(data.revised_amount || data.budget_amount || 0).toFixed(2));
+            $('#view_labor_hours').text(parseFloat(data.labor_hours || 0).toFixed(2) + ' hrs');
             openViewModal();
         });
     }
@@ -296,6 +316,14 @@
                     return '$' + parseFloat(data).toFixed(2);
                 },
                 className: 'text-right font-semibold'
+            },
+            {
+                data: 'labor_hours',
+                name: 'labor_hours',
+                render: function(data) {
+                    return (parseFloat(data) || 0).toFixed(2) + ' hrs';
+                },
+                className: 'text-right'
             },
             {
                 data: 'actions',

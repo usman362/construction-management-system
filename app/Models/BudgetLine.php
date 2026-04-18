@@ -17,11 +17,13 @@ class BudgetLine extends Model
         'description',
         'budget_amount',
         'revised_amount',
+        'labor_hours',
     ];
 
     protected $casts = [
         'budget_amount' => 'decimal:2',
         'revised_amount' => 'decimal:2',
+        'labor_hours' => 'decimal:2',
     ];
 
     public function project(): BelongsTo
