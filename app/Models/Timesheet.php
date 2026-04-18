@@ -12,6 +12,7 @@ class Timesheet extends Model
         'employee_id',
         'project_id',
         'cost_code_id',
+        'cost_type_id',
         'crew_id',
         'date',
         'shift_id',
@@ -67,6 +68,11 @@ class Timesheet extends Model
     public function costCode(): BelongsTo
     {
         return $this->belongsTo(CostCode::class);
+    }
+
+    public function costType(): BelongsTo
+    {
+        return $this->belongsTo(CostType::class);
     }
 
     public function crew(): BelongsTo

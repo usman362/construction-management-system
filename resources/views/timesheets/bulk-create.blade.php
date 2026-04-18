@@ -70,14 +70,25 @@
                         @enderror
                     </div>
                 </div>
-                <div class="mt-4 max-w-md">
-                    <label for="cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Cost code (applies to all rows)</label>
-                    <select name="cost_code_id" id="cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
-                        <option value="">— Optional —</option>
-                        @foreach ($costCodes ?? [] as $cc)
-                            <option value="{{ $cc->id }}" {{ old('cost_code_id') == $cc->id ? 'selected' : '' }}>{{ $cc->code }} — {{ $cc->name }}</option>
-                        @endforeach
-                    </select>
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Phase Code (applies to all rows, can be overridden)</label>
+                        <select name="cost_code_id" id="cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
+                            <option value="">— Optional —</option>
+                            @foreach ($costCodes ?? [] as $cc)
+                                <option value="{{ $cc->id }}" {{ old('cost_code_id') == $cc->id ? 'selected' : '' }}>{{ $cc->code }} — {{ $cc->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="cost_type_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Type (default for all rows)</label>
+                        <select name="cost_type_id" id="cost_type_id" class="w-full border-gray-300 rounded-lg shadow-sm">
+                            <option value="">— None —</option>
+                            @foreach ($costTypes ?? [] as $ct)
+                                <option value="{{ $ct->id }}" {{ old('cost_type_id') == $ct->id ? 'selected' : '' }}>{{ $ct->code }} — {{ $ct->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -94,6 +105,7 @@
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Lunch?</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Per Diem</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Per Diem $</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Cost Type</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Total</th>
                         </tr>
                     </thead>
@@ -125,13 +137,21 @@
                                 <td class="px-2 py-3 text-center">
                                     <input type="number" name="entries[{{ $loop->index }}][per_diem_amount]" step="0.01" placeholder="default" class="w-20 border-gray-300 rounded text-center text-xs">
                                 </td>
+                                <td class="px-2 py-3 text-center">
+                                    <select name="entries[{{ $loop->index }}][cost_type_id]" class="w-28 border-gray-300 rounded text-xs">
+                                        <option value="">(default)</option>
+                                        @foreach ($costTypes ?? [] as $ct)
+                                            <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </td>
                                 <td class="px-3 py-3 text-center text-sm font-semibold text-gray-900">
                                     <span class="total">0</span> hrs
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                                <td colspan="10" class="px-6 py-4 text-center text-gray-500">
                                     Select a crew to view members
                                 </td>
                             </tr>

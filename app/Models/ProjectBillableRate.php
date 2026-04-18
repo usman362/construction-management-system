@@ -104,8 +104,8 @@ class ProjectBillableRate extends Model
     {
         $base = (float) $this->base_hourly_rate;
 
-        // Calculate total markup percentage
-        $totalMarkup = (float) $this->payroll_tax_rate
+        // ST markup %: sum of straight-time markup rates
+        $stMarkup = (float) $this->payroll_tax_rate
             + (float) $this->burden_rate
             + (float) $this->insurance_rate
             + (float) $this->job_expenses_rate
@@ -113,12 +113,27 @@ class ProjectBillableRate extends Model
             + (float) $this->overhead_rate
             + (float) $this->profit_rate;
 
-        // Base loaded rate = base * (1 + total markup %)
-        $straightTimeRate = $base * (1 + $totalMarkup);
+        // OT markup %: sum of OT-specific markups.
+        // Fall back to ST markup if no OT markups have been entered yet.
+        $otMarkup = (float) $this->payroll_tax_ot_rate
+            + (float) $this->burden_ot_rate
+            + (float) $this->insurance_ot_rate
+            + (float) $this->job_expenses_ot_rate
+            + (float) $this->consumables_ot_rate
+            + (float) $this->overhead_ot_rate
+            + (float) $this->profit_ot_rate;
+        if ($otMarkup <= 0) {
+            $otMarkup = $stMarkup;
+        }
 
-        // Overtime and double-time: multiply the entire loaded rate by the overtime factor
-        $overtimeRate = $straightTimeRate * 1.5;
-        $doubleTimeRate = $straightTimeRate * 2;
+        // ST Billable = ST Base × (1 + ST markups)
+        // OT Billable = OT Base (ST Base × 1.5) × (1 + OT markups)
+        // DT Billable = DT Base (ST Base × 2)   × (1 + OT markups)
+        // Matches client's Calculation Rate Sheet: OT has its own burdens,
+        // not a blind 1.5× of the ST billable.
+        $straightTimeRate = $base * (1 + $stMarkup);
+        $overtimeRate     = ($base * 1.5) * (1 + $otMarkup);
+        $doubleTimeRate   = ($base * 2.0) * (1 + $otMarkup);
 
         return [
             'straight_time' => round($straightTimeRate, 2),
@@ -198,13 +213,13 @@ class ProjectBillableRate extends Model
             // Auto-calculate loaded rates if base rate is set and rates aren't already calculated
             if ($model->base_hourly_rate && (!$model->straight_time_rate || $model->isDirty([
                 'base_hourly_rate',
-                'payroll_tax_rate',
-                'burden_rate',
-                'insurance_rate',
-                'job_expenses_rate',
-                'consumables_rate',
-                'overhead_rate',
-                'profit_rate',
+                'payroll_tax_rate', 'payroll_tax_ot_rate',
+                'burden_rate',      'burden_ot_rate',
+                'insurance_rate',   'insurance_ot_rate',
+                'job_expenses_rate','job_expenses_ot_rate',
+                'consumables_rate', 'consumables_ot_rate',
+                'overhead_rate',    'overhead_ot_rate',
+                'profit_rate',      'profit_ot_rate',
             ]))) {
                 $rates = $model->calculateLoadedRate();
                 $model->straight_time_rate = $rates['straight_time'];

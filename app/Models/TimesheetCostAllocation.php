@@ -12,6 +12,7 @@ class TimesheetCostAllocation extends Model
     protected $fillable = [
         'timesheet_id',
         'cost_code_id',
+        'cost_type_id',
         'hours',
         'cost',
         'per_diem_amount',
@@ -32,5 +33,10 @@ class TimesheetCostAllocation extends Model
     public function costCode(): BelongsTo
     {
         return $this->belongsTo(CostCode::class);
+    }
+
+    public function costType(): BelongsTo
+    {
+        return $this->belongsTo(CostType::class);
     }
 }

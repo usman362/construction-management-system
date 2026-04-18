@@ -147,7 +147,7 @@
                     <div class="grid grid-cols-3 gap-2 items-center mb-2">
                         <label class="text-sm text-gray-700">{{ $label }}</label>
                         <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
-                        <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm" placeholder="0.0000">
+                        <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000">
                     </div>
                 @endforeach
             </div>
@@ -239,7 +239,7 @@
                     <div class="grid grid-cols-3 gap-2 items-center mb-2">
                         <label class="text-sm text-gray-700">{{ $label }}</label>
                         <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
-                        <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm" placeholder="0.0000">
+                        <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000">
                     </div>
                 @endforeach
             </div>
@@ -393,45 +393,47 @@
     function loadEditSelectOptions() {}
 
     // Calculate and update preview rates for create form
-    function updateCreatePreview() {
-        const baseRate = parseFloat(document.getElementById('create_base_hourly_rate').value) || 0;
-        const payrollTax = parseFloat(document.getElementById('create_payroll_tax_rate').value) || 0;
-        const burden = parseFloat(document.getElementById('create_burden_rate').value) || 0;
-        const insurance = parseFloat(document.getElementById('create_insurance_rate').value) || 0;
-        const jobExpenses = parseFloat(document.getElementById('create_job_expenses_rate').value) || 0;
-        const consumables = parseFloat(document.getElementById('create_consumables_rate').value) || 0;
-        const overhead = parseFloat(document.getElementById('create_overhead_rate').value) || 0;
-        const profit = parseFloat(document.getElementById('create_profit_rate').value) || 0;
+    // Shared preview calculation.
+    // ST Billable = ST Base Wage × (1 + ST markups)
+    // OT Billable = OT Base Wage (= ST Base × 1.5) × (1 + OT markups)
+    // This mirrors the client's Calculation Rate Sheet — OT has its own
+    // markup %, not a blind 1.5× of the ST billable.
+    function computeRatesFor(prefix) {
+        const v = (id) => parseFloat(document.getElementById(prefix + '_' + id)?.value) || 0;
+        const baseRate = v('base_hourly_rate');
 
-        const totalMarkup = payrollTax + burden + insurance + jobExpenses + consumables + overhead + profit;
-        const straightTimeRate = baseRate * (1 + totalMarkup);
-        const overtimeRate = straightTimeRate * 1.5;
-        const doubleTimeRate = straightTimeRate * 2;
+        const stMarkup = v('payroll_tax_rate') + v('burden_rate') + v('insurance_rate')
+            + v('job_expenses_rate') + v('consumables_rate') + v('overhead_rate') + v('profit_rate');
+        const otMarkup = v('payroll_tax_ot_rate') + v('burden_ot_rate') + v('insurance_ot_rate')
+            + v('job_expenses_ot_rate') + v('consumables_ot_rate') + v('overhead_ot_rate') + v('profit_ot_rate');
 
-        document.getElementById('create_st_rate_preview').textContent = '$' + straightTimeRate.toFixed(2);
-        document.getElementById('create_ot_rate_preview').textContent = '$' + overtimeRate.toFixed(2);
-        document.getElementById('create_dt_rate_preview').textContent = '$' + doubleTimeRate.toFixed(2);
+        const stBase = baseRate;
+        const otBase = baseRate * 1.5;
+        const dtBase = baseRate * 2;
+
+        // If OT markups all 0 (e.g. during initial data entry), fall back to
+        // ST markups so the preview still shows a reasonable OT figure.
+        const effectiveOtMarkup = otMarkup > 0 ? otMarkup : stMarkup;
+
+        return {
+            st: stBase * (1 + stMarkup),
+            ot: otBase * (1 + effectiveOtMarkup),
+            dt: dtBase * (1 + effectiveOtMarkup),
+        };
     }
 
-    // Calculate and update preview rates for edit form
+    function updateCreatePreview() {
+        const r = computeRatesFor('create');
+        document.getElementById('create_st_rate_preview').textContent = '$' + r.st.toFixed(2);
+        document.getElementById('create_ot_rate_preview').textContent = '$' + r.ot.toFixed(2);
+        document.getElementById('create_dt_rate_preview').textContent = '$' + r.dt.toFixed(2);
+    }
+
     function updateEditPreview() {
-        const baseRate = parseFloat(document.getElementById('edit_base_hourly_rate').value) || 0;
-        const payrollTax = parseFloat(document.getElementById('edit_payroll_tax_rate').value) || 0;
-        const burden = parseFloat(document.getElementById('edit_burden_rate').value) || 0;
-        const insurance = parseFloat(document.getElementById('edit_insurance_rate').value) || 0;
-        const jobExpenses = parseFloat(document.getElementById('edit_job_expenses_rate').value) || 0;
-        const consumables = parseFloat(document.getElementById('edit_consumables_rate').value) || 0;
-        const overhead = parseFloat(document.getElementById('edit_overhead_rate').value) || 0;
-        const profit = parseFloat(document.getElementById('edit_profit_rate').value) || 0;
-
-        const totalMarkup = payrollTax + burden + insurance + jobExpenses + consumables + overhead + profit;
-        const straightTimeRate = baseRate * (1 + totalMarkup);
-        const overtimeRate = straightTimeRate * 1.5;
-        const doubleTimeRate = straightTimeRate * 2;
-
-        document.getElementById('edit_st_rate_preview').textContent = '$' + straightTimeRate.toFixed(2);
-        document.getElementById('edit_ot_rate_preview').textContent = '$' + overtimeRate.toFixed(2);
-        document.getElementById('edit_dt_rate_preview').textContent = '$' + doubleTimeRate.toFixed(2);
+        const r = computeRatesFor('edit');
+        document.getElementById('edit_st_rate_preview').textContent = '$' + r.st.toFixed(2);
+        document.getElementById('edit_ot_rate_preview').textContent = '$' + r.ot.toFixed(2);
+        document.getElementById('edit_dt_rate_preview').textContent = '$' + r.dt.toFixed(2);
     }
 
     // Attach event listeners for create form inputs

@@ -136,12 +136,14 @@ class TimesheetController extends Controller
     {
         $request->merge([
             'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+            'cost_type_id' => $request->filled('cost_type_id') ? $request->cost_type_id : null,
         ]);
 
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'project_id' => 'required|exists:projects,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'crew_id' => 'nullable|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'nullable|exists:shifts,id',
@@ -165,6 +167,7 @@ class TimesheetController extends Controller
             'employee_id' => $validated['employee_id'],
             'project_id' => $validated['project_id'],
             'cost_code_id' => $validated['cost_code_id'] ?? null,
+            'cost_type_id' => $validated['cost_type_id'] ?? null,
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
@@ -228,6 +231,7 @@ class TimesheetController extends Controller
             'crews' => Crew::query()->with('project')->orderBy('name')->get(),
             'shifts' => Shift::query()->orderBy('name')->get(),
             'costCodes' => CostCode::query()->orderBy('code')->get(['id', 'code', 'name']),
+            'costTypes' => \App\Models\CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']),
         ];
     }
 
@@ -235,12 +239,14 @@ class TimesheetController extends Controller
     {
         $request->merge([
             'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+            'cost_type_id' => $request->filled('cost_type_id') ? $request->cost_type_id : null,
         ]);
 
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'project_id' => 'required|exists:projects,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'crew_id' => 'nullable|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'nullable|exists:shifts,id',
@@ -264,6 +270,7 @@ class TimesheetController extends Controller
             'employee_id' => $validated['employee_id'],
             'project_id' => $validated['project_id'],
             'cost_code_id' => $validated['cost_code_id'] ?? null,
+            'cost_type_id' => $validated['cost_type_id'] ?? null,
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
@@ -312,6 +319,7 @@ class TimesheetController extends Controller
             TimesheetCostAllocation::create([
                 'timesheet_id' => $timesheet->id,
                 'cost_code_id' => $timesheet->cost_code_id,
+                'cost_type_id' => $timesheet->cost_type_id,
                 'hours' => $timesheet->total_hours,
                 'cost' => $timesheet->total_cost,
                 'per_diem_amount' => $perDiem,
@@ -373,6 +381,7 @@ class TimesheetController extends Controller
         $projects = Project::where('status', 'active')->get();
         $shifts = Shift::all();
         $costCodes = CostCode::query()->orderBy('code')->get(['id', 'code', 'name']);
+        $costTypes = \App\Models\CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']);
         $crewMembers = collect();
 
         // Load crew members (employees) if crew_id is provided via query string
@@ -389,6 +398,7 @@ class TimesheetController extends Controller
             'shifts' => $shifts,
             'crewMembers' => $crewMembers,
             'costCodes' => $costCodes,
+            'costTypes' => $costTypes,
         ]);
     }
 
@@ -396,6 +406,7 @@ class TimesheetController extends Controller
     {
         $request->merge([
             'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+            'cost_type_id' => $request->filled('cost_type_id') ? $request->cost_type_id : null,
         ]);
 
         $validated = $request->validate([
@@ -404,6 +415,7 @@ class TimesheetController extends Controller
             'date' => 'required|date',
             'shift_id' => 'required|exists:shifts,id',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'entries' => 'required|array|min:1',
             'entries.*.employee_id' => 'required|exists:employees,id',
             'entries.*.regular_hours' => 'required|numeric|min:0',
@@ -413,6 +425,7 @@ class TimesheetController extends Controller
             'entries.*.per_diem' => 'nullable|boolean',
             'entries.*.per_diem_amount' => 'nullable|numeric|min:0',
             'entries.*.work_through_lunch' => 'nullable|boolean',
+            'entries.*.cost_type_id' => 'nullable|exists:cost_types,id',
         ]);
 
         $timesheets = [];
@@ -433,6 +446,9 @@ class TimesheetController extends Controller
                 'employee_id' => $entry['employee_id'],
                 'project_id' => $validated['project_id'],
                 'cost_code_id' => $validated['cost_code_id'] ?? null,
+                // Per-row cost_type_id wins; otherwise fall back to the
+                // crew-level cost_type_id picked at the top of the form.
+                'cost_type_id' => $entry['cost_type_id'] ?? $validated['cost_type_id'] ?? null,
                 'crew_id' => $validated['crew_id'],
                 'date' => $validated['date'],
                 'shift_id' => $validated['shift_id'],

@@ -199,7 +199,18 @@ class CrewController extends Controller
             'employee_id' => 'required|exists:employees,id',
         ]);
 
-        $crew->employees()->syncWithoutDetaching([$validated['employee_id']]);
+        // crew_members.assigned_date is NOT NULL; syncWithoutDetaching wouldn't
+        // set it, so we pass it explicitly. Using `attach()` via firstOrCreate
+        // on CrewMember so re-adding the same employee is a no-op.
+        \App\Models\CrewMember::firstOrCreate(
+            [
+                'crew_id' => $crew->id,
+                'employee_id' => $validated['employee_id'],
+            ],
+            [
+                'assigned_date' => now()->toDateString(),
+            ]
+        );
 
         return response()->json([
             'success' => true,

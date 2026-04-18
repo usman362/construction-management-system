@@ -65,6 +65,30 @@
                     </div>
 
                     <div>
+                        <label for="cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Phase Code</label>
+                        <select name="cost_code_id" id="cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
+                            <option value="">— None —</option>
+                            @foreach ($costCodes ?? [] as $cc)
+                                <option value="{{ $cc->id }}" {{ old('cost_code_id') == $cc->id ? 'selected' : '' }}>
+                                    {{ $cc->code }} — {{ $cc->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="cost_type_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Type</label>
+                        <select name="cost_type_id" id="cost_type_id" class="w-full border-gray-300 rounded-lg shadow-sm">
+                            <option value="">— None —</option>
+                            @foreach ($costTypes ?? [] as $ct)
+                                <option value="{{ $ct->id }}" {{ old('cost_type_id') == $ct->id ? 'selected' : '' }}>
+                                    {{ $ct->code }} — {{ $ct->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
                         <label for="date" class="block text-sm font-medium text-gray-700 mb-2">Date *</label>
                         <input type="date" name="date" id="date" required value="{{ old('date') }}" class="w-full border-gray-300 rounded-lg shadow-sm @error('date') border-red-500 @enderror">
                         @error('date')
