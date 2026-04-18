@@ -150,6 +150,7 @@
                         <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm" placeholder="0.0000">
                     </div>
                 @endforeach
+            </div>
 
             <!-- Auto-calculated Preview -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
@@ -241,6 +242,7 @@
                         <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm" placeholder="0.0000">
                     </div>
                 @endforeach
+            </div>
 
             <!-- Auto-calculated Preview -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
