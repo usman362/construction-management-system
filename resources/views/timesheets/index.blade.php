@@ -88,14 +88,16 @@
     </table>
 </div>
 
-<!-- Create Modal -->
+<!-- Create Modal — mirrors the Edit modal's UX so the add + edit flows feel
+     identical (weekly OT split preview, Force OT, per-diem toggle). -->
 <div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('createModal')">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Add New Timesheet</h3>
-            <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            <button type="button" onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="createForm" class="p-6 space-y-4">
+            @csrf
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Date *</label><input type="date" name="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div>
@@ -137,10 +139,34 @@
                     @endforeach
                 </select>
             </div>
+            {{-- Hours Worked shortcut — type a daily total and the server re-splits
+                 into Reg/OT using the weekly 40-hr rule. Leave blank if you're
+                 entering Reg/OT/DT manually below. --}}
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-blue-900 mb-1">Hours Worked (auto-split)</label>
+                        <input type="number" step="0.25" min="0" name="hours_worked" id="create_hours_worked" placeholder="blank = use fields below" class="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <p class="text-[11px] text-blue-700 mt-1">OT after 40 hrs/week.</p>
+                    </div>
+                    <div class="flex items-end pb-1">
+                        <label class="flex items-center gap-2">
+                            {{-- Sentinel so unchecked submits 0 --}}
+                            <input type="hidden" name="force_overtime" value="0">
+                            <input type="checkbox" name="force_overtime" id="create_force_overtime" value="1" class="w-4 h-4 border border-amber-400 rounded focus:ring-2 focus:ring-amber-500">
+                            <span class="text-sm font-medium text-amber-900">Force OT</span>
+                        </label>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 text-xs">
+                        <div class="flex justify-between"><span class="text-gray-600">Week so far:</span> <span id="create_week_so_far" class="font-semibold">—</span></div>
+                        <div class="flex justify-between"><span class="text-gray-600">→ Reg / OT:</span>   <span id="create_split_preview" class="font-semibold">—</span></div>
+                    </div>
+                </div>
+            </div>
             <div class="grid grid-cols-4 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Regular Hrs *</label><input type="number" step="0.5" name="regular_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Hrs</label><input type="number" step="0.5" name="overtime_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">DT Hrs</label><input type="number" step="0.5" name="double_time_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Regular Hrs</label><input type="number" step="0.25" name="regular_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Hrs</label><input type="number" step="0.25" name="overtime_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">DT Hrs</label><input type="number" step="0.25" name="double_time_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Shift</label>
                     <select name="shift_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
@@ -151,14 +177,25 @@
                     </select>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
-                <input type="hidden" name="is_billable" value="0">
-                <label class="flex items-center gap-2"><input type="checkbox" name="is_billable" value="1" checked class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Billable</span></label>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="flex items-center gap-3 pt-5">
+                    {{-- Hidden sentinel so an unchecked box still submits 0 --}}
+                    <input type="hidden" name="is_billable" value="0">
+                    <label class="flex items-center gap-2"><input type="checkbox" name="is_billable" value="1" checked class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Billable</span></label>
+                </div>
+                <div class="flex items-center gap-3 pt-5">
+                    <input type="hidden" name="per_diem" value="0">
+                    <label class="flex items-center gap-2"><input type="checkbox" name="per_diem" id="create_per_diem" value="1" class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Pay per diem</span></label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Per diem $</label>
+                    <input type="number" step="0.01" min="0" name="per_diem_amount" id="create_per_diem_amount" placeholder="default" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
             </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
-            <button onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onclick="submitForm('createForm','{{ route("timesheets.store") }}','POST',table,'createModal')" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save Timesheet</button>
+            <button type="button" onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button type="button" onclick="submitForm('createForm','{{ route("timesheets.store") }}','POST',table,'createModal')" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save Timesheet</button>
         </div>
     </div>
 </div>
@@ -189,7 +226,64 @@ var table = $('#dataTable').DataTable({
     ]
 });
 
-function openCreateModal(){ document.getElementById('createForm').reset(); openModal('createModal'); }
+function openCreateModal(){
+    document.getElementById('createForm').reset();
+    // Reset the live preview so old values don't linger between opens
+    document.getElementById('create_week_so_far').textContent = '—';
+    document.getElementById('create_split_preview').textContent = '—';
+    openModal('createModal');
+}
+
+// Mirror of the edit modal's preview logic. Lets the Add form show the same
+// "Week so far" + "Reg / OT split" hints so office data-entry matches Edit UX.
+let createWeekSoFar = 0;
+
+function createUpdateSplitPreview() {
+    const f = document.getElementById('createForm');
+    const hw = parseFloat(f.querySelector('[name="hours_worked"]').value) || 0;
+    const forceOT = f.querySelector('#create_force_overtime').checked;
+    let reg = 0, ot = 0;
+    if (hw > 0) {
+        if (forceOT) {
+            ot = hw;
+        } else {
+            const cap = Math.max(0, 40 - createWeekSoFar);
+            reg = Math.min(hw, cap);
+            ot  = Math.max(0, hw - reg);
+        }
+        document.getElementById('create_split_preview').textContent = reg.toFixed(2) + ' / ' + ot.toFixed(2);
+    } else {
+        document.getElementById('create_split_preview').textContent = '(manual)';
+    }
+}
+
+async function createFetchWeekHours() {
+    const f = document.getElementById('createForm');
+    const empId = f.querySelector('[name="employee_id"]').value;
+    const date  = f.querySelector('[name="date"]').value;
+    const sfEl  = document.getElementById('create_week_so_far');
+    if (!empId || !date) { sfEl.textContent = '—'; return; }
+    try {
+        const res = await fetch(`{{ route('timesheets.week-hours') }}?employee_id=${empId}&date=${encodeURIComponent(date)}`, {
+            headers: { 'Accept': 'application/json' },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        createWeekSoFar = parseFloat(data.week_hours_before || 0);
+        sfEl.textContent = createWeekSoFar.toFixed(2) + ' hrs';
+        sfEl.className = 'font-semibold ' + (createWeekSoFar >= 40 ? 'text-amber-600' : 'text-gray-900');
+        createUpdateSplitPreview();
+    } catch (e) { /* ignore */ }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var f = document.getElementById('createForm');
+    if (!f) return;
+    f.querySelector('[name="hours_worked"]').addEventListener('input', createUpdateSplitPreview);
+    f.querySelector('[name="force_overtime"]')?.addEventListener('change', createUpdateSplitPreview);
+    f.querySelector('[name="employee_id"]').addEventListener('change', createFetchWeekHours);
+    f.querySelector('[name="date"]').addEventListener('change', createFetchWeekHours);
+});
 
 // Batch print — builds a query string from the modal form and opens the
 // print-batch route in a new tab (either the HTML print view or the PDF).
