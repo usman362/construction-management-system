@@ -31,17 +31,21 @@
         </div>
     </div>
 
-    <!-- Change Orders Table -->
+    <!-- Change Orders Table (layout mirrors Commitments — CO #, Client PO #,
+         Phase Code, Cost Type, Description, Amount, Type, Status, Actions) -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <table id="dataTable" class="w-full">
             <thead class="bg-gray-100 border-b">
                 <tr>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">CO #</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Title</th>
-                    <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Type</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
-                    <th class="px-6 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">CO #</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Client PO #</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phase Code</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cost Type</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Type</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
             </thead>
         </table>
@@ -172,7 +176,10 @@ $(document).ready(function() {
         ajax: '{{ route("projects.change-orders.index", $project) }}',
         columns: [
             {data:'co_number', name:'co_number'},
-            {data:'title', name:'title', render: d=>d||'—'},
+            {data:'client_po', name:'client_po', render: function(d){return d?d:'<span class="text-gray-400">—</span>';}},
+            {data:'phase_code', name:'phase_code', orderable:false, searchable:false, render: function(d){return d?'<span class="font-mono text-xs">'+d+'</span>':'<span class="text-gray-400">—</span>';}},
+            {data:'cost_type', name:'cost_type', orderable:false, searchable:false, render: function(d){return d?d:'<span class="text-gray-400">—</span>';}},
+            {data:'description', name:'description', render: function(d){return d?d:'<span class="text-gray-400">—</span>';}},
             {data:'amount', name:'amount', render: d=>'$'+parseFloat(d).toFixed(2), className:'text-right'},
             {data:'pricing_type', name:'pricing_type', orderable:false, className:'text-center', render: function(d) {
                 if (d === 't_and_m') return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">T &amp; M</span>';
@@ -186,9 +193,9 @@ $(document).ready(function() {
                 };
                 return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium '+statusColors[d]+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</span>';
             }, className:'text-center'},
-            {data:'actions', orderable:false, searchable:false, className:'text-right',
+            {data:'actions', orderable:false, searchable:false, className:'text-center',
                 render: function(id) {
-                    return `<div class="flex items-center justify-end gap-1">
+                    return `<div class="flex items-center justify-center gap-1">
                         <button onclick="viewChangeOrder(${id})" class="p-1 text-gray-400 hover:text-blue-600" title="View"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
                         <a href="${window.BASE_URL}/projects/{{ $project->id }}/change-orders/${id}/pdf" class="p-1 text-gray-400 hover:text-green-600" title="Download PDF"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></a>
                         <button onclick="editChangeOrder(${id})" class="p-1 text-gray-400 hover:text-amber-600" title="Edit"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>

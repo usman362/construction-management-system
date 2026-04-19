@@ -12,6 +12,7 @@ class ChangeOrderItem extends Model
     protected $fillable = [
         'change_order_id',
         'cost_code_id',
+        'cost_type_id',
         'description',
         'category',
         'quantity',
@@ -34,5 +35,10 @@ class ChangeOrderItem extends Model
     public function costCode(): BelongsTo
     {
         return $this->belongsTo(CostCode::class);
+    }
+
+    public function costType(): BelongsTo
+    {
+        return $this->belongsTo(CostType::class);
     }
 }

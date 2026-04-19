@@ -203,6 +203,11 @@ Route::middleware('auth')->group(function () {
         // Week-hours preview endpoint must be registered BEFORE the resource route
         // so it isn't swallowed by the {timesheet} parameter.
         Route::get('timesheets/week-hours', [TimesheetController::class, 'weekHours'])->name('timesheets.week-hours');
+        // Print routes must live BEFORE the resource so "print-batch" isn't
+        // swallowed by the {timesheet} wildcard. The single-timesheet print
+        // uses the bound model AFTER these fixed URIs resolve.
+        Route::get('timesheets/print-batch', [TimesheetController::class, 'printBatch'])->name('timesheets.print-batch');
+        Route::get('timesheets/{timesheet}/print', [TimesheetController::class, 'print'])->name('timesheets.print');
         Route::resource('timesheets', TimesheetController::class);
         Route::post('timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])->name('timesheets.approve');
         Route::post('timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])->name('timesheets.reject');

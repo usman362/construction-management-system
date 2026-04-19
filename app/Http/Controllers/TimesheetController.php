@@ -246,6 +246,104 @@ class TimesheetController extends Controller
     }
 
     /**
+     * Single-timesheet print view — shared by field (client signature) and
+     * office (billing) use cases. Returns HTML with auto-print dialog unless
+     * `?mode=pdf` is supplied, in which case a DomPDF download is streamed.
+     */
+    public function print(Request $request, Timesheet $timesheet): \Illuminate\Http\Response|View
+    {
+        $timesheet->load([
+            'employee', 'project.client', 'crew', 'shift', 'costCode',
+            'costAllocations.costCode', 'approver',
+        ]);
+
+        $data = [
+            'timesheets'   => collect([$timesheet]),
+            'single'       => true,
+            'heading'      => 'Timesheet — ' . $timesheet->date->format('M j, Y'),
+            'printMode'    => $request->query('mode', 'html'),
+            'generatedAt'  => now(),
+            'companyName'  => \App\Models\Setting::get('company_name', 'BuildTrack'),
+            'companyLogo'  => \App\Models\Setting::get('company_logo'),
+            'primaryColor' => \App\Models\Setting::get('primary_color', '#2563eb'),
+        ];
+
+        if ($request->query('mode') === 'pdf') {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('timesheets.print', $data)
+                ->setPaper('letter', 'portrait');
+            return $pdf->download('timesheet-' . $timesheet->id . '-' . $timesheet->date->format('Y-m-d') . '.pdf');
+        }
+
+        return view('timesheets.print', $data);
+    }
+
+    /**
+     * Batch print — office billing workflow. Accepts the same filter params as
+     * the timesheet index (employee_id/project_id/date_from/date_to/crew_id/status)
+     * and renders every matching row on one printable sheet, page-breaking
+     * between timesheets so each can be signed/filed individually.
+     */
+    public function printBatch(Request $request): \Illuminate\Http\Response|View
+    {
+        $request->validate([
+            'employee_id' => 'nullable|exists:employees,id',
+            'project_id'  => 'nullable|exists:projects,id',
+            'crew_id'     => 'nullable|exists:crews,id',
+            'status'      => 'nullable|string',
+            'date_from'   => 'nullable|date',
+            'date_to'     => 'nullable|date',
+            'mode'        => 'nullable|in:html,pdf',
+        ]);
+
+        $query = Timesheet::with([
+            'employee', 'project.client', 'crew', 'shift', 'costCode',
+            'costAllocations.costCode', 'approver',
+        ]);
+
+        if ($request->filled('employee_id')) $query->where('employee_id', $request->employee_id);
+        if ($request->filled('project_id'))  $query->where('project_id', $request->project_id);
+        if ($request->filled('crew_id'))     $query->where('crew_id', $request->crew_id);
+        if ($request->filled('status'))      $query->where('status', $request->status);
+        if ($request->filled('date_from'))   $query->whereDate('date', '>=', $request->date_from);
+        if ($request->filled('date_to'))     $query->whereDate('date', '<=', $request->date_to);
+
+        // Sort for readability — group by project, then by date, then by employee
+        $timesheets = $query->orderBy('project_id')
+            ->orderBy('date')
+            ->orderBy('employee_id')
+            ->get();
+
+        abort_if($timesheets->isEmpty(), 404, 'No timesheets match the selected filters.');
+
+        $heading = 'Timesheet Batch — ';
+        if ($request->filled('date_from') || $request->filled('date_to')) {
+            $heading .= ($request->date_from ?: '…') . ' to ' . ($request->date_to ?: '…');
+        } else {
+            $heading .= 'All Dates';
+        }
+
+        $data = [
+            'timesheets'   => $timesheets,
+            'single'       => false,
+            'heading'      => $heading,
+            'printMode'    => $request->query('mode', 'html'),
+            'generatedAt'  => now(),
+            'companyName'  => \App\Models\Setting::get('company_name', 'BuildTrack'),
+            'companyLogo'  => \App\Models\Setting::get('company_logo'),
+            'primaryColor' => \App\Models\Setting::get('primary_color', '#2563eb'),
+            'filters'      => $request->only(['employee_id','project_id','crew_id','status','date_from','date_to']),
+        ];
+
+        if ($request->query('mode') === 'pdf') {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('timesheets.print', $data)
+                ->setPaper('letter', 'portrait');
+            return $pdf->download('timesheets-batch-' . now()->format('Y-m-d-His') . '.pdf');
+        }
+
+        return view('timesheets.print', $data);
+    }
+
+    /**
      * @return array{employees: \Illuminate\Database\Eloquent\Collection, projects: \Illuminate\Database\Eloquent\Collection, crews: \Illuminate\Database\Eloquent\Collection, shifts: \Illuminate\Database\Eloquent\Collection}
      */
     private function timesheetFormOptions(): array

@@ -230,23 +230,57 @@ class PayrollController extends Controller
     }
 
     /**
-     * Export a payroll period to CSV with all legacy employee info + hours + per diem.
+     * Export a payroll period to a true .xlsx workbook with all legacy employee
+     * info + hours + per diem. Two sheets:
+     *  - "Detail"    — one row per payroll entry (per project/phase-code split)
+     *  - "Employee Summary" — rolled up per employee with total hours, per-diem
+     *                         days, and comma-separated job numbers.
      * Columns match what the client typically uploads into payroll software.
      */
-    public function export(PayrollPeriod $payrollPeriod): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function export(PayrollPeriod $payrollPeriod): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $entries = PayrollEntry::with(['employee.craft', 'project', 'costCode'])
             ->where('payroll_period_id', $payrollPeriod->id)
             ->orderBy('employee_id')
             ->get();
 
-        // Group entries by employee to get total per-diem days + unique projects
+        // Group entries by employee for summary sheet + per-row enrichment.
         $perDiemDaysByEmployee = $entries->groupBy('employee_id')->map(function ($rows) {
             return $rows->where('per_diem', '>', 0)->count();
         });
         $projectsByEmployee = $entries->groupBy('employee_id')->map(function ($rows) {
             return $rows->pluck('project.project_number')->filter()->unique()->implode(', ');
         });
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $this->populatePayrollDetailSheet($spreadsheet, $entries, $perDiemDaysByEmployee);
+        $this->populatePayrollSummarySheet($spreadsheet, $entries, $perDiemDaysByEmployee, $projectsByEmployee);
+
+        // Default to Detail sheet when the file is opened
+        $spreadsheet->setActiveSheetIndex(0);
+
+        $filename = 'payroll_' . str_replace(' ', '_', $payrollPeriod->name ?? ('period_' . $payrollPeriod->id)) . '.xlsx';
+        $tmp = tempnam(sys_get_temp_dir(), 'payroll_') . '.xlsx';
+        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save($tmp);
+
+        return response()->download($tmp, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Build the "Detail" sheet — one row per PayrollEntry. Preserves the
+     * line-level breakdown needed by accounting systems that want per-project
+     * labor splits, not just an employee-level roll-up.
+     */
+    private function populatePayrollDetailSheet(
+        \PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet,
+        \Illuminate\Support\Collection $entries,
+        \Illuminate\Support\Collection $perDiemDaysByEmployee,
+    ): void {
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Detail');
 
         $header = [
             'Employee Number', 'Legacy ID', 'First Name', 'Middle Name', 'Last Name',
@@ -260,27 +294,15 @@ class PayrollController extends Controller
             'Regular Pay', 'OT Pay', 'DT Pay', 'Total Pay',
             'Per Diem Amount', 'Per Diem Days', 'Billable Amount',
         ];
+        $sheet->fromArray($header, null, 'A1');
 
-        $filename = 'payroll_' . str_replace(' ', '_', $payrollPeriod->name ?? ('period_' . $payrollPeriod->id)) . '.csv';
+        $row = 2;
+        foreach ($entries as $e) {
+            $emp = $e->employee;
+            if (!$emp) continue;
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'no-cache, must-revalidate',
-            'Expires' => '0',
-        ];
-
-        return response()->streamDownload(function () use ($entries, $header, $perDiemDaysByEmployee, $projectsByEmployee) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF"); // BOM for Excel
-            fputcsv($out, $header);
-
-            foreach ($entries as $e) {
-                $emp = $e->employee;
-                if (!$emp) continue;
-
-                fputcsv($out, [
+            $sheet->fromArray([
+                [
                     $emp->employee_number,
                     $emp->legacy_employee_id,
                     $emp->first_name,
@@ -292,10 +314,10 @@ class PayrollController extends Controller
                     $emp->union,
                     $emp->pay_cycle,
                     $emp->pay_type,
-                    $emp->hourly_rate,
-                    $emp->overtime_rate,
-                    $emp->st_burden_rate,
-                    $emp->ot_burden_rate,
+                    (float) $emp->hourly_rate,
+                    (float) $emp->overtime_rate,
+                    (float) $emp->st_burden_rate,
+                    (float) $emp->ot_burden_rate,
                     $emp->work_comp_code,
                     $emp->suta_state,
                     $emp->state_tax,
@@ -303,19 +325,126 @@ class PayrollController extends Controller
                     optional($emp->hire_date)->format('Y-m-d'),
                     $e->project?->project_number,
                     $e->costCode?->code,
-                    $e->regular_hours,
-                    $e->overtime_hours,
-                    $e->double_time_hours,
-                    $e->regular_pay,
-                    $e->overtime_pay,
-                    $e->double_time_pay,
-                    $e->total_pay,
-                    $e->per_diem,
-                    $perDiemDaysByEmployee[$emp->id] ?? 0,
-                    $e->billable_amount,
-                ]);
+                    (float) $e->regular_hours,
+                    (float) $e->overtime_hours,
+                    (float) $e->double_time_hours,
+                    (float) $e->regular_pay,
+                    (float) $e->overtime_pay,
+                    (float) $e->double_time_pay,
+                    (float) $e->total_pay,
+                    (float) $e->per_diem,
+                    (int) ($perDiemDaysByEmployee[$emp->id] ?? 0),
+                    (float) $e->billable_amount,
+                ],
+            ], null, 'A' . $row);
+            $row++;
+        }
+
+        $this->applyPayrollSheetFormatting($sheet, $header, $row - 1, currencyColumns: ['L','M','N','O','Z','AA','AB','AC','AD','AF']);
+    }
+
+    /**
+     * Build the "Employee Summary" sheet — one row per employee with totals
+     * across the entire period, plus per-diem day count and a comma-separated
+     * list of job numbers (client specifically asked for per-diem days + jobs).
+     */
+    private function populatePayrollSummarySheet(
+        \PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet,
+        \Illuminate\Support\Collection $entries,
+        \Illuminate\Support\Collection $perDiemDaysByEmployee,
+        \Illuminate\Support\Collection $projectsByEmployee,
+    ): void {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Employee Summary');
+
+        $header = [
+            'Employee Number', 'Legacy ID', 'Name',
+            'Craft', 'Department', 'Pay Type',
+            'Reg Hrs', 'OT Hrs', 'DT Hrs', 'Total Hrs',
+            'Reg Pay', 'OT Pay', 'DT Pay', 'Total Pay',
+            'Per Diem $', 'Per Diem Days',
+            'Jobs Worked (Project #s)',
+            'Billable $',
+        ];
+        $sheet->fromArray($header, null, 'A1');
+
+        $grouped = $entries->groupBy('employee_id');
+        $row = 2;
+        foreach ($grouped as $empId => $rows) {
+            $emp = $rows->first()->employee;
+            if (!$emp) continue;
+
+            $sheet->fromArray([[
+                $emp->employee_number,
+                $emp->legacy_employee_id,
+                trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? '')),
+                $emp->craft?->name,
+                $emp->department,
+                $emp->pay_type,
+                (float) $rows->sum('regular_hours'),
+                (float) $rows->sum('overtime_hours'),
+                (float) $rows->sum('double_time_hours'),
+                (float) $rows->sum(fn($r) => (float)$r->regular_hours + (float)$r->overtime_hours + (float)$r->double_time_hours),
+                (float) $rows->sum('regular_pay'),
+                (float) $rows->sum('overtime_pay'),
+                (float) $rows->sum('double_time_pay'),
+                (float) $rows->sum('total_pay'),
+                (float) $rows->sum('per_diem'),
+                (int) ($perDiemDaysByEmployee[$empId] ?? 0),
+                $projectsByEmployee[$empId] ?? '',
+                (float) $rows->sum('billable_amount'),
+            ]], null, 'A' . $row);
+            $row++;
+        }
+
+        $this->applyPayrollSheetFormatting($sheet, $header, $row - 1, currencyColumns: ['K','L','M','N','O','R']);
+    }
+
+    /**
+     * Shared formatting — bold header row, frozen top, auto-width columns,
+     * currency format on money columns. Pulled out so both sheets stay consistent.
+     */
+    private function applyPayrollSheetFormatting(
+        \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet,
+        array $header,
+        int $lastRow,
+        array $currencyColumns = [],
+    ): void {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($header));
+
+        // Header styling
+        $headerRange = 'A1:' . $lastCol . '1';
+        $sheet->getStyle($headerRange)->getFont()->setBold(true);
+        $sheet->getStyle($headerRange)->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('1F2937');
+        $sheet->getStyle($headerRange)->getFont()->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle($headerRange)->getAlignment()
+            ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+        // Freeze header row so scrolling long lists stays readable
+        $sheet->freezePane('A2');
+
+        // Auto-fit columns based on content
+        for ($i = 1; $i <= count($header); $i++) {
+            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i);
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // Currency formatting for money columns
+        if ($lastRow >= 2) {
+            foreach ($currencyColumns as $col) {
+                $sheet->getStyle("{$col}2:{$col}{$lastRow}")
+                    ->getNumberFormat()->setFormatCode('$#,##0.00;[Red]($#,##0.00);-');
             }
-            fclose($out);
-        }, $filename, $headers);
+        }
+
+        // Add thin borders to the data area for a tidy look
+        if ($lastRow >= 1) {
+            $sheet->getStyle("A1:{$lastCol}{$lastRow}")->getBorders()
+                ->getAllBorders()
+                ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)
+                ->getColor()->setRGB('CCCCCC');
+        }
     }
 }

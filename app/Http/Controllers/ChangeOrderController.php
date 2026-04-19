@@ -7,6 +7,7 @@ use App\Models\ChangeOrder;
 use App\Models\ChangeOrderItem;
 use App\Models\ChangeOrderLabor;
 use App\Models\CostCode;
+use App\Models\CostType;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -18,18 +19,29 @@ class ChangeOrderController extends Controller
         if ($request->ajax()) {
             return $this->dataTable($project, $request);
         }
-        return view('change-orders.index', ['project' => $project]);
+
+        // Cost codes + cost types powering the phase-code / cost-type dropdowns
+        // on the create/edit modals, mirroring the Commitments screen.
+        $costCodes = CostCode::orderBy('code')->get();
+        $costTypes = CostType::where('is_active', true)->orderBy('sort_order')->orderBy('code')->get();
+
+        return view('change-orders.index', [
+            'project' => $project,
+            'costCodes' => $costCodes,
+            'costTypes' => $costTypes,
+        ]);
     }
 
     private function dataTable(Project $project, Request $request): JsonResponse
     {
-        $query = $project->changeOrders();
+        $query = $project->changeOrders()->with(['items.costCode', 'items.costType']);
         $totalRecords = $project->changeOrders()->count();
 
         // Search
         if ($search = $request->input('search.value')) {
             $query->where(function ($q) use ($search) {
                 $q->where('co_number', 'like', "%{$search}%")
+                  ->orWhere('client_po', 'like', "%{$search}%")
                   ->orWhere('title', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%");
             });
@@ -37,7 +49,7 @@ class ChangeOrderController extends Controller
         $filteredRecords = $query->count();
 
         // Order
-        $columns = ['id', 'co_number', 'title', 'amount', 'status'];
+        $columns = ['id', 'co_number', 'client_po', 'title', 'amount', 'status'];
         $orderCol = $columns[$request->input('order.0.column', 0)] ?? 'id';
         $orderDir = $request->input('order.0.dir', 'asc');
         $query->orderBy($orderCol, $orderDir);
@@ -52,10 +64,34 @@ class ChangeOrderController extends Controller
             'recordsTotal' => $totalRecords,
             'recordsFiltered' => $filteredRecords,
             'data' => $data->map(function ($co) {
+                // If the CO has line items, surface the first item's phase
+                // code / cost type / description so the list looks like
+                // Commitments. When the CO has >1 item we say "Multiple" to
+                // signal the user should drill into the detail view.
+                $itemCount = $co->items->count();
+                $firstItem = $co->items->first();
+
+                $phaseCode = $firstItem?->costCode?->code;
+                $costType  = $firstItem?->costType?->name ?? $firstItem?->costType?->code;
+                $itemDesc  = $firstItem?->description;
+
+                if ($itemCount > 1) {
+                    $phaseCode = $phaseCode ? $phaseCode.' +'.($itemCount - 1).' more' : 'Multiple ('.$itemCount.')';
+                    $costType  = $costType ? $costType.' +'.($itemCount - 1).' more' : 'Multiple';
+                    $itemDesc  = $itemDesc ? $itemDesc.' …' : 'Multiple line items';
+                }
+
+                // Fall back to CO-level description if there are no items
+                $description = $itemDesc ?: $co->description ?: $co->title;
+
                 return [
                     'id' => $co->id,
                     'co_number' => $co->co_number,
+                    'client_po' => $co->client_po,
                     'title' => $co->title ?? '—',
+                    'phase_code' => $phaseCode,
+                    'cost_type' => $costType,
+                    'description' => $description,
                     'amount' => $co->amount,
                     'status' => $co->status,
                     'pricing_type' => $co->pricing_type ?? 'lump_sum',
@@ -155,6 +191,7 @@ class ChangeOrderController extends Controller
     {
         $validated = $request->validate([
             'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'cost_type_id' => 'nullable|exists:cost_types,id',
             'description' => 'required|string|max:255',
             'category' => 'nullable|string|max:100',
             'quantity' => 'required|numeric|min:0',
