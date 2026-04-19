@@ -220,6 +220,65 @@
                     </div>
                 </form>
             </div>
+
+            {{-- ═══ System Maintenance — post-deployment helpers for shared hosting ═══ --}}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+                    <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-800">System Maintenance</h2>
+                        <p class="text-xs text-gray-500">Clear server caches after deploying updates or rebuild the storage symlink.</p>
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-5">
+                    {{-- Status snapshot — shows current caching state so admin knows what's compiled --}}
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <p class="text-[10px] uppercase font-semibold text-gray-500 tracking-wider mb-3">Current Status</p>
+                        <div class="grid grid-cols-2 gap-y-2 gap-x-4 text-xs" id="sysStatus">
+                            <div class="flex justify-between"><span class="text-gray-600">Config cache:</span> <span id="statusConfig" class="font-semibold text-gray-400">—</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Route cache:</span> <span id="statusRoute" class="font-semibold text-gray-400">—</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Compiled views:</span> <span id="statusViews" class="font-semibold text-gray-400">—</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Storage link:</span> <span id="statusStorage" class="font-semibold text-gray-400">—</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Environment:</span> <span id="statusEnv" class="font-semibold text-gray-400">—</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Laravel:</span> <span id="statusLaravel" class="font-semibold text-gray-400">—</span></div>
+                        </div>
+                    </div>
+
+                    {{-- Primary action — this is the one most users will click after a deploy --}}
+                    <div>
+                        <button type="button" onclick="runMaintenance('clear-cache', 'all')"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-red-500 rounded-lg hover:from-orange-600 hover:to-red-600 transition shadow-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                            Clear All Caches (Recommended)
+                        </button>
+                        <p class="text-[10px] text-gray-500 mt-1.5 text-center">Run this after uploading new code to the server.</p>
+                    </div>
+
+                    {{-- Granular controls for rare cases --}}
+                    <details class="border border-gray-200 rounded-lg">
+                        <summary class="px-4 py-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-50 select-none">Advanced — Clear individual caches</summary>
+                        <div class="p-3 border-t border-gray-200 grid grid-cols-2 gap-2">
+                            <button type="button" onclick="runMaintenance('clear-cache', 'config')" class="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100">Config Cache</button>
+                            <button type="button" onclick="runMaintenance('clear-cache', 'route')" class="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100">Route Cache</button>
+                            <button type="button" onclick="runMaintenance('clear-cache', 'view')" class="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100">View Cache</button>
+                            <button type="button" onclick="runMaintenance('clear-cache', 'cache')" class="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100">App Cache</button>
+                            <button type="button" onclick="runMaintenance('clear-cache', 'compiled')" class="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 col-span-2">Compiled Services</button>
+                        </div>
+                    </details>
+
+                    {{-- Storage symlink — needed for file uploads to be publicly accessible --}}
+                    <div class="border-t border-gray-100 pt-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-800">Storage Symlink</p>
+                                <p class="text-[11px] text-gray-500 mt-0.5">Creates <code class="bg-gray-100 px-1 rounded text-[10px]">public/storage</code> → <code class="bg-gray-100 px-1 rounded text-[10px]">storage/app/public</code>. Required for uploaded files (logos, documents) to display.</p>
+                            </div>
+                            <button type="button" onclick="runMaintenance('storage-link')" class="flex-shrink-0 px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Create Link</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         @endif
     </div>
@@ -358,6 +417,63 @@ document.querySelector('[name="primary_color"]')?.addEventListener('input', func
     document.getElementById('previewLogoArea').style.backgroundColor = this.value;
     document.getElementById('colorHex').value = this.value;
 });
+
+// ─── System Maintenance ───────────────────────────────────────────────
+@if(Auth::user()->role === 'admin')
+/**
+ * Runs a maintenance action. `action` = 'clear-cache' | 'storage-link',
+ * `type` is only used for clear-cache (all/config/route/view/cache/compiled).
+ */
+function runMaintenance(action, type) {
+    var url = action === 'storage-link'
+        ? '{{ route("admin.system.storage-link") }}'
+        : '{{ route("admin.system.clear-cache") }}';
+    var payload = action === 'storage-link' ? {} : { type: type };
+
+    // Disable buttons while running so user can't double-click
+    var buttons = document.querySelectorAll('button[onclick^="runMaintenance"]');
+    buttons.forEach(function(b) { b.disabled = true; b.classList.add('opacity-60','cursor-wait'); });
+
+    $.ajax({
+        url: url,
+        type: 'POST',
+        data: payload,
+        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        success: function(res) {
+            Toast.fire({ icon: 'success', title: res.message || 'Done' });
+            loadSystemStatus();
+        },
+        error: function(xhr) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Maintenance failed',
+                text: xhr.responseJSON?.message || 'Could not complete the operation.',
+                confirmButtonColor: '#f97316',
+            });
+        },
+        complete: function() {
+            buttons.forEach(function(b) { b.disabled = false; b.classList.remove('opacity-60','cursor-wait'); });
+        }
+    });
+}
+
+function loadSystemStatus() {
+    $.get('{{ route("admin.system.status") }}', function(d) {
+        var yes = '<span class="text-green-600">Yes</span>';
+        var no  = '<span class="text-gray-400">No</span>';
+        document.getElementById('statusConfig').innerHTML   = d.config_cached ? yes : no;
+        document.getElementById('statusRoute').innerHTML    = d.route_cached ? yes : no;
+        document.getElementById('statusViews').textContent  = d.compiled_views + ' files';
+        document.getElementById('statusStorage').innerHTML  = d.storage_linked ? yes : '<span class="text-red-500">Missing</span>';
+        document.getElementById('statusEnv').textContent    = d.app_env + (d.app_debug ? ' (debug on)' : '');
+        document.getElementById('statusLaravel').textContent= 'v' + d.laravel_version;
+    }).fail(function() {
+        // Status is informational only — silently ignore if the endpoint is unavailable
+    });
+}
+
+document.addEventListener('DOMContentLoaded', loadSystemStatus);
+@endif
 </script>
 @endpush
 

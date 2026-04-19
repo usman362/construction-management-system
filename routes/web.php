@@ -33,6 +33,7 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EmployeeCertificationController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\SystemMaintenanceController;
 
 // ─── Guest (Auth) Routes ─────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -68,6 +69,11 @@ Route::middleware('auth')->group(function () {
         Route::post('admin/backup', [BackupController::class, 'create'])->name('admin.backup.create');
         Route::get('admin/backups/{filename}/download', [BackupController::class, 'download'])->name('admin.backup.download');
         Route::delete('admin/backups/{filename}', [BackupController::class, 'destroy'])->name('admin.backup.destroy');
+
+        // System Maintenance — Admin only (cache clear, storage link)
+        Route::get('admin/system/status', [SystemMaintenanceController::class, 'status'])->name('admin.system.status');
+        Route::post('admin/system/clear-cache', [SystemMaintenanceController::class, 'clearCache'])->name('admin.system.clear-cache');
+        Route::post('admin/system/storage-link', [SystemMaintenanceController::class, 'storageLink'])->name('admin.system.storage-link');
     });
 
     // ─── Documents (polymorphic — any authenticated user can view/download) ──
