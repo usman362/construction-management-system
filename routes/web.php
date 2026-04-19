@@ -194,6 +194,9 @@ Route::middleware('auth')->group(function () {
 
     // ─── Time & Labor ────────────────────────────────────────────
     Route::middleware('role:admin,project_manager,accountant,field')->group(function () {
+        // Week-hours preview endpoint must be registered BEFORE the resource route
+        // so it isn't swallowed by the {timesheet} parameter.
+        Route::get('timesheets/week-hours', [TimesheetController::class, 'weekHours'])->name('timesheets.week-hours');
         Route::resource('timesheets', TimesheetController::class);
         Route::post('timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])->name('timesheets.approve');
         Route::post('timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])->name('timesheets.reject');

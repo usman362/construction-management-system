@@ -49,7 +49,7 @@
 
                     <div>
                         <label for="date" class="block text-sm font-medium text-gray-700 mb-2">Date *</label>
-                        <input type="date" name="date" id="date" required value="{{ old('date') }}" class="w-full border-gray-300 rounded-lg shadow-sm @error('date') border-red-500 @enderror">
+                        <input type="date" name="date" id="date" required value="{{ old('date') }}" class="w-full border-gray-300 rounded-lg shadow-sm @error('date') border-red-500 @enderror" onchange="refreshWeekHours()">
                         @error('date')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                         @enderror
@@ -92,14 +92,23 @@
                 </div>
             </div>
 
-            <!-- Quick fill toolbar: applies hours/per-diem to the whole crew at once -->
+            <!-- Quick fill toolbar: applies hours/per-diem/force-OT to the whole crew at once -->
             <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p class="text-sm font-semibold text-blue-900 mb-3">Quick fill (apply to all rows below)</p>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-blue-900 mb-1">Hours worked</label>
                         <input type="number" id="bulk_hours_worked" step="0.25" min="0" placeholder="e.g. 10" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
-                        <p class="text-[11px] text-blue-700 mt-1">Splits into 8 Reg + excess OT (or &gt;16 → 8 Reg + 8 OT + DT)</p>
+                        <p class="text-[11px] text-blue-700 mt-1">Splits OT only after 40 hrs/week (Mon–Sun).</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-blue-900 mb-1">Force OT (all)</label>
+                        <select id="bulk_force_ot" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
+                            <option value="">— No change —</option>
+                            <option value="1">Yes — all hours as OT</option>
+                            <option value="0">No — use weekly rule</option>
+                        </select>
+                        <p class="text-[11px] text-blue-700 mt-1">For holidays, weekend premium, etc.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-blue-900 mb-1">Per diem (all)</label>
@@ -127,7 +136,8 @@
                     <thead class="bg-gray-100 border-b">
                         <tr>
                             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Enter hours worked. System splits into Reg/OT/DT automatically.">Hours Worked</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Enter hours worked. System splits into Reg/OT using the weekly 40-hr rule.">Hours Worked</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Tick to treat this entry as OT regardless of the weekly total.">Force OT</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Reg</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">OT</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">DT</th>
@@ -141,23 +151,30 @@
                     </thead>
                     <tbody>
                         @forelse ($crewMembers ?? [] as $employee)
-                            <tr class="border-b hover:bg-gray-50">
+                            <tr class="border-b hover:bg-gray-50" data-employee-id="{{ $employee->id }}">
                                 <td class="px-4 py-3 text-sm text-gray-900 font-medium">
-                                    {{ $employee->first_name }} {{ $employee->last_name }}
-                                    <input type="hidden" name="entries[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}">
+                                    <div>{{ $employee->first_name }} {{ $employee->last_name }}</div>
+                                    <div class="week-hours-badge text-[11px] text-gray-500 mt-0.5">Week so far: —</div>
+                                    <input type="hidden" name="entries[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}" class="employee-id">
                                 </td>
                                 <td class="px-2 py-3 text-center">
-                                    {{-- Hours worked: typing a single number (e.g. 10) auto-distributes into Reg/OT/DT --}}
-                                    <input type="number" step="0.25" min="0" placeholder="0" class="hours-worked w-20 border-gray-300 rounded text-center font-semibold" onchange="distributeHours(this)">
+                                    {{-- Hours worked: server splits Reg/OT using 40-hr/week rule --}}
+                                    <input type="number" step="0.25" min="0" placeholder="0" name="entries[{{ $loop->index }}][hours_worked]" class="hours-worked w-20 border-gray-300 rounded text-center font-semibold" onchange="distributeHours(this)">
                                 </td>
                                 <td class="px-2 py-3 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][regular_hours]" step="0.5" value="0" class="w-16 border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                    <input type="checkbox" name="entries[{{ $loop->index }}][force_overtime]" value="1" class="force-ot rounded border-gray-300 text-amber-600" onchange="distributeHours(this)">
                                 </td>
                                 <td class="px-2 py-3 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][overtime_hours]" step="0.5" value="0" class="w-16 border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                    <span class="reg-preview text-sm text-gray-700">0</span>
+                                    <input type="hidden" name="entries[{{ $loop->index }}][regular_hours]" value="0" class="reg-input">
                                 </td>
                                 <td class="px-2 py-3 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][double_time_hours]" step="0.5" value="0" class="w-16 border-gray-300 rounded text-center" onchange="updateTotal(this)">
+                                    <span class="ot-preview text-sm text-gray-700">0</span>
+                                    <input type="hidden" name="entries[{{ $loop->index }}][overtime_hours]" value="0" class="ot-input">
+                                </td>
+                                <td class="px-2 py-3 text-center">
+                                    <span class="dt-preview text-sm text-gray-700">0</span>
+                                    <input type="hidden" name="entries[{{ $loop->index }}][double_time_hours]" value="0" class="dt-input">
                                 </td>
                                 <td class="px-2 py-3 text-center">
                                     <input type="number" name="entries[{{ $loop->index }}][gate_log_hours]" step="0.25" placeholder="—" class="w-16 border-gray-300 rounded text-center text-xs">
@@ -185,7 +202,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-6 py-4 text-center text-gray-500">
+                                <td colspan="12" class="px-6 py-4 text-center text-gray-500">
                                     Select a crew to view members
                                 </td>
                             </tr>
@@ -208,56 +225,106 @@
 </div>
 
 <script>
+    const WEEK_HOURS_URL = @json(route('timesheets.week-hours'));
+    const WEEKLY_OT_THRESHOLD = 40;
+
+    // Map of employee_id → hours already logged this week (Mon–Sun)
+    // Pre-fetched once whenever the date changes so per-row splits happen
+    // instantly without a round-trip on every keystroke.
+    let weekHoursMap = {};
+
     function reloadWithCrew() {
-        var projectId = document.getElementById('project_id').value;
-        var crewId = document.getElementById('crew_id').value;
-        var url = '{{ route("timesheets.bulk-create") }}?';
+        const projectId = document.getElementById('project_id').value;
+        const crewId = document.getElementById('crew_id').value;
+        let url = '{{ route("timesheets.bulk-create") }}?';
         if (projectId) url += 'project_id=' + projectId + '&';
         if (crewId) url += 'crew_id=' + crewId;
         location.href = url;
     }
 
-    function updateTotal(input) {
-        const row = input.closest('tr');
-        const regularHours = parseFloat(row.querySelector('input[name*="regular_hours"]').value) || 0;
-        const overtimeHours = parseFloat(row.querySelector('input[name*="overtime_hours"]').value) || 0;
-        const doubleTimeHours = parseFloat(row.querySelector('input[name*="double_time_hours"]').value) || 0;
-        const total = regularHours + overtimeHours + doubleTimeHours;
-        row.querySelector('.total').textContent = total.toFixed(2);
+    // Re-split hours for one row using the client-side version of the
+    // weekly-40 rule against the pre-fetched weekHoursMap. This mirrors
+    // App\Services\OvertimeCalculator::splitWeekly exactly.
+    function distributeHours(inputEl) {
+        const row = inputEl.closest('tr');
+        if (!row) return;
+        const empId = row.querySelector('.employee-id').value;
+        const hours = parseFloat(row.querySelector('.hours-worked').value) || 0;
+        const forceOT = row.querySelector('.force-ot').checked;
+        const weekSoFar = parseFloat(weekHoursMap[empId] || 0);
+
+        let reg = 0, ot = 0, dt = 0;
+        if (forceOT) {
+            ot = hours;
+        } else {
+            const regCapacity = Math.max(0, WEEKLY_OT_THRESHOLD - weekSoFar);
+            reg = Math.min(hours, regCapacity);
+            ot = Math.max(0, hours - reg);
+        }
+
+        row.querySelector('.reg-input').value = reg.toFixed(2);
+        row.querySelector('.ot-input').value  = ot.toFixed(2);
+        row.querySelector('.dt-input').value  = dt.toFixed(2);
+        row.querySelector('.reg-preview').textContent = reg.toFixed(2);
+        row.querySelector('.ot-preview').textContent  = ot.toFixed(2);
+        row.querySelector('.dt-preview').textContent  = dt.toFixed(2);
+        row.querySelector('.total').textContent       = (reg + ot + dt).toFixed(2);
     }
 
-    // Split a "hours worked" number into Reg (≤8) + OT (8–16) + DT (>16)
-    // Example: 10 → 8 Reg + 2 OT.  6 → 6 Reg.  18 → 8 Reg + 8 OT + 2 DT.
-    function splitHours(h) {
-        h = parseFloat(h) || 0;
-        const reg = Math.min(h, 8);
-        const ot  = Math.max(0, Math.min(h, 16) - 8);
-        const dt  = Math.max(0, h - 16);
-        return { reg, ot, dt };
+    // When the date changes (or on first page load with crew members),
+    // fetch each crew member's already-logged week total so the split
+    // is accurate.
+    async function refreshWeekHours() {
+        const date = document.getElementById('date').value;
+        const rows = Array.from(document.querySelectorAll('tr[data-employee-id]'));
+        if (!date || rows.length === 0) return;
+
+        const empIds = rows.map(r => r.dataset.employeeId);
+        await Promise.all(empIds.map(async (id) => {
+            try {
+                const res = await fetch(`${WEEK_HOURS_URL}?employee_id=${id}&date=${encodeURIComponent(date)}`, {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                weekHoursMap[id] = data.week_hours_before ?? 0;
+                const row = document.querySelector(`tr[data-employee-id="${id}"]`);
+                if (row) {
+                    const badge = row.querySelector('.week-hours-badge');
+                    if (badge) {
+                        badge.textContent = `Week so far: ${Number(data.week_hours_before).toFixed(2)} hrs`;
+                        badge.className = 'week-hours-badge text-[11px] mt-0.5 ' +
+                            (data.week_hours_before >= 40 ? 'text-amber-600 font-semibold' : 'text-gray-500');
+                    }
+                }
+                // Re-run the split in case the user has already typed hours.
+                const row2 = document.querySelector(`tr[data-employee-id="${id}"]`);
+                if (row2) {
+                    const hw = row2.querySelector('.hours-worked');
+                    if (hw && hw.value) distributeHours(hw);
+                }
+            } catch (e) { /* network issue — leave weekHoursMap[id] undefined → treated as 0 */ }
+        }));
     }
 
-    function distributeHours(input) {
-        const row = input.closest('tr');
-        const { reg, ot, dt } = splitHours(input.value);
-        row.querySelector('input[name*="regular_hours"]').value     = reg;
-        row.querySelector('input[name*="overtime_hours"]').value    = ot;
-        row.querySelector('input[name*="double_time_hours"]').value = dt;
-        updateTotal(input);
-    }
-
-    // Apply a single hours value / per-diem toggle to EVERY row in the table.
+    // Push a quick-fill value from the blue toolbar down into every row.
     function applyBulkFill() {
         const hoursWorked = document.getElementById('bulk_hours_worked').value;
+        const forceOtSel  = document.getElementById('bulk_force_ot').value;
         const perDiemSel  = document.getElementById('bulk_per_diem').value;
         const perDiemAmt  = document.getElementById('bulk_per_diem_amount').value;
-        let touched = 0;
 
-        document.querySelectorAll('.hours-worked').forEach((input) => {
-            if (hoursWorked !== '') {
-                input.value = hoursWorked;
-                distributeHours(input);
-                touched++;
+        document.querySelectorAll('tr[data-employee-id]').forEach((row) => {
+            const hoursInput = row.querySelector('.hours-worked');
+            const forceOtInput = row.querySelector('.force-ot');
+
+            if (hoursWorked !== '' && hoursInput) {
+                hoursInput.value = hoursWorked;
             }
+            if (forceOtSel === '1' && forceOtInput) forceOtInput.checked = true;
+            else if (forceOtSel === '0' && forceOtInput) forceOtInput.checked = false;
+
+            if (hoursInput) distributeHours(hoursInput);
         });
 
         document.querySelectorAll('input[name*="[per_diem]"]').forEach((cb) => {
@@ -275,5 +342,10 @@
             Toast.fire({icon:'success', title:'Applied to all rows'});
         }
     }
+
+    // First load: if the date field is pre-filled (old() or defaults), fetch.
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.getElementById('date').value) refreshWeekHours();
+    });
 </script>
 @endsection

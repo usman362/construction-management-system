@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Project;
 use App\Models\Timesheet;
 use App\Models\TimesheetCostAllocation;
+use App\Services\OvertimeCalculator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -29,8 +30,8 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  *     created using "Last, First" split.
  *   - Projects are matched by project_number = Job. Missing ones are
  *     created with Customer/Jobsite as name.
- *   - Hours are summed for non-"Per Diem" classifications then split:
- *       ≤8 → regular, 8–16 → overtime, >16 → double-time.
+ *   - Hours are summed for non-"Per Diem" classifications then split via
+ *     App\Services\OvertimeCalculator using the weekly-40 rule (Mon–Sun).
  *   - "Per Diem" classification rows contribute per_diem_amount =
  *     (sum of Labor Hours) × project.default_per_diem_rate.
  *   - Existing timesheets (same employee_id + project_id + date) are
@@ -181,11 +182,19 @@ class ImportPayrollPreprocessor extends Command
                 }
                 $project = $projectsByNumber[$projKey];
 
-                // Split hours: ≤8 reg / 8-16 OT / >16 DT
+                // Split hours using the same weekly-40 rule the UI uses, so
+                // imports stay consistent with manual entries (Mon–Sun week).
                 $total = (float) $g['hours'];
-                $reg = min($total, 8);
-                $ot  = max(0, min($total, 16) - 8);
-                $dt  = max(0, $total - 16);
+                $split = app(OvertimeCalculator::class)->splitWeekly(
+                    $employee,
+                    $g['date'],
+                    $total,
+                    false,
+                    null
+                );
+                $reg = $split['regular'];
+                $ot  = $split['overtime'];
+                $dt  = $split['double'];
 
                 // Per-diem dollars
                 $rate = (float) ($project->default_per_diem_rate ?? 0);

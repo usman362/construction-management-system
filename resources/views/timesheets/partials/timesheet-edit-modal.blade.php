@@ -49,10 +49,34 @@
                     @endforeach
                 </select>
             </div>
+            {{-- Hours Worked shortcut: typing a total here tells the server to re-split into
+                 Reg/OT using the weekly 40-hr rule. Leaving it blank keeps the Reg/OT/DT
+                 values you type below as-is (manual override). --}}
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-blue-900 mb-1">Hours Worked (re-split)</label>
+                        <input type="number" step="0.25" min="0" name="hours_worked" id="edit_hours_worked" placeholder="blank = keep current" class="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <p class="text-[11px] text-blue-700 mt-1">OT after 40 hrs/week.</p>
+                    </div>
+                    <div class="flex items-end pb-1">
+                        <label class="flex items-center gap-2">
+                            {{-- Sentinel so unchecked submits 0 --}}
+                            <input type="hidden" name="force_overtime" value="0">
+                            <input type="checkbox" name="force_overtime" id="edit_force_overtime" value="1" class="w-4 h-4 border border-amber-400 rounded focus:ring-2 focus:ring-amber-500">
+                            <span class="text-sm font-medium text-amber-900">Force OT</span>
+                        </label>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 text-xs">
+                        <div class="flex justify-between"><span class="text-gray-600">Week so far:</span> <span id="edit_week_so_far" class="font-semibold">—</span></div>
+                        <div class="flex justify-between"><span class="text-gray-600">→ Reg / OT:</span>   <span id="edit_split_preview" class="font-semibold">—</span></div>
+                    </div>
+                </div>
+            </div>
             <div class="grid grid-cols-4 gap-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Regular Hrs *</label><input type="number" step="0.5" name="regular_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Hrs</label><input type="number" step="0.5" name="overtime_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">DT Hrs</label><input type="number" step="0.5" name="double_time_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Regular Hrs</label><input type="number" step="0.25" name="regular_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">OT Hrs</label><input type="number" step="0.25" name="overtime_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">DT Hrs</label><input type="number" step="0.25" name="double_time_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Shift</label>
                     <select name="shift_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
@@ -63,10 +87,20 @@
                     </select>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
-                {{-- Hidden sentinel so an unchecked box still submits 0 (Laravel pattern) --}}
-                <input type="hidden" name="is_billable" value="0">
-                <label class="flex items-center gap-2"><input type="checkbox" name="is_billable" value="1" class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Billable</span></label>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="flex items-center gap-3 pt-5">
+                    {{-- Hidden sentinel so an unchecked box still submits 0 (Laravel pattern) --}}
+                    <input type="hidden" name="is_billable" value="0">
+                    <label class="flex items-center gap-2"><input type="checkbox" name="is_billable" value="1" class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Billable</span></label>
+                </div>
+                <div class="flex items-center gap-3 pt-5">
+                    <input type="hidden" name="per_diem" value="0">
+                    <label class="flex items-center gap-2"><input type="checkbox" name="per_diem" id="edit_per_diem" value="1" class="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"><span class="text-sm font-medium text-gray-700">Pay per diem</span></label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Per diem $</label>
+                    <input type="number" step="0.01" min="0" name="per_diem_amount" id="edit_per_diem_amount" placeholder="default" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
             </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
