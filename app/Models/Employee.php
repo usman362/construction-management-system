@@ -42,6 +42,7 @@ class Employee extends Model
         'employee_type',
         'department',
         'classification',
+        'default_cost_type_id',
         'is_supervisor',
         'certified_pay',
         'work_comp_code',
@@ -76,6 +77,13 @@ class Employee extends Model
     public function craft(): BelongsTo
     {
         return $this->belongsTo(Craft::class);
+    }
+
+    // Default cost type for this employee — used by bulk timesheet entry to
+    // pre-fill each row's Cost Type dropdown (still overridable per row).
+    public function defaultCostType(): BelongsTo
+    {
+        return $this->belongsTo(CostType::class, 'default_cost_type_id');
     }
 
     public function rotationGroup(): BelongsTo

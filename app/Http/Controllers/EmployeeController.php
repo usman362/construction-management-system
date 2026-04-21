@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Craft;
+use App\Models\CostType;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
@@ -124,11 +125,15 @@ class EmployeeController extends Controller
     {
         return view('employees.create', [
             'crafts' => Craft::orderBy('name')->get(),
+            'costTypes' => CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']),
         ]);
     }
 
     public function store(Request $request): JsonResponse|RedirectResponse
     {
+        // HTML <select> sends "" when the user leaves the dropdown on the
+        // blank option, which breaks FK integer columns (SQLSTATE 1366).
+        $this->normalizeNullableIds($request);
         $validated = $request->validate($this->employeeRules());
         $validated['is_supervisor'] = $request->boolean('is_supervisor');
         $validated['certified_pay'] = $request->boolean('certified_pay');
@@ -186,11 +191,13 @@ class EmployeeController extends Controller
         return view('employees.edit', [
             'employee' => $employee,
             'crafts' => $crafts,
+            'costTypes' => CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']),
         ]);
     }
 
     public function update(Request $request, Employee $employee): JsonResponse|RedirectResponse
     {
+        $this->normalizeNullableIds($request);
         $validated = $request->validate($this->employeeRules($employee->id));
         $validated['is_supervisor'] = $request->boolean('is_supervisor');
         $validated['certified_pay'] = $request->boolean('certified_pay');
@@ -218,6 +225,18 @@ class EmployeeController extends Controller
             'success' => true,
             'message' => 'Employee deleted successfully.',
         ]);
+    }
+
+    /**
+     * Empty "" from optional FK <select>s → null before validate/save.
+     */
+    private function normalizeNullableIds(Request $request): void
+    {
+        foreach (['craft_id', 'default_cost_type_id', 'rotation_group_id'] as $k) {
+            if ($request->input($k) === '') {
+                $request->merge([$k => null]);
+            }
+        }
     }
 
     /**
@@ -257,6 +276,7 @@ class EmployeeController extends Controller
             'employee_type'       => 'nullable|string|max:100',
             'department'          => 'nullable|string|max:100',
             'classification'      => 'nullable|string|max:100',
+            'default_cost_type_id'=> 'nullable|exists:cost_types,id',
             'is_supervisor'       => 'nullable|boolean',
             'certified_pay'       => 'nullable|boolean',
             'work_comp_code'      => 'nullable|string|max:50',

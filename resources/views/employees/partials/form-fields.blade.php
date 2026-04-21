@@ -178,7 +178,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Union</label>
             <input type="text" name="union" value="{{ $val('union') }}"
@@ -188,6 +188,18 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Classification</label>
             <input type="text" name="classification" value="{{ $val('classification') }}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Default Cost Type</label>
+            {{-- Used by Bulk Timesheet Entry to pre-fill this employee's Cost
+                 Type row (Direct Labor / Indirect Labor / Equipment / etc.).
+                 Still overridable per timesheet. --}}
+            <select name="default_cost_type_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">— None —</option>
+                @foreach ($costTypes ?? [] as $ct)
+                    <option value="{{ $ct->id }}" @selected((string) $val('default_cost_type_id') === (string) $ct->id)>{{ $ct->code }} — {{ $ct->name }}</option>
+                @endforeach
+            </select>
         </div>
         <div class="flex items-center gap-6 pt-6">
             <label class="inline-flex items-center gap-2">

@@ -62,14 +62,23 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
-                    <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                        <option value="">Any status</option>
-                        <option value="draft">Draft</option>
-                        <option value="submitted">Submitted</option>
-                        <option value="approved">Approved</option>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Crew <span class="text-gray-400 font-normal">(Print by crew)</span></label>
+                    <select name="crew_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">All crews</option>
+                        @foreach($crews as $c)
+                            <option value="{{ $c->id }}">{{ $c->name }}@if($c->project) ({{ $c->project->name }})@endif</option>
+                        @endforeach
                     </select>
                 </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                    <option value="">Any status</option>
+                    <option value="draft">Draft</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="approved">Approved</option>
+                </select>
             </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
@@ -130,14 +139,32 @@
                     </select>
                 </div>
             </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phase code</label>
+                    <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— Optional —</option>
+                        @foreach($costCodes ?? [] as $cc)
+                            <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                    {{-- Direct Labor / Indirect Labor etc. — feeds cost analyst's
+                         labor-cost breakdowns so single-entry timesheets get the
+                         same categorization as bulk entries. --}}
+                    <select name="cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— Optional —</option>
+                        @foreach($costTypes ?? [] as $ct)
+                            <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Phase code</label>
-                <select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                    <option value="">— Optional —</option>
-                    @foreach($costCodes ?? [] as $cc)
-                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
-                    @endforeach
-                </select>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Work Order # <span class="text-gray-400 font-normal">(shop's internal WO, optional)</span></label>
+                <input type="text" name="work_order_number" maxlength="100" placeholder="e.g. WO-12345" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
             </div>
             {{-- Hours Worked shortcut — type a daily total and the server re-splits
                  into Reg/OT using the weekly 40-hr rule. Leave blank if you're

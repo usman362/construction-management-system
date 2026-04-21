@@ -14,6 +14,7 @@ class ProjectBillableRate extends Model
         'craft_id',
         'employee_id',
         'base_hourly_rate',
+        'base_ot_hourly_rate',
         // Straight-time markup rates
         'payroll_tax_rate',
         'burden_rate',
@@ -40,6 +41,7 @@ class ProjectBillableRate extends Model
 
     protected $casts = [
         'base_hourly_rate' => 'decimal:2',
+        'base_ot_hourly_rate' => 'decimal:4',
         'payroll_tax_rate' => 'decimal:4',
         'burden_rate' => 'decimal:4',
         'insurance_rate' => 'decimal:4',
@@ -126,13 +128,20 @@ class ProjectBillableRate extends Model
             $otMarkup = $stMarkup;
         }
 
+        // OT base rate: use explicit `base_ot_hourly_rate` when client has set it
+        // (union/prevailing wage schedules where OT isn't 1.5× ST), otherwise
+        // default to ST base × 1.5.
+        $otBase = $this->base_ot_hourly_rate !== null && (float) $this->base_ot_hourly_rate > 0
+            ? (float) $this->base_ot_hourly_rate
+            : $base * 1.5;
+
         // ST Billable = ST Base × (1 + ST markups)
-        // OT Billable = OT Base (ST Base × 1.5) × (1 + OT markups)
-        // DT Billable = DT Base (ST Base × 2)   × (1 + OT markups)
-        // Matches client's Calculation Rate Sheet: OT has its own burdens,
-        // not a blind 1.5× of the ST billable.
+        // OT Billable = OT Base × (1 + OT markups)
+        // DT Billable = (ST Base × 2) × (1 + OT markups)
+        // Matches client's Calculation Rate Sheet: OT has its own burdens and
+        // its own base, not a blind 1.5× of the ST billable.
         $straightTimeRate = $base * (1 + $stMarkup);
-        $overtimeRate     = ($base * 1.5) * (1 + $otMarkup);
+        $overtimeRate     = $otBase * (1 + $otMarkup);
         $doubleTimeRate   = ($base * 2.0) * (1 + $otMarkup);
 
         return [
@@ -212,7 +221,7 @@ class ProjectBillableRate extends Model
         static::saving(function (self $model) {
             // Auto-calculate loaded rates if base rate is set and rates aren't already calculated
             if ($model->base_hourly_rate && (!$model->straight_time_rate || $model->isDirty([
-                'base_hourly_rate',
+                'base_hourly_rate', 'base_ot_hourly_rate',
                 'payroll_tax_rate', 'payroll_tax_ot_rate',
                 'burden_rate',      'burden_ot_rate',
                 'insurance_rate',   'insurance_ot_rate',

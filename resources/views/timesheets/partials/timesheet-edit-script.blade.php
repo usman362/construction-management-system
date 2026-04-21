@@ -59,8 +59,10 @@ function editTimesheet(id, dt) {
         setSelect('employee_id', d.employee_id);
         setSelect('project_id', d.project_id);
         setSelect('cost_code_id', d.cost_code_id);
+        setSelect('cost_type_id', d.cost_type_id);
         setSelect('crew_id', d.crew_id);
         setSelect('shift_id', d.shift_id);
+        f.querySelector('[name="work_order_number"]').value = d.work_order_number ?? '';
         f.querySelector('[name="regular_hours"]').value = d.regular_hours;
         f.querySelector('[name="overtime_hours"]').value = d.overtime_hours ?? '';
         f.querySelector('[name="double_time_hours"]').value = d.double_time_hours ?? '';

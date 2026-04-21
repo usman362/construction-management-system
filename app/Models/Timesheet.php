@@ -16,6 +16,7 @@ class Timesheet extends Model
         'crew_id',
         'date',
         'shift_id',
+        'work_order_number',
         'regular_hours',
         'overtime_hours',
         'double_time_hours',

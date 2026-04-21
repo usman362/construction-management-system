@@ -14,6 +14,7 @@ use App\Services\OvertimeCalculator;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 
 class TimesheetController extends Controller
 {
@@ -152,6 +153,7 @@ class TimesheetController extends Controller
             'crew_id' => 'nullable|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'nullable|exists:shifts,id',
+            'work_order_number' => 'nullable|string|max:100',
             // Either enter a single "hours_worked" total (system splits into
             // Reg/OT via the weekly-40 rule) OR override each bucket manually.
             'hours_worked' => 'nullable|numeric|min:0',
@@ -194,6 +196,7 @@ class TimesheetController extends Controller
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
+            'work_order_number' => $validated['work_order_number'] ?? null,
             'gate_log_hours' => $validated['gate_log_hours'] ?? null,
             'work_through_lunch' => $request->boolean('work_through_lunch'),
             'client_signature' => $validated['client_signature'] ?? null,
@@ -376,6 +379,7 @@ class TimesheetController extends Controller
             'crew_id' => 'nullable|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'nullable|exists:shifts,id',
+            'work_order_number' => 'nullable|string|max:100',
             'hours_worked' => 'nullable|numeric|min:0',
             'regular_hours' => 'nullable|numeric|min:0',
             'overtime_hours' => 'nullable|numeric|min:0',
@@ -421,6 +425,7 @@ class TimesheetController extends Controller
             'crew_id' => $validated['crew_id'] ?? null,
             'date' => $validated['date'],
             'shift_id' => $validated['shift_id'] ?? null,
+            'work_order_number' => $validated['work_order_number'] ?? null,
             'gate_log_hours' => $validated['gate_log_hours'] ?? null,
             'work_through_lunch' => $request->boolean('work_through_lunch'),
             'client_signature' => $validated['client_signature'] ?? $timesheet->client_signature,
@@ -552,22 +557,39 @@ class TimesheetController extends Controller
         ]);
     }
 
-    public function bulkStore(Request $request): JsonResponse
+    public function bulkStore(Request $request): JsonResponse|RedirectResponse
     {
+        // Normalize empty strings to null for nullable columns — HTML forms
+        // send "" for unselected <select> and empty inputs, and MySQL rejects
+        // ""  on integer FK / numeric columns (SQLSTATE 1366). This was
+        // causing "Server Error" when a user hit "Create All Timesheets"
+        // without picking a per-row Cost Type or filling Gate Log hours.
         $request->merge([
             'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
             'cost_type_id' => $request->filled('cost_type_id') ? $request->cost_type_id : null,
         ]);
+        $entries = $request->input('entries', []);
+        foreach ($entries as $i => $row) {
+            foreach (['cost_type_id', 'gate_log_hours', 'per_diem_amount',
+                      'hours_worked', 'regular_hours', 'overtime_hours', 'double_time_hours'] as $col) {
+                if (array_key_exists($col, $row) && $row[$col] === '') {
+                    $entries[$i][$col] = null;
+                }
+            }
+        }
+        $request->merge(['entries' => $entries]);
 
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
             'crew_id' => 'required|exists:crews,id',
             'date' => 'required|date',
             'shift_id' => 'required|exists:shifts,id',
+            'work_order_number' => 'nullable|string|max:100',
             'cost_code_id' => 'nullable|exists:cost_codes,id',
             'cost_type_id' => 'nullable|exists:cost_types,id',
             'entries' => 'required|array|min:1',
             'entries.*.employee_id' => 'required|exists:employees,id',
+            'entries.*.work_order_number' => 'nullable|string|max:100',
             // Preferred path: single "hours_worked" input per row → calculator splits.
             'entries.*.hours_worked' => 'nullable|numeric|min:0',
             // Manual override path: explicit per-bucket entry.
@@ -615,6 +637,11 @@ class TimesheetController extends Controller
                 'crew_id' => $validated['crew_id'],
                 'date' => $validated['date'],
                 'shift_id' => $validated['shift_id'],
+                // Per-row work order # wins; falls back to the crew-level
+                // work order # entered at the top of the form.
+                'work_order_number' => $entry['work_order_number']
+                    ?? $validated['work_order_number']
+                    ?? null,
                 'regular_hours' => $reg,
                 'overtime_hours' => $ot,
                 'double_time_hours' => $dt,

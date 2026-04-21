@@ -123,8 +123,19 @@
                 </div>
 
                 <div>
-                    <label for="create_base_hourly_rate" class="block text-sm font-medium text-gray-700 mb-2">Base Hourly Rate *</label>
+                    <label for="create_base_hourly_rate" class="block text-sm font-medium text-gray-700 mb-2">Base ST Hourly Rate *</label>
                     <input type="number" name="base_hourly_rate" id="create_base_hourly_rate" step="0.01" min="0" required class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="0.00">
+                </div>
+
+                <div>
+                    <label for="create_base_ot_hourly_rate" class="block text-sm font-medium text-gray-700 mb-2">
+                        Base OT Hourly Rate
+                        <span class="text-gray-400 text-xs font-normal">(blank = 1.5× ST)</span>
+                    </label>
+                    {{-- Client asked for a dedicated OT base so union/prevailing-wage
+                         schedules (where OT ≠ 1.5× ST) feed the OT Billable calc
+                         correctly. Leaving blank keeps the legacy 1.5× behavior. --}}
+                    <input type="number" name="base_ot_hourly_rate" id="create_base_ot_hourly_rate" step="0.0001" min="0" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="e.g. 60.0000">
                 </div>
 
                 <div>
@@ -214,8 +225,16 @@
                 </div>
 
                 <div>
-                    <label for="edit_base_hourly_rate" class="block text-sm font-medium text-gray-700 mb-2">Base Hourly Rate *</label>
+                    <label for="edit_base_hourly_rate" class="block text-sm font-medium text-gray-700 mb-2">Base ST Hourly Rate *</label>
                     <input type="number" name="base_hourly_rate" id="edit_base_hourly_rate" step="0.01" min="0" required class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="0.00">
+                </div>
+
+                <div>
+                    <label for="edit_base_ot_hourly_rate" class="block text-sm font-medium text-gray-700 mb-2">
+                        Base OT Hourly Rate
+                        <span class="text-gray-400 text-xs font-normal">(blank = 1.5× ST)</span>
+                    </label>
+                    <input type="number" name="base_ot_hourly_rate" id="edit_base_ot_hourly_rate" step="0.0001" min="0" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="e.g. 60.0000">
                 </div>
 
                 <div>
@@ -401,6 +420,7 @@
     function computeRatesFor(prefix) {
         const v = (id) => parseFloat(document.getElementById(prefix + '_' + id)?.value) || 0;
         const baseRate = v('base_hourly_rate');
+        const baseOtRate = v('base_ot_hourly_rate');
 
         const stMarkup = v('payroll_tax_rate') + v('burden_rate') + v('insurance_rate')
             + v('job_expenses_rate') + v('consumables_rate') + v('overhead_rate') + v('profit_rate');
@@ -408,7 +428,9 @@
             + v('job_expenses_ot_rate') + v('consumables_ot_rate') + v('overhead_ot_rate') + v('profit_ot_rate');
 
         const stBase = baseRate;
-        const otBase = baseRate * 1.5;
+        // Use the dedicated OT base when entered (union/prevailing wage where
+        // OT ≠ 1.5× ST); otherwise default to 1.5× ST so legacy rows still work.
+        const otBase = baseOtRate > 0 ? baseOtRate : baseRate * 1.5;
         const dtBase = baseRate * 2;
 
         // If OT markups all 0 (e.g. during initial data entry), fall back to
@@ -439,6 +461,8 @@
     // Attach event listeners for create form inputs
     document.getElementById('create_base_hourly_rate').addEventListener('change', updateCreatePreview);
     document.getElementById('create_base_hourly_rate').addEventListener('keyup', updateCreatePreview);
+    document.getElementById('create_base_ot_hourly_rate').addEventListener('change', updateCreatePreview);
+    document.getElementById('create_base_ot_hourly_rate').addEventListener('keyup', updateCreatePreview);
     document.querySelectorAll('.create-rate-input').forEach(function(input) {
         input.addEventListener('change', updateCreatePreview);
         input.addEventListener('keyup', updateCreatePreview);
@@ -447,6 +471,8 @@
     // Attach event listeners for edit form inputs
     document.getElementById('edit_base_hourly_rate').addEventListener('change', updateEditPreview);
     document.getElementById('edit_base_hourly_rate').addEventListener('keyup', updateEditPreview);
+    document.getElementById('edit_base_ot_hourly_rate').addEventListener('change', updateEditPreview);
+    document.getElementById('edit_base_ot_hourly_rate').addEventListener('keyup', updateEditPreview);
     document.querySelectorAll('.edit-rate-input').forEach(function(input) {
         input.addEventListener('change', updateEditPreview);
         input.addEventListener('keyup', updateEditPreview);
@@ -461,6 +487,12 @@
             $('#edit_craft_id').val(data.craft_id || '');
             $('#edit_employee_id').val(data.employee_id || '');
             $('#edit_base_hourly_rate').val(parseFloat(data.base_hourly_rate).toFixed(2));
+            // base_ot_hourly_rate is optional — only populate if the server
+            // returned a value so the placeholder ("blank = 1.5× ST") still
+            // shows on legacy rows that never set it.
+            $('#edit_base_ot_hourly_rate').val(data.base_ot_hourly_rate != null && parseFloat(data.base_ot_hourly_rate) > 0
+                ? parseFloat(data.base_ot_hourly_rate).toFixed(4)
+                : '');
             $('#edit_payroll_tax_rate').val(parseFloat(data.payroll_tax_rate || 0).toFixed(4));
             $('#edit_burden_rate').val(parseFloat(data.burden_rate || 0).toFixed(4));
             $('#edit_insurance_rate').val(parseFloat(data.insurance_rate || 0).toFixed(4));

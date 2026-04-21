@@ -40,14 +40,29 @@
                     </select>
                 </div>
             </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phase code</label>
+                    <select name="cost_code_id" id="edit_cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— Optional —</option>
+                        @foreach($costCodes ?? [] as $cc)
+                            <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                    <select name="cost_type_id" id="edit_cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— Optional —</option>
+                        @foreach($costTypes ?? [] as $ct)
+                            <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Phase code</label>
-                <select name="cost_code_id" id="edit_cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                    <option value="">— Optional —</option>
-                    @foreach($costCodes ?? [] as $cc)
-                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
-                    @endforeach
-                </select>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Work Order # <span class="text-gray-400 font-normal">(shop's internal WO, optional)</span></label>
+                <input type="text" name="work_order_number" id="edit_work_order_number" maxlength="100" placeholder="e.g. WO-12345" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
             </div>
             {{-- Hours Worked shortcut: typing a total here tells the server to re-split into
                  Reg/OT using the weekly 40-hr rule. Leaving it blank keeps the Reg/OT/DT
