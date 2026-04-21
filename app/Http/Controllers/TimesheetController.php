@@ -118,7 +118,7 @@ class TimesheetController extends Controller
                 'cost_code' => $timesheet->costCode?->code ?? '—',
                 'crew_id' => $timesheet->crew_id,
                 'crew_name' => $timesheet->crew->name ?? '—',
-                'date' => $timesheet->date,
+                'date' => optional($timesheet->date)->format('Y-m-d'),
                 'shift_id' => $timesheet->shift_id,
                 'regular_hours' => $timesheet->regular_hours,
                 'overtime_hours' => $timesheet->overtime_hours,

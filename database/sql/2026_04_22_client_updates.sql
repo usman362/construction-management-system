@@ -84,7 +84,38 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 
 -- -----------------------------------------------------------------------------
--- 4. Record these migrations in Laravel's `migrations` table so
+-- 4. budget_lines — relax unique key from (project_id, cost_code_id)
+--    to (project_id, cost_code_id, cost_type_id) so the same phase code
+--    can be budgeted twice on a project (e.g. Direct Labor + Indirect Labor
+--    both on 01.10.000).
+-- -----------------------------------------------------------------------------
+SET @old_idx := (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'budget_lines'
+      AND INDEX_NAME   = 'budget_lines_project_id_cost_code_id_unique'
+);
+SET @sql := IF(@old_idx > 0,
+    'ALTER TABLE `budget_lines` DROP INDEX `budget_lines_project_id_cost_code_id_unique`',
+    'SELECT "budget_lines old unique index already dropped — skipped" AS note'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @new_idx := (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'budget_lines'
+      AND INDEX_NAME   = 'budget_lines_project_cost_code_cost_type_unique'
+);
+SET @sql := IF(@new_idx = 0,
+    'ALTER TABLE `budget_lines` ADD UNIQUE KEY `budget_lines_project_cost_code_cost_type_unique` (`project_id`, `cost_code_id`, `cost_type_id`)',
+    'SELECT "budget_lines new unique index already exists — skipped" AS note'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+
+-- -----------------------------------------------------------------------------
+-- 5. Record these migrations in Laravel's `migrations` table so
 --    `php artisan migrate` will NOT try to re-run them on the live server.
 --    Uses a single new batch = (max existing batch + 1). Per-row existence
 --    check (INSERT … SELECT … WHERE NOT EXISTS) so re-running the file is safe
@@ -114,6 +145,13 @@ FROM DUAL WHERE NOT EXISTS (
     WHERE `migration` = '2026_04_22_000003_add_base_ot_hourly_rate_to_project_billable_rates'
 );
 
+INSERT INTO `migrations` (`migration`, `batch`)
+SELECT '2026_04_22_000004_relax_budget_lines_unique_to_include_cost_type', @next_batch
+FROM DUAL WHERE NOT EXISTS (
+    SELECT 1 FROM `migrations`
+    WHERE `migration` = '2026_04_22_000004_relax_budget_lines_unique_to_include_cost_type'
+);
+
 
 -- -----------------------------------------------------------------------------
 -- Verification — optional; run these to confirm the columns landed.
@@ -121,4 +159,5 @@ FROM DUAL WHERE NOT EXISTS (
 -- SHOW COLUMNS FROM `timesheets`             LIKE 'work_order_number';
 -- SHOW COLUMNS FROM `employees`              LIKE 'default_cost_type_id';
 -- SHOW COLUMNS FROM `project_billable_rates` LIKE 'base_ot_hourly_rate';
+-- SHOW INDEX FROM `budget_lines` WHERE Key_name LIKE '%unique';
 -- SELECT * FROM `migrations` WHERE `migration` LIKE '2026_04_22_%';

@@ -68,6 +68,13 @@
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Committed</p>
             <p class="text-2xl font-bold text-gray-900">${{ number_format($committedTotal ?? 0, 0) }}</p>
+            {{-- Breakdown so the user can see how much of "Committed" came
+                 from vendor POs vs labor hours booked on timesheets. --}}
+            <p class="text-[11px] text-gray-500 mt-1">
+                POs/Subs ${{ number_format($vendorCommitted ?? 0, 0) }}
+                &nbsp;·&nbsp;
+                Labor ${{ number_format($laborCommitted ?? 0, 0) }}
+            </p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Profit</p>
@@ -232,7 +239,16 @@
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->budget_amount ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->revised_amount ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">{{ number_format($line->labor_hours ?? 0, 2) }} hrs</td>
-                                    <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->committed ?? 0, 2) }}</td>
+                                    <td class="px-4 py-2 text-right text-gray-900">
+                                        ${{ number_format($line->committed ?? 0, 2) }}
+                                        @if(($line->committed_labor ?? 0) > 0 && ($line->committed_vendor ?? 0) > 0)
+                                            <div class="text-[10px] text-gray-400 leading-tight">
+                                                V ${{ number_format($line->committed_vendor, 0) }} · L ${{ number_format($line->committed_labor, 0) }}
+                                            </div>
+                                        @elseif(($line->committed_labor ?? 0) > 0)
+                                            <div class="text-[10px] text-gray-400 leading-tight">Labor</div>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format($line->invoiced ?? 0, 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">${{ number_format(($line->revised_amount ?? 0) - ($line->committed ?? 0), 2) }}</td>
                                     <td class="px-4 py-2 text-right text-gray-900">{{ $line->percent_complete ?? 0 }}%</td>
@@ -472,6 +488,8 @@
                                 <tr>
                                     <th class="px-3 py-2 text-left font-semibold text-gray-700">Phase Code</th>
                                     <th class="px-3 py-2 text-left font-semibold text-gray-700">Name</th>
+                                    <th class="px-3 py-2 text-right font-semibold text-gray-700">Vendor POs / Subs</th>
+                                    <th class="px-3 py-2 text-right font-semibold text-gray-700">Labor</th>
                                     <th class="px-3 py-2 text-right font-semibold text-gray-700">Total Committed</th>
                                 </tr>
                             </thead>
@@ -480,11 +498,21 @@
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-3 py-2 text-gray-900 font-mono text-xs">{{ $cost->code ?? '—' }}</td>
                                         <td class="px-3 py-2 text-gray-700">{{ $cost->description ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-right text-gray-700">${{ number_format($cost->vendor ?? 0, 2) }}</td>
+                                        <td class="px-3 py-2 text-right text-gray-700">${{ number_format($cost->labor ?? 0, 2) }}</td>
                                         <td class="px-3 py-2 text-right text-gray-900 font-medium">${{ number_format($cost->total ?? 0, 2) }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="3" class="px-3 py-4 text-center text-gray-500">No cost data available.</td></tr>
+                                    <tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">No cost data available.</td></tr>
                                 @endforelse
+                                @if($costSummary->count() > 0)
+                                    <tr class="bg-gray-50 font-semibold">
+                                        <td class="px-3 py-2 text-gray-900" colspan="2">Total</td>
+                                        <td class="px-3 py-2 text-right text-gray-900">${{ number_format($costSummary->sum('vendor'), 2) }}</td>
+                                        <td class="px-3 py-2 text-right text-gray-900">${{ number_format($costSummary->sum('labor'), 2) }}</td>
+                                        <td class="px-3 py-2 text-right text-gray-900">${{ number_format($costSummary->sum('total'), 2) }}</td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
                     </div>

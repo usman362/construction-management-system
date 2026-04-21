@@ -148,17 +148,48 @@ class ProjectController extends Controller
         $invoices = $project->invoices;
         $timesheets = $project->timesheets ?? collect();
 
+        // Client's definition of "committed cost" = vendor POs/subcontracts +
+        // labor already booked on timesheets. Construction-industry standard:
+        // anything we've already agreed/worked on counts as committed spend.
+        // Rejected timesheets are excluded because they represent entries
+        // the approver rolled back.
+        $laborTimesheets = $timesheets->where('status', '!=', 'rejected');
+        $laborCommitted = (float) $laborTimesheets->sum('total_cost');
+
         $budgetTotal = $budgetLines->sum('amount');
-        $committedTotal = $commitments->sum('amount');
+        $vendorCommitted = (float) $commitments->sum('amount');
+        $committedTotal = $vendorCommitted + $laborCommitted;
         $invoicedTotal = $invoices->sum('amount');
         $coTotal = $changeOrders->where('status', 'approved')->sum('amount');
 
-        // Cost summary grouped by cost code
-        $costSummary = $commitments->groupBy('cost_code_id')->map(function ($items, $key) {
+        // Cost summary grouped by cost code — now folds in labor cost from
+        // timesheets against the timesheet's own cost_code_id, so the per-
+        // code totals match what the budget-line table shows below.
+        $commitmentsByCostCode = $commitments->groupBy('cost_code_id');
+        $invoicesByCostCode    = $invoices->groupBy('cost_code_id');
+        $laborByCostCode       = $laborTimesheets->groupBy('cost_code_id');
+
+        $allCostCodeIds = collect()
+            ->merge($commitmentsByCostCode->keys())
+            ->merge($laborByCostCode->keys())
+            ->unique();
+
+        $costSummary = $allCostCodeIds->map(function ($ccId) use ($commitmentsByCostCode, $laborByCostCode) {
+            $vendor = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+            $labor  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
+
+            // Prefer a commitment's costCode (richer relation) for display;
+            // fall back to the first timesheet's costCode when a cost code is
+            // labor-only (no vendor commitment yet).
+            $sampleCostCode = ($commitmentsByCostCode[$ccId] ?? collect())->first()?->costCode
+                ?? ($laborByCostCode[$ccId] ?? collect())->first()?->costCode;
+
             return (object) [
-                'code' => $items->first()->costCode->code ?? 'N/A',
-                'description' => $items->first()->costCode->name ?? 'N/A',
-                'total' => $items->sum('amount'),
+                'code'        => $sampleCostCode->code ?? 'N/A',
+                'description' => $sampleCostCode->name ?? 'N/A',
+                'vendor'      => $vendor,
+                'labor'       => $labor,
+                'total'       => $vendor + $labor,
             ];
         })->values();
 
@@ -167,11 +198,12 @@ class ProjectController extends Controller
             ? min(round(($committedTotal / $revisedBudget) * 100, 1), 100)
             : 0;
 
-        $commitmentsByCostCode = $commitments->groupBy('cost_code_id');
-        $invoicesByCostCode = $invoices->groupBy('cost_code_id');
-
         foreach ($budgetLines as $line) {
-            $line->committed = ($commitmentsByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
+            $lineVendor = (float) ($commitmentsByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
+            $lineLabor  = (float) ($laborByCostCode[$line->cost_code_id] ?? collect())->sum('total_cost');
+            $line->committed_vendor = $lineVendor;
+            $line->committed_labor  = $lineLabor;
+            $line->committed = $lineVendor + $lineLabor;
             $line->invoiced = ($invoicesByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
             $revised = $line->revised_amount ?: $line->budget_amount;
             $line->percent_complete = $revised > 0 ? round(($line->committed / $revised) * 100, 1) : 0;
@@ -189,6 +221,8 @@ class ProjectController extends Controller
             'billingInvoices' => $billingInvoices,
             'budgetTotal' => $budgetTotal,
             'committedTotal' => $committedTotal,
+            'vendorCommitted' => $vendorCommitted,
+            'laborCommitted' => $laborCommitted,
             'invoicedTotal' => $invoicedTotal,
             'coTotal' => $coTotal,
             'balance' => ($budgetTotal + $coTotal) - $committedTotal,

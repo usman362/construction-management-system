@@ -234,7 +234,15 @@
 var table = $('#dataTable').DataTable({
     ajax: '{{ route("timesheets.index") }}',
     columns: [
-        {data:'date', render: d=>d?new Date(d).toLocaleDateString():'—'}, {data:'employee_name'}, {data:'project_name'}, {data:'cost_code'},
+        {data:'date', render: function(d) {
+            if (!d) return '—';
+            // Server sends Y-m-d string. Parse manually to avoid JS timezone shift
+            // (new Date("2026-03-31") is treated as UTC midnight and becomes 3/30 in US zones).
+            var s = String(d).substring(0, 10); // strip any T... suffix
+            var parts = s.split('-');
+            if (parts.length !== 3) return s;
+            return parts[1] + '/' + parts[2] + '/' + parts[0];
+        }}, {data:'employee_name'}, {data:'project_name'}, {data:'cost_code'},
         {data:'crew_name'},
         {data:'regular_hours', className:'text-right'}, {data:'overtime_hours', className:'text-right'}, {data:'double_time_hours', className:'text-right'},
         {data:'total_hours', className:'text-right font-semibold'}, {data:'cost', render: d=>'$'+parseFloat(d||0).toFixed(2), className:'text-right'},

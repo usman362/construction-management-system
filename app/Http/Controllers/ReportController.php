@@ -29,6 +29,13 @@ class ReportController extends Controller
         $budgetLines = $project->budgetLines()->with('costCode')->get();
         $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
         $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
+        // Labor committed = non-rejected timesheet total_cost grouped by the
+        // timesheet's own cost code. Matches the project dashboard so the
+        // Cost Report and the project-level "Committed" card agree.
+        $laborByCostCode = $project->timesheets()
+            ->where('status', '!=', 'rejected')
+            ->get()
+            ->groupBy('cost_code_id');
 
         $costCodeData = [];
 
@@ -42,18 +49,24 @@ class ReportController extends Controller
                     'name' => $line->costCode?->name ?? 'Unassigned',
                     'budget' => 0,
                     'committed' => 0,
+                    'committed_vendor' => 0,
+                    'committed_labor' => 0,
                     'invoiced' => 0,
                     'balance' => 0,
                     'percentage_complete' => 0,
                 ];
             }
 
-            $committed = ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+            $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+            $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
+            $committed = $vendorCommitted + $laborCommitted;
             $invoiced = ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
             $budget = $line->amount;
 
             $costCodeData[$code]['budget'] += $budget;
             $costCodeData[$code]['committed'] += $committed;
+            $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
+            $costCodeData[$code]['committed_labor'] += $laborCommitted;
             $costCodeData[$code]['invoiced'] += $invoiced;
             $costCodeData[$code]['balance'] += $budget - $committed;
             $costCodeData[$code]['percentage_complete'] = $costCodeData[$code]['budget'] > 0
@@ -96,6 +109,12 @@ class ReportController extends Controller
         $budgetLines = $project->budgetLines()->with('costCode')->get();
         $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
         $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
+        // Labor committed feeds into the Forecast report's "Committed" column
+        // the same way it does on the Cost Report and project dashboard.
+        $laborByCostCode = $project->timesheets()
+            ->where('status', '!=', 'rejected')
+            ->get()
+            ->groupBy('cost_code_id');
 
         $originalBudgetTotal = $budgetLines->sum('amount');
         $approvedCoTotal = $project->changeOrders()
@@ -116,17 +135,23 @@ class ReportController extends Controller
                     'original_budget' => 0,
                     'forecast_budget' => 0,
                     'committed' => 0,
+                    'committed_vendor' => 0,
+                    'committed_labor' => 0,
                     'invoiced' => 0,
                     'balance' => 0,
                 ];
             }
 
-            $committed = ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+            $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+            $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
+            $committed = $vendorCommitted + $laborCommitted;
             $invoiced = ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
 
             $costCodeData[$code]['original_budget'] += $line->amount;
             $costCodeData[$code]['forecast_budget'] += $line->amount;
             $costCodeData[$code]['committed'] += $committed;
+            $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
+            $costCodeData[$code]['committed_labor'] += $laborCommitted;
             $costCodeData[$code]['invoiced'] += $invoiced;
             $costCodeData[$code]['balance'] += $line->amount - $committed;
         }
@@ -575,9 +600,12 @@ class ReportController extends Controller
                 ->sum('budget_hours');
 
             // % complete: prefer cost-based (committed/budget $$). Fall back to actual/budget hours.
+            // Labor cost is folded in so booking timesheets against a cost code
+            // moves its % complete — matches the dashboard's new committed calc.
             $budgetDollars = (float) ($budgetLines->get($ccId)?->sum('amount') ?? 0);
             $committedDollars = (float) ($commitments->get($ccId)?->sum('amount') ?? 0)
-                + (float) ($invoices->get($ccId)?->sum('amount') ?? 0);
+                + (float) ($invoices->get($ccId)?->sum('amount') ?? 0)
+                + $laborCost;
 
             if ($budgetDollars > 0) {
                 $percentComplete = min($committedDollars / $budgetDollars, 1);
