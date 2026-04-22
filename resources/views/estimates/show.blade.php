@@ -128,7 +128,7 @@
                             <td class="px-6 py-4 text-sm text-right text-gray-900 font-semibold">${{ number_format($item->amount, 2) }}</td>
                             <td class="px-6 py-4 text-sm text-center text-gray-900">{{ $item->labor_hours ?? '-' }}</td>
                             <td class="px-6 py-4 text-sm text-center space-x-2">
-                                <button type="button" onclick="confirmDelete('{{ route('projects.estimates.remove-line', [$project, $estimate, $item]) }}', null, window.location.href)" class="text-red-600 hover:text-red-900">Delete</button>
+                                <button type="button" onclick="confirmDelete('{{ route('projects.estimates.remove-line', [$project, $item]) }}', null, window.location.href)" class="text-red-600 hover:text-red-900">Delete</button>
                             </td>
                         </tr>
                     @empty

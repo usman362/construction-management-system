@@ -4,6 +4,17 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
+    @if (session('success'))
+        <div class="mb-4 bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded">
+            {{ session('success') }}
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="mb-4 bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <div class="mb-6 flex justify-between items-center">
         <a href="{{ route('timesheets.index') }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Timesheets</a>
         <div class="space-x-2">

@@ -538,7 +538,7 @@ class ImportController extends Controller
             return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
         }
 
-        $header = $this->normalizeHeader(array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows), 'vendor');
         $allowedTypes = ['subcontractor', 'supplier', 'rental', 'other'];
 
         DB::transaction(function () use ($rows, $header, $allowedTypes, &$result) {
@@ -632,7 +632,7 @@ class ImportController extends Controller
             return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'CSV file is empty.']]]);
         }
 
-        $header = $this->normalizeHeader(array_shift($rows));
+        $header = $this->normalizeHeader(array_shift($rows), 'client');
 
         DB::transaction(function () use ($rows, $header, &$result) {
             foreach ($rows as $rowIndex => $row) {
@@ -859,8 +859,47 @@ class ImportController extends Controller
      * canonical snake_case names. E.g. "First Name" → "first_name",
      * "Employee ID" → "employee_number", "Emp #" → "employee_number".
      */
-    private function normalizeHeader(array $rawHeader): array
+    /**
+     * $context = 'employee' | 'vendor' | 'client' | 'cost_code' | null (default: all aliases)
+     *
+     * Without a context the employee-specific aliases (name→first_name,
+     * address→address_1, number→employee_number, id→employee_number) silently
+     * mangle vendor/client CSVs whose headers include a plain "name" or
+     * "address" column. Passing a context skips those aliases so vendor and
+     * client imports keep their canonical column names.
+     */
+    private function normalizeHeader(array $rawHeader, ?string $context = null): array
     {
+        // Aliases that are safe for ANY import (no ambiguity between entities).
+        $sharedAliases = [
+            'e-mail'            => 'email',
+            'email address'     => 'email',
+            'phone number'      => 'phone',
+            'telephone'         => 'phone',
+            'zip code'          => 'zip',
+            'zipcode'           => 'zip',
+            'postal code'       => 'zip',
+            'postal_code'       => 'zip',
+            'company'           => 'name',
+            'company name'      => 'name',
+            'vendor name'       => 'name',
+            'client name'       => 'name',
+            'contact'           => 'contact_name',
+            'contact name'      => 'contact_name',
+            'contact person'    => 'contact_name',
+            'vendor code'       => 'vendor_code',
+            'legacy code'       => 'vendor_code',
+            'legacy id'         => 'vendor_code',
+            'vendor type'       => 'type',
+            'active'            => 'is_active',
+            'preferred'         => 'is_preferred',
+        ];
+
+        // Vendor/client imports use only the shared aliases.
+        if ($context === 'vendor' || $context === 'client') {
+            return $this->applyAliases($rawHeader, $sharedAliases);
+        }
+
         $aliases = [
             // Employee variants
             'employee id'       => 'employee_number',
@@ -1027,18 +1066,23 @@ class ImportController extends Controller
             'sort'              => 'sort_order',
         ];
 
+        return $this->applyAliases($rawHeader, $aliases);
+    }
+
+    /**
+     * Apply an aliases map to raw headers + dedupe collisions (two columns that
+     * normalize to the same name get suffixed _2, _3, …).
+     */
+    private function applyAliases(array $rawHeader, array $aliases): array
+    {
         $normalized = array_map(function ($h) use ($aliases) {
             $name = strtolower(trim((string) $h));
-            // Direct match on alias
             if (isset($aliases[$name])) {
                 return $aliases[$name];
             }
-            // Already snake_case canonical
             return preg_replace('/[\s\-]+/', '_', $name);
         }, $rawHeader);
 
-        // Rename duplicate columns so both values are preserved
-        // (e.g., two "base_hourly_rate" columns → "base_hourly_rate", "base_hourly_rate_2")
         $seen = [];
         foreach ($normalized as $i => $col) {
             if (isset($seen[$col])) {

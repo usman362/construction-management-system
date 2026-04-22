@@ -433,29 +433,36 @@
         const otBase = baseOtRate > 0 ? baseOtRate : baseRate * 1.5;
         const dtBase = baseRate * 2;
 
-        // If OT markups all 0 (e.g. during initial data entry), fall back to
-        // ST markups so the preview still shows a reasonable OT figure.
-        const effectiveOtMarkup = otMarkup > 0 ? otMarkup : stMarkup;
+        // OT / DT only populate when the user has actually entered OT burdens —
+        // per client request, we do NOT silently inherit ST markups for OT.
+        // When OT markups are all zero, surface "—" so it is obvious the user
+        // still needs to enter OT burden values before billing those rates.
+        const hasOtMarkup = otMarkup > 0;
 
         return {
             st: stBase * (1 + stMarkup),
-            ot: otBase * (1 + effectiveOtMarkup),
-            dt: dtBase * (1 + effectiveOtMarkup),
+            ot: hasOtMarkup ? otBase * (1 + otMarkup) : null,
+            dt: hasOtMarkup ? dtBase * (1 + otMarkup) : null,
+            hasOtMarkup: hasOtMarkup,
         };
+    }
+
+    function formatRate(value) {
+        return value === null ? '—' : '$' + value.toFixed(2);
     }
 
     function updateCreatePreview() {
         const r = computeRatesFor('create');
         document.getElementById('create_st_rate_preview').textContent = '$' + r.st.toFixed(2);
-        document.getElementById('create_ot_rate_preview').textContent = '$' + r.ot.toFixed(2);
-        document.getElementById('create_dt_rate_preview').textContent = '$' + r.dt.toFixed(2);
+        document.getElementById('create_ot_rate_preview').textContent = formatRate(r.ot);
+        document.getElementById('create_dt_rate_preview').textContent = formatRate(r.dt);
     }
 
     function updateEditPreview() {
         const r = computeRatesFor('edit');
         document.getElementById('edit_st_rate_preview').textContent = '$' + r.st.toFixed(2);
-        document.getElementById('edit_ot_rate_preview').textContent = '$' + r.ot.toFixed(2);
-        document.getElementById('edit_dt_rate_preview').textContent = '$' + r.dt.toFixed(2);
+        document.getElementById('edit_ot_rate_preview').textContent = formatRate(r.ot);
+        document.getElementById('edit_dt_rate_preview').textContent = formatRate(r.dt);
     }
 
     // Attach event listeners for create form inputs

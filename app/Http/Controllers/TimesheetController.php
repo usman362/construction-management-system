@@ -492,7 +492,7 @@ class TimesheetController extends Controller
         ]);
     }
 
-    public function approve(Request $request, Timesheet $timesheet): JsonResponse
+    public function approve(Request $request, Timesheet $timesheet): JsonResponse|RedirectResponse
     {
         $timesheet->update([
             'status' => 'approved',
@@ -500,14 +500,23 @@ class TimesheetController extends Controller
             'approved_at' => now(),
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Timesheet approved.',
-            'timesheet' => $timesheet->fresh(),
-        ]);
+        // The Approve button on timesheets/show.blade.php is a plain HTML form, so a
+        // JSON response would render as raw text and look like an error page to the
+        // user. Only return JSON when the caller actually asked for it (AJAX).
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Timesheet approved.',
+                'timesheet' => $timesheet->fresh(),
+            ]);
+        }
+
+        return redirect()
+            ->route('timesheets.show', $timesheet)
+            ->with('success', 'Timesheet approved.');
     }
 
-    public function reject(Request $request, Timesheet $timesheet): JsonResponse
+    public function reject(Request $request, Timesheet $timesheet): JsonResponse|RedirectResponse
     {
         $request->validate([
             'rejection_reason' => 'nullable|string|max:2000',
@@ -523,11 +532,17 @@ class TimesheetController extends Controller
             'notes' => $notes,
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Timesheet rejected.',
-            'timesheet' => $timesheet->fresh(),
-        ]);
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Timesheet rejected.',
+                'timesheet' => $timesheet->fresh(),
+            ]);
+        }
+
+        return redirect()
+            ->route('timesheets.show', $timesheet)
+            ->with('success', 'Timesheet rejected.');
     }
 
     public function bulkCreate(Request $request): View

@@ -116,7 +116,9 @@ class ProjectBillableRate extends Model
             + (float) $this->profit_rate;
 
         // OT markup %: sum of OT-specific markups.
-        // Fall back to ST markup if no OT markups have been entered yet.
+        // Per client: DO NOT fall back to ST markups. If the user hasn't entered
+        // OT burdens yet, the loaded OT/DT rates stay at 0 — a clear signal
+        // that those rates aren't usable for billing until OT burdens are set.
         $otMarkup = (float) $this->payroll_tax_ot_rate
             + (float) $this->burden_ot_rate
             + (float) $this->insurance_ot_rate
@@ -124,9 +126,6 @@ class ProjectBillableRate extends Model
             + (float) $this->consumables_ot_rate
             + (float) $this->overhead_ot_rate
             + (float) $this->profit_ot_rate;
-        if ($otMarkup <= 0) {
-            $otMarkup = $stMarkup;
-        }
 
         // OT base rate: use explicit `base_ot_hourly_rate` when client has set it
         // (union/prevailing wage schedules where OT isn't 1.5× ST), otherwise
@@ -136,13 +135,10 @@ class ProjectBillableRate extends Model
             : $base * 1.5;
 
         // ST Billable = ST Base × (1 + ST markups)
-        // OT Billable = OT Base × (1 + OT markups)
-        // DT Billable = (ST Base × 2) × (1 + OT markups)
-        // Matches client's Calculation Rate Sheet: OT has its own burdens and
-        // its own base, not a blind 1.5× of the ST billable.
+        // OT / DT Billable = only computed once OT burdens are entered.
         $straightTimeRate = $base * (1 + $stMarkup);
-        $overtimeRate     = $otBase * (1 + $otMarkup);
-        $doubleTimeRate   = ($base * 2.0) * (1 + $otMarkup);
+        $overtimeRate     = $otMarkup > 0 ? $otBase * (1 + $otMarkup) : 0.0;
+        $doubleTimeRate   = $otMarkup > 0 ? ($base * 2.0) * (1 + $otMarkup) : 0.0;
 
         return [
             'straight_time' => round($straightTimeRate, 2),
