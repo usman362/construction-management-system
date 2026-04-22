@@ -430,19 +430,24 @@
         const stBase = baseRate;
         // Use the dedicated OT base when entered (union/prevailing wage where
         // OT ≠ 1.5× ST); otherwise default to 1.5× ST so legacy rows still work.
-        const otBase = baseOtRate > 0 ? baseOtRate : baseRate * 1.5;
+        const hasExplicitOtBase = baseOtRate > 0;
+        const otBase = hasExplicitOtBase ? baseOtRate : baseRate * 1.5;
         const dtBase = baseRate * 2;
 
-        // OT / DT only populate when the user has actually entered OT burdens —
-        // per client request, we do NOT silently inherit ST markups for OT.
-        // When OT markups are all zero, surface "—" so it is obvious the user
-        // still needs to enter OT burden values before billing those rates.
+        // OT/DT populate when the user has given us ANY OT signal — either an
+        // explicit Base OT Hourly Rate OR OT burden percentages. If only OT
+        // burdens are entered, apply them to the OT base. If only the Base OT
+        // rate is entered (no OT burdens yet), fall back to the ST markups so
+        // the preview reflects the OT base the user already typed. When the
+        // user has entered nothing OT-specific, show "—".
         const hasOtMarkup = otMarkup > 0;
+        const showOt = hasExplicitOtBase || hasOtMarkup;
+        const effectiveOtMarkup = hasOtMarkup ? otMarkup : stMarkup;
 
         return {
             st: stBase * (1 + stMarkup),
-            ot: hasOtMarkup ? otBase * (1 + otMarkup) : null,
-            dt: hasOtMarkup ? dtBase * (1 + otMarkup) : null,
+            ot: showOt ? otBase * (1 + effectiveOtMarkup) : null,
+            dt: showOt ? dtBase * (1 + effectiveOtMarkup) : null,
             hasOtMarkup: hasOtMarkup,
         };
     }

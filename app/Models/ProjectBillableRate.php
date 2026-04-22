@@ -116,9 +116,6 @@ class ProjectBillableRate extends Model
             + (float) $this->profit_rate;
 
         // OT markup %: sum of OT-specific markups.
-        // Per client: DO NOT fall back to ST markups. If the user hasn't entered
-        // OT burdens yet, the loaded OT/DT rates stay at 0 — a clear signal
-        // that those rates aren't usable for billing until OT burdens are set.
         $otMarkup = (float) $this->payroll_tax_ot_rate
             + (float) $this->burden_ot_rate
             + (float) $this->insurance_ot_rate
@@ -130,15 +127,21 @@ class ProjectBillableRate extends Model
         // OT base rate: use explicit `base_ot_hourly_rate` when client has set it
         // (union/prevailing wage schedules where OT isn't 1.5× ST), otherwise
         // default to ST base × 1.5.
-        $otBase = $this->base_ot_hourly_rate !== null && (float) $this->base_ot_hourly_rate > 0
-            ? (float) $this->base_ot_hourly_rate
-            : $base * 1.5;
+        $hasExplicitOtBase = $this->base_ot_hourly_rate !== null && (float) $this->base_ot_hourly_rate > 0;
+        $otBase = $hasExplicitOtBase ? (float) $this->base_ot_hourly_rate : $base * 1.5;
 
-        // ST Billable = ST Base × (1 + ST markups)
-        // OT / DT Billable = only computed once OT burdens are entered.
+        // OT / DT billable populates when the user has given ANY OT signal —
+        // an explicit Base OT Hourly Rate OR OT burden percentages. If only
+        // the Base OT is set (no OT burdens yet), fall back to ST markups so
+        // the loaded OT rate reflects the OT base the user already entered.
+        // When neither Base OT nor OT burdens are set, OT/DT stay at 0 — a
+        // clear signal those rates aren't usable for billing yet.
+        $showOt = $hasExplicitOtBase || $otMarkup > 0;
+        $effectiveOtMarkup = $otMarkup > 0 ? $otMarkup : $stMarkup;
+
         $straightTimeRate = $base * (1 + $stMarkup);
-        $overtimeRate     = $otMarkup > 0 ? $otBase * (1 + $otMarkup) : 0.0;
-        $doubleTimeRate   = $otMarkup > 0 ? ($base * 2.0) * (1 + $otMarkup) : 0.0;
+        $overtimeRate     = $showOt ? $otBase * (1 + $effectiveOtMarkup) : 0.0;
+        $doubleTimeRate   = $showOt ? ($base * 2.0) * (1 + $effectiveOtMarkup) : 0.0;
 
         return [
             'straight_time' => round($straightTimeRate, 2),

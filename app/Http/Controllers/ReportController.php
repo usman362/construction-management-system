@@ -38,6 +38,13 @@ class ReportController extends Controller
             ->groupBy('cost_code_id');
 
         $costCodeData = [];
+        // Commitments, invoices, and labor timesheets live at the cost_code_id level
+        // (not budget_line_id). When a project has multiple budget lines that share
+        // the same cost code — e.g. 01.10.000 split into Direct Labor + Indirect
+        // Labor — iterating per budget line would double-count the shared
+        // commitments/labor. Track which cost codes have already contributed their
+        // commitments so we only add them once per code.
+        $countedCostCodeIds = [];
 
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
@@ -57,20 +64,29 @@ class ReportController extends Controller
                 ];
             }
 
-            $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
-            $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-            $committed = $vendorCommitted + $laborCommitted;
-            $invoiced = ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
-            $budget = $line->amount;
+            // Budget is per-line — always accumulate so Direct + Indirect budgets sum
+            $costCodeData[$code]['budget'] += (float) $line->amount;
 
-            $costCodeData[$code]['budget'] += $budget;
-            $costCodeData[$code]['committed'] += $committed;
-            $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
-            $costCodeData[$code]['committed_labor'] += $laborCommitted;
-            $costCodeData[$code]['invoiced'] += $invoiced;
-            $costCodeData[$code]['balance'] += $budget - $committed;
-            $costCodeData[$code]['percentage_complete'] = $costCodeData[$code]['budget'] > 0
-                ? round(($costCodeData[$code]['committed'] / $costCodeData[$code]['budget']) * 100, 2)
+            // Commitments/invoices/labor are per-code — only add once per cost code
+            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
+                $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
+                $invoiced        = (float) ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
+
+                $costCodeData[$code]['committed']        += $vendorCommitted + $laborCommitted;
+                $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
+                $costCodeData[$code]['committed_labor']  += $laborCommitted;
+                $costCodeData[$code]['invoiced']         += $invoiced;
+
+                $countedCostCodeIds[] = $ccId;
+            }
+        }
+
+        // Finalize balance and % complete once totals are fully accumulated
+        foreach ($costCodeData as $code => $row) {
+            $costCodeData[$code]['balance'] = $row['budget'] - $row['committed'];
+            $costCodeData[$code]['percentage_complete'] = $row['budget'] > 0
+                ? round(($row['committed'] / $row['budget']) * 100, 2)
                 : 0;
         }
 
@@ -123,6 +139,11 @@ class ReportController extends Controller
         $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
 
         $costCodeData = [];
+        // See costReport(): when multiple budget lines share a cost code
+        // (Direct + Indirect Labor on the same phase code), commitments/labor/
+        // invoices must only be counted once per code — they live at the
+        // cost_code_id level, not the budget_line level.
+        $countedCostCodeIds = [];
 
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
@@ -142,18 +163,26 @@ class ReportController extends Controller
                 ];
             }
 
-            $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
-            $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-            $committed = $vendorCommitted + $laborCommitted;
-            $invoiced = ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
+            $costCodeData[$code]['original_budget'] += (float) $line->amount;
+            $costCodeData[$code]['forecast_budget'] += (float) $line->amount;
 
-            $costCodeData[$code]['original_budget'] += $line->amount;
-            $costCodeData[$code]['forecast_budget'] += $line->amount;
-            $costCodeData[$code]['committed'] += $committed;
-            $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
-            $costCodeData[$code]['committed_labor'] += $laborCommitted;
-            $costCodeData[$code]['invoiced'] += $invoiced;
-            $costCodeData[$code]['balance'] += $line->amount - $committed;
+            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
+                $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
+                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
+                $invoiced        = (float) ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
+
+                $costCodeData[$code]['committed']        += $vendorCommitted + $laborCommitted;
+                $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
+                $costCodeData[$code]['committed_labor']  += $laborCommitted;
+                $costCodeData[$code]['invoiced']         += $invoiced;
+
+                $countedCostCodeIds[] = $ccId;
+            }
+        }
+
+        // Finalize balance after all budget and committed totals are accumulated
+        foreach ($costCodeData as $code => $row) {
+            $costCodeData[$code]['balance'] = $row['forecast_budget'] - $row['committed'];
         }
 
         $manhourData = $this->getManHourForecastData($project, $validated);
@@ -691,21 +720,31 @@ class ReportController extends Controller
 
         $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
         $costCodeData = [];
+        // $line->commitments resolves via cost_code_id, so two budget lines with
+        // the same code (Direct + Indirect Labor) would double-count commitments.
+        // Aggregate commitments/invoices once per cost code; accumulate budget
+        // per line so the split budgets still sum correctly.
+        $countedCostCodeIds = [];
 
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
+            $ccId = $line->cost_code_id;
             if (!isset($costCodeData[$code])) {
                 $costCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0, 'percentage_complete' => 0];
             }
-            $committed = $line->commitments->sum('amount');
-            $invoiced = $line->invoices->sum('amount');
-            $budget = $line->amount;
-            $costCodeData[$code]['budget'] += $budget;
-            $costCodeData[$code]['committed'] += $committed;
-            $costCodeData[$code]['invoiced'] += $invoiced;
-            $costCodeData[$code]['balance'] += $budget - $committed;
-            $costCodeData[$code]['percentage_complete'] = $costCodeData[$code]['budget'] > 0
-                ? round(($costCodeData[$code]['committed'] / $costCodeData[$code]['budget']) * 100, 2) : 0;
+            $costCodeData[$code]['budget'] += (float) $line->amount;
+
+            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
+                $costCodeData[$code]['committed'] += (float) $line->commitments->sum('amount');
+                $costCodeData[$code]['invoiced']  += (float) $line->invoices->sum('amount');
+                $countedCostCodeIds[] = $ccId;
+            }
+        }
+
+        foreach ($costCodeData as $code => $row) {
+            $costCodeData[$code]['balance'] = $row['budget'] - $row['committed'];
+            $costCodeData[$code]['percentage_complete'] = $row['budget'] > 0
+                ? round(($row['committed'] / $row['budget']) * 100, 2) : 0;
         }
 
         $changeOrders = $project->changeOrders()->where('status', 'approved')->get();
@@ -734,18 +773,26 @@ class ReportController extends Controller
         $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
 
         $costCodeData = [];
+        // Prevent double-counting when multiple budget lines share a cost code
+        $countedCostCodeIds = [];
+
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
+            $ccId = $line->cost_code_id;
             if (!isset($costCodeData[$code])) {
                 $costCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'original_budget' => 0, 'forecast_budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
             }
-            $committed = $line->commitments->sum('amount');
-            $invoiced = $line->invoices->sum('amount');
-            $costCodeData[$code]['original_budget'] += $line->amount;
-            $costCodeData[$code]['forecast_budget'] += $line->amount;
-            $costCodeData[$code]['committed'] += $committed;
-            $costCodeData[$code]['invoiced'] += $invoiced;
-            $costCodeData[$code]['balance'] += $line->amount - $committed;
+            $costCodeData[$code]['original_budget'] += (float) $line->amount;
+            $costCodeData[$code]['forecast_budget'] += (float) $line->amount;
+
+            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
+                $costCodeData[$code]['committed'] += (float) $line->commitments->sum('amount');
+                $costCodeData[$code]['invoiced']  += (float) $line->invoices->sum('amount');
+                $countedCostCodeIds[] = $ccId;
+            }
+        }
+        foreach ($costCodeData as $code => $row) {
+            $costCodeData[$code]['balance'] = $row['forecast_budget'] - $row['committed'];
         }
 
         $manhourData = $this->getManHourForecastData($project, $validated);
@@ -940,9 +987,12 @@ class ReportController extends Controller
 
         $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
         $costCodeData = [];
+        // See costReport(): avoid double-counting when two budget lines share a cost code
+        $countedCostCodeIds = [];
 
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
+            $ccId = $line->cost_code_id;
             if (!isset($costCodeData[$code])) {
                 $costCodeData[$code] = [
                     'code' => $code,
@@ -953,12 +1003,15 @@ class ReportController extends Controller
                     'balance' => 0,
                 ];
             }
-            $committed = $line->commitments->sum('amount');
-            $invoiced = $line->invoices->sum('amount');
-            $costCodeData[$code]['budget']    += (float) $line->amount;
-            $costCodeData[$code]['committed'] += (float) $committed;
-            $costCodeData[$code]['invoiced']  += (float) $invoiced;
-            $costCodeData[$code]['balance']   += (float) $line->amount - (float) $committed;
+            $costCodeData[$code]['budget'] += (float) $line->amount;
+            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
+                $costCodeData[$code]['committed'] += (float) $line->commitments->sum('amount');
+                $costCodeData[$code]['invoiced']  += (float) $line->invoices->sum('amount');
+                $countedCostCodeIds[] = $ccId;
+            }
+        }
+        foreach ($costCodeData as $code => $row) {
+            $costCodeData[$code]['balance'] = $row['budget'] - $row['committed'];
         }
 
         $totals = ['budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
@@ -1011,8 +1064,11 @@ class ReportController extends Controller
         $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
 
         $costCodeData = [];
+        // See costReport(): avoid double-counting when two budget lines share a cost code
+        $countedCostCodeIds = [];
         foreach ($budgetLines as $line) {
             $code = $line->costCode?->code ?? 'Unassigned';
+            $ccId = $line->cost_code_id;
             if (!isset($costCodeData[$code])) {
                 $costCodeData[$code] = [
                     'code' => $code,
@@ -1024,13 +1080,17 @@ class ReportController extends Controller
                     'balance' => 0,
                 ];
             }
-            $committed = (float) $line->commitments->sum('amount');
-            $invoiced = (float) $line->invoices->sum('amount');
             $costCodeData[$code]['original_budget'] += (float) $line->amount;
             $costCodeData[$code]['forecast_budget'] += (float) $line->amount;
-            $costCodeData[$code]['committed']       += $committed;
-            $costCodeData[$code]['invoiced']        += $invoiced;
-            $costCodeData[$code]['balance']         += (float) $line->amount - $committed;
+
+            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
+                $costCodeData[$code]['committed'] += (float) $line->commitments->sum('amount');
+                $costCodeData[$code]['invoiced']  += (float) $line->invoices->sum('amount');
+                $countedCostCodeIds[] = $ccId;
+            }
+        }
+        foreach ($costCodeData as $code => $row) {
+            $costCodeData[$code]['balance'] = $row['forecast_budget'] - $row['committed'];
         }
 
         $totals = ['original_budget' => 0, 'forecast_budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
