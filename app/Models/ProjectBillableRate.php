@@ -130,18 +130,21 @@ class ProjectBillableRate extends Model
         $hasExplicitOtBase = $this->base_ot_hourly_rate !== null && (float) $this->base_ot_hourly_rate > 0;
         $otBase = $hasExplicitOtBase ? (float) $this->base_ot_hourly_rate : $base * 1.5;
 
-        // OT / DT billable populates when the user has given ANY OT signal —
-        // an explicit Base OT Hourly Rate OR OT burden percentages. If only
-        // the Base OT is set (no OT burdens yet), fall back to ST markups so
-        // the loaded OT rate reflects the OT base the user already entered.
-        // When neither Base OT nor OT burdens are set, OT/DT stay at 0 — a
-        // clear signal those rates aren't usable for billing yet.
-        $showOt = $hasExplicitOtBase || $otMarkup > 0;
-        $effectiveOtMarkup = $otMarkup > 0 ? $otMarkup : $stMarkup;
-
+        // OT / DT billable rules (per client — OT must NEVER inherit ST burdens):
+        //   1. OT burdens entered   → OT = OT base × (1 + OT markup)
+        //   2. Only Base OT entered → OT = Base OT raw (no markup applied)
+        //   3. Neither entered      → OT/DT = 0 (unusable until user provides data)
         $straightTimeRate = $base * (1 + $stMarkup);
-        $overtimeRate     = $showOt ? $otBase * (1 + $effectiveOtMarkup) : 0.0;
-        $doubleTimeRate   = $showOt ? ($base * 2.0) * (1 + $effectiveOtMarkup) : 0.0;
+        if ($otMarkup > 0) {
+            $overtimeRate   = $otBase * (1 + $otMarkup);
+            $doubleTimeRate = ($base * 2.0) * (1 + $otMarkup);
+        } elseif ($hasExplicitOtBase) {
+            $overtimeRate   = $otBase;        // raw Base OT, no burdens
+            $doubleTimeRate = $base * 2.0;    // raw DT base, no burdens
+        } else {
+            $overtimeRate   = 0.0;
+            $doubleTimeRate = 0.0;
+        }
 
         return [
             'straight_time' => round($straightTimeRate, 2),

@@ -12,12 +12,174 @@ use App\Models\Employee;
 use App\Models\ManhourBudget;
 use App\Models\BillingInvoice;
 use App\Models\CostCode;
+use App\Models\CostType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ReportController extends Controller
 {
+    /**
+     * Build a cost-type-grouped cost breakdown for a project.
+     *
+     * Hierarchy per the client's spec:
+     *   Budget → Cost Type → Phase Code
+     *
+     * Commitments/invoices/timesheets all live at the (cost_code_id, cost_type_id)
+     * level. We aggregate per composite key so the same phase code split across
+     * Direct Labor + Indirect Labor (or Equipment + Materials) shows as separate
+     * rows and can't double-count shared cost-code-level totals.
+     *
+     * Invoices don't carry a cost_type_id directly — we resolve it via the
+     * invoice's parent commitment, or fall back to the cost code's default type.
+     *
+     * Returns a flat array of rows. Header rows (`is_header = true`) separate
+     * each cost type; detail rows (`indent = true`) list phase codes under the
+     * header. The view renders the indent/header flags natively.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildCostTypeBreakdown(Project $project): array
+    {
+        $budgetLines = $project->budgetLines()->with(['costCode', 'costType'])->get();
+        $commitments = $project->commitments()->with(['costCode', 'costType'])->get();
+        $invoices    = $project->invoices()->with(['commitment', 'costCode'])->get();
+        $timesheets  = $project->timesheets()
+            ->where('status', '!=', 'rejected')
+            ->with(['costCode', 'costType'])
+            ->get();
+
+        $keyFor = static fn ($ccId, $ctId): string =>
+            (string) ($ccId ?? 'x') . '|' . (string) ($ctId ?? 'x');
+
+        // Preload cost types for invoice fallback (when invoice has no commitment
+        // and we need to look up the cost code's default cost type).
+        $costTypesById = CostType::all()->keyBy('id');
+
+        $makeBucket = function ($ccId, $ctId, $costCode, $costType) {
+            return [
+                'cost_code_id'        => $ccId,
+                'cost_type_id'        => $ctId,
+                'code'                => $costCode?->code ?? 'Unassigned',
+                'name'                => $costCode?->name ?? 'Unassigned',
+                'cost_type'           => $costType?->name ?? 'Unassigned',
+                'cost_type_sort'      => $costType?->sort_order ?? 9999,
+                'budget'              => 0.0,
+                'committed_vendor'    => 0.0,
+                'committed_labor'     => 0.0,
+                'invoiced'            => 0.0,
+            ];
+        };
+
+        $buckets = [];
+
+        // Budget lines — authoritative for the budget column.
+        foreach ($budgetLines as $line) {
+            $k = $keyFor($line->cost_code_id, $line->cost_type_id);
+            $buckets[$k] ??= $makeBucket($line->cost_code_id, $line->cost_type_id, $line->costCode, $line->costType);
+            $buckets[$k]['budget'] += (float) $line->amount;
+        }
+
+        // Vendor commitments.
+        foreach ($commitments as $c) {
+            $k = $keyFor($c->cost_code_id, $c->cost_type_id);
+            $buckets[$k] ??= $makeBucket($c->cost_code_id, $c->cost_type_id, $c->costCode, $c->costType);
+            $buckets[$k]['committed_vendor'] += (float) $c->amount;
+        }
+
+        // Labor timesheets (non-rejected) — fold into committed_labor.
+        foreach ($timesheets as $t) {
+            $k = $keyFor($t->cost_code_id, $t->cost_type_id);
+            $buckets[$k] ??= $makeBucket($t->cost_code_id, $t->cost_type_id, $t->costCode, $t->costType);
+            $buckets[$k]['committed_labor'] += (float) $t->total_cost;
+        }
+
+        // Vendor invoices — infer cost_type_id from commitment, then cost code default.
+        foreach ($invoices as $inv) {
+            $ctId = $inv->commitment?->cost_type_id ?? $inv->costCode?->cost_type_id;
+            $k = $keyFor($inv->cost_code_id, $ctId);
+            if (!isset($buckets[$k])) {
+                $buckets[$k] = $makeBucket(
+                    $inv->cost_code_id,
+                    $ctId,
+                    $inv->costCode,
+                    $ctId ? $costTypesById->get($ctId) : null
+                );
+            }
+            $buckets[$k]['invoiced'] += (float) $inv->amount;
+        }
+
+        // Finalize derived fields. `cost` is an alias for `committed` so the P&L
+        // view/PDF (which reads `cost`) can consume the same row shape.
+        foreach ($buckets as $k => $b) {
+            $committed = $b['committed_vendor'] + $b['committed_labor'];
+            $buckets[$k]['committed'] = $committed;
+            $buckets[$k]['cost']      = $committed;
+            $buckets[$k]['balance']   = $b['budget'] - $committed;
+            $buckets[$k]['percentage_complete'] = $b['budget'] > 0
+                ? round(($committed / $b['budget']) * 100, 2)
+                : 0.0;
+        }
+
+        // Sort by cost type sort_order (Direct Labor first, Indirect Labor next, etc.),
+        // then by phase code within each type.
+        $rows = array_values($buckets);
+        usort($rows, function ($a, $b) {
+            return [$a['cost_type_sort'], $a['cost_type'], $a['code']]
+                <=> [$b['cost_type_sort'], $b['cost_type'], $b['code']];
+        });
+
+        // Emit with header rows so the view can render the hierarchy
+        // (Budget → Cost Type → Phase Code) without needing nested loops.
+        $out = [];
+        $currentType = '__unset__';
+        $groupTotals = null;
+        $emitGroupTotal = function () use (&$groupTotals, &$out, &$currentType) {
+            if ($groupTotals !== null) {
+                $groupTotals['is_group_total'] = true;
+                $groupTotals['code'] = '';
+                $groupTotals['name'] = 'Subtotal — ' . $currentType;
+                $groupTotals['cost_type'] = $currentType;
+                $groupTotals['cost'] = $groupTotals['committed']; // P&L alias
+                $groupTotals['percentage_complete'] = $groupTotals['budget'] > 0
+                    ? round(($groupTotals['committed'] / $groupTotals['budget']) * 100, 2)
+                    : 0.0;
+                $out[] = $groupTotals;
+            }
+        };
+        foreach ($rows as $r) {
+            if ($r['cost_type'] !== $currentType) {
+                $emitGroupTotal();
+                $currentType = $r['cost_type'];
+                $groupTotals = [
+                    'budget' => 0, 'committed' => 0, 'committed_vendor' => 0,
+                    'committed_labor' => 0, 'invoiced' => 0, 'balance' => 0,
+                ];
+                $out[] = [
+                    'is_header'   => true,
+                    'code'        => '',
+                    'name'        => strtoupper($currentType),
+                    'cost_type'   => $currentType,
+                    'budget'      => 0,
+                    'committed'   => 0,
+                    'committed_vendor' => 0,
+                    'committed_labor'  => 0,
+                    'invoiced'    => 0,
+                    'balance'     => 0,
+                    'percentage_complete' => 0,
+                ];
+            }
+            $r['indent'] = true;
+            $out[] = $r;
+            foreach (['budget', 'committed', 'committed_vendor', 'committed_labor', 'invoiced', 'balance'] as $k) {
+                $groupTotals[$k] += $r[$k];
+            }
+        }
+        $emitGroupTotal();
+
+        return $out;
+    }
+
     public function costReport(Request $request, Project $project): View
     {
         $project->load('client');
@@ -26,69 +188,9 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()->with('costCode')->get();
-        $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
-        $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
-        // Labor committed = non-rejected timesheet total_cost grouped by the
-        // timesheet's own cost code. Matches the project dashboard so the
-        // Cost Report and the project-level "Committed" card agree.
-        $laborByCostCode = $project->timesheets()
-            ->where('status', '!=', 'rejected')
-            ->get()
-            ->groupBy('cost_code_id');
-
-        $costCodeData = [];
-        // Commitments, invoices, and labor timesheets live at the cost_code_id level
-        // (not budget_line_id). When a project has multiple budget lines that share
-        // the same cost code — e.g. 01.10.000 split into Direct Labor + Indirect
-        // Labor — iterating per budget line would double-count the shared
-        // commitments/labor. Track which cost codes have already contributed their
-        // commitments so we only add them once per code.
-        $countedCostCodeIds = [];
-
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            $ccId = $line->cost_code_id;
-
-            if (!isset($costCodeData[$code])) {
-                $costCodeData[$code] = [
-                    'code' => $code,
-                    'name' => $line->costCode?->name ?? 'Unassigned',
-                    'budget' => 0,
-                    'committed' => 0,
-                    'committed_vendor' => 0,
-                    'committed_labor' => 0,
-                    'invoiced' => 0,
-                    'balance' => 0,
-                    'percentage_complete' => 0,
-                ];
-            }
-
-            // Budget is per-line — always accumulate so Direct + Indirect budgets sum
-            $costCodeData[$code]['budget'] += (float) $line->amount;
-
-            // Commitments/invoices/labor are per-code — only add once per cost code
-            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
-                $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
-                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-                $invoiced        = (float) ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
-
-                $costCodeData[$code]['committed']        += $vendorCommitted + $laborCommitted;
-                $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
-                $costCodeData[$code]['committed_labor']  += $laborCommitted;
-                $costCodeData[$code]['invoiced']         += $invoiced;
-
-                $countedCostCodeIds[] = $ccId;
-            }
-        }
-
-        // Finalize balance and % complete once totals are fully accumulated
-        foreach ($costCodeData as $code => $row) {
-            $costCodeData[$code]['balance'] = $row['budget'] - $row['committed'];
-            $costCodeData[$code]['percentage_complete'] = $row['budget'] > 0
-                ? round(($row['committed'] / $row['budget']) * 100, 2)
-                : 0;
-        }
+        // Breakdown rows are grouped by cost type then phase code
+        // (Budget → Cost Type → Phase Code), with header + subtotal rows.
+        $rows = $this->buildCostTypeBreakdown($project);
 
         $changeOrders = $project->changeOrders()
             ->where('status', 'approved')
@@ -103,8 +205,8 @@ class ReportController extends Controller
 
         return view('reports.cost-report', [
             'project' => $project,
-            'costData' => collect($costCodeData)->values(),
-            'costCodeData' => $costCodeData,
+            'costData' => collect($rows),
+            'costCodeData' => $rows,
             'changeOrders' => $changeOrders,
             'manhourData' => $manhourData,
             'compositeRate' => $compositeRate,
@@ -122,81 +224,57 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()->with('costCode')->get();
-        $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
-        $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
-        // Labor committed feeds into the Forecast report's "Committed" column
-        // the same way it does on the Cost Report and project dashboard.
-        $laborByCostCode = $project->timesheets()
-            ->where('status', '!=', 'rejected')
-            ->get()
-            ->groupBy('cost_code_id');
-
-        $originalBudgetTotal = $budgetLines->sum('amount');
-        $approvedCoTotal = $project->changeOrders()
+        // Totals for the header cards (Original Budget + Forecast Budget).
+        $originalBudgetTotal = (float) $project->budgetLines()->sum('budget_amount');
+        $approvedCoTotal = (float) $project->changeOrders()
             ->where('status', 'approved')
             ->sum('amount');
         $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
 
-        $costCodeData = [];
-        // See costReport(): when multiple budget lines share a cost code
-        // (Direct + Indirect Labor on the same phase code), commitments/labor/
-        // invoices must only be counted once per code — they live at the
-        // cost_code_id level, not the budget_line level.
-        $countedCostCodeIds = [];
-
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            $ccId = $line->cost_code_id;
-
-            if (!isset($costCodeData[$code])) {
-                $costCodeData[$code] = [
-                    'code' => $code,
-                    'name' => $line->costCode?->name ?? 'Unassigned',
-                    'original_budget' => 0,
-                    'forecast_budget' => 0,
-                    'committed' => 0,
-                    'committed_vendor' => 0,
-                    'committed_labor' => 0,
-                    'invoiced' => 0,
-                    'balance' => 0,
-                ];
-            }
-
-            $costCodeData[$code]['original_budget'] += (float) $line->amount;
-            $costCodeData[$code]['forecast_budget'] += (float) $line->amount;
-
-            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
-                $vendorCommitted = (float) ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount');
-                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-                $invoiced        = (float) ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
-
-                $costCodeData[$code]['committed']        += $vendorCommitted + $laborCommitted;
-                $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
-                $costCodeData[$code]['committed_labor']  += $laborCommitted;
-                $costCodeData[$code]['invoiced']         += $invoiced;
-
-                $countedCostCodeIds[] = $ccId;
-            }
-        }
-
-        // Finalize balance after all budget and committed totals are accumulated
-        foreach ($costCodeData as $code => $row) {
-            $costCodeData[$code]['balance'] = $row['forecast_budget'] - $row['committed'];
+        // Build cost-type-grouped breakdown, then add the forecast-specific
+        // `original_budget` / `forecast_budget` aliases the view expects.
+        $rows = $this->buildCostTypeBreakdown($project);
+        foreach ($rows as $i => $r) {
+            $rows[$i]['original_budget'] = $r['budget'];
+            $rows[$i]['forecast_budget'] = $r['budget']; // no per-line forecast override yet
         }
 
         $manhourData = $this->getManHourForecastData($project, $validated);
+
+        // Populate the "Manhours Summary" table. The view reads:
+        //   $forecastTotals['earned'|'productivity'|'forecast'|'total_hours'|'budget']
+        // All four labor-summary keys must be present or the section stays blank.
+        $totalActualHours   = (float) array_sum(array_column($manhourData, 'actual_hours'));
+        $totalBudgetHours   = (float) array_sum(array_column($manhourData, 'budget_hours'));
+        $totalForecastHours = (float) array_sum(array_column($manhourData, 'forecast_hours'));
+        $earnedHours = 0.0;
+        foreach ($manhourData as $mh) {
+            $bh = (float) ($mh['budget_hours'] ?? 0);
+            $ah = (float) ($mh['actual_hours'] ?? 0);
+            $pc = $bh > 0 ? min($ah / $bh, 1) : 0;
+            $earnedHours += $bh * $pc;
+        }
+        $productivity = $totalActualHours > 0
+            ? round(($earnedHours / $totalActualHours) * 100, 2)
+            : 0;
+
         $changeOrders = $project->changeOrders()->where('status', 'approved')->get();
 
         return view('reports.forecast', [
             'project' => $project,
-            'costCodeData' => $costCodeData,
-            'costData' => collect($costCodeData)->values(),
-            'forecastData' => collect($costCodeData)->values(),
+            'costCodeData' => $rows,
+            'costData' => collect($rows),
+            'forecastData' => collect($rows),
             'originalBudgetTotal' => $originalBudgetTotal,
             'forecastBudgetTotal' => $forecastBudgetTotal,
             'originalBudgetTotals' => ['budget' => $originalBudgetTotal],
-            'forecastTotals' => ['budget' => $forecastBudgetTotal],
+            'forecastTotals' => [
+                'budget'       => $forecastBudgetTotal,
+                'earned'       => round($earnedHours, 1),
+                'productivity' => $productivity,
+                'forecast'     => round($totalForecastHours, 1),
+                'total_hours'  => round($totalActualHours, 1),
+            ],
             'changeOrders' => $changeOrders,
             'manhourData' => $manhourData,
             'export' => $request->get('export'),
@@ -448,35 +526,56 @@ class ReportController extends Controller
         $commitments = $project->commitments()->get();
         $invoices = $project->invoices()->get();
 
-        // Avoid double-counting: invoices are billed against commitments.
-        // Actual cost = sum of invoices + any commitments that have no invoices yet.
+        // Cost = invoices + uninvoiced commitments + labor. Invoices replace
+        // commitments they're billed against, so we strip those commitments to
+        // avoid double-counting. Labor timesheets are always additive.
         $invoicedCommitmentIds = $invoices->pluck('commitment_id')->filter()->unique();
         $uninvoicedCommitments = $commitments->whereNotIn('id', $invoicedCommitmentIds);
-        $totalCosts = (float) $invoices->sum('amount') + (float) $uninvoicedCommitments->sum('amount');
+        $laborCost = (float) $project->timesheets()
+            ->where('status', '!=', 'rejected')
+            ->sum('total_cost');
+        $totalCosts = (float) $invoices->sum('amount')
+            + (float) $uninvoicedCommitments->sum('amount')
+            + $laborCost;
 
         $margin = $totalRevenue - $totalCosts;
         $marginPercentage = $totalRevenue > 0 ? round(($margin / $totalRevenue) * 100, 2) : 0;
 
-        $budgetLines = $project->budgetLines()->with('costCode')->get();
-        $commitmentsByCostCode = $project->commitments()->get()->groupBy('cost_code_id');
-        $invoicesByCostCode = $project->invoices()->get()->groupBy('cost_code_id');
+        // Per-row cost breakdown via the same cost-type-grouped helper used by
+        // the cost & forecast reports. `buildCostTypeBreakdown()` returns rows
+        // with header/subtotal markers so the P&L table can show the same
+        // Budget → Cost Type → Phase Code hierarchy.
+        $breakdownRows = $this->buildCostTypeBreakdown($project);
 
-        $byCodeData = [];
+        // Revenue is not tracked per phase code (billing invoices are project-
+        // level). Distribute proportionally by each detail row's cost share so
+        // the P&L per-row revenue still sums to the project total revenue.
+        $detailRows = array_values(array_filter(
+            $breakdownRows,
+            fn ($r) => ($r['is_header'] ?? false) === false && ($r['is_group_total'] ?? false) === false
+        ));
+        $sumCost = (float) array_sum(array_column($detailRows, 'committed')) ?: 0.0;
 
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            $ccId = $line->cost_code_id;
+        $plData = collect();
+        foreach ($breakdownRows as $r) {
+            // Preserve header + subtotal rows with zero revenue — the view
+            // renders them with different styling.
+            $cost = (float) ($r['committed'] ?? 0);
+            $isStructural = ($r['is_header'] ?? false) || ($r['is_group_total'] ?? false);
+            $revenue = $isStructural
+                ? 0.0
+                : ($sumCost > 0 ? ($cost / $sumCost) * $totalRevenue : 0.0);
 
-            if (!isset($byCodeData[$code])) {
-                $byCodeData[$code] = [
-                    'code' => $code,
-                    'name' => $line->costCode?->name ?? 'Unassigned',
-                    'cost' => 0,
-                ];
-            }
-
-            $byCodeData[$code]['cost'] += ($commitmentsByCostCode[$ccId] ?? collect())->sum('amount')
-                + ($invoicesByCostCode[$ccId] ?? collect())->sum('amount');
+            $plData->push([
+                'code'           => $r['code'] ?? '',
+                'name'           => $r['name'] ?? '',
+                'cost_type'      => $r['cost_type'] ?? '',
+                'revenue'        => $revenue,
+                'cost'           => $cost,
+                'is_header'      => $r['is_header'] ?? false,
+                'is_group_total' => $r['is_group_total'] ?? false,
+                'indent'         => $r['indent'] ?? false,
+            ]);
         }
 
         return view('reports.profit-loss', [
@@ -485,18 +584,12 @@ class ReportController extends Controller
             'totalCosts' => $totalCosts,
             'margin' => $margin,
             'marginPercentage' => $marginPercentage,
-            'byCodeData' => $byCodeData,
-            'plData' => collect($byCodeData)->values()->map(function ($item) use ($totalRevenue, $totalCosts) {
-                return [
-                    'code' => $item['code'],
-                    'name' => $item['name'],
-                    'revenue' => ($item['cost'] > 0 && $totalCosts > 0) ? ($item['cost'] / $totalCosts) * $totalRevenue : 0,
-                    'cost' => $item['cost'],
-                ];
-            }),
+            'byCodeData' => $breakdownRows,
+            'plData' => $plData,
             'summary' => [
                 'total_revenue' => $totalRevenue,
-                'total_cost' => $totalCosts,
+                'total_cost'    => $totalCosts,
+                'labor_cost'    => $laborCost,
             ],
             'export' => $request->get('export'),
         ]);
@@ -665,31 +758,80 @@ class ReportController extends Controller
         return $rows;
     }
 
+    /**
+     * Per-cost-code manhour forecast rows for the Forecast Report's "Man Hour
+     * Data" table.
+     *
+     * Returns one row per cost code that has either a manhour budget or any
+     * timesheet activity, with the keys the forecast view reads directly:
+     *   - code, name (phase code label)
+     *   - actual_hours (non-rejected timesheet hours)
+     *   - budget_hours (from ManhourBudget, used as forecast fallback)
+     *   - forecast_hours (max of budget vs actual — at least cover actual burn)
+     *   - labor_cost
+     *
+     * @return array<int, array<string, mixed>>
+     */
     protected function getManHourForecastData(Project $project, array $filters): array
     {
-        $timesheets = $this->getTimesheetsForPeriod($project, $filters);
+        $normalizeCcKey = static fn ($id): string => $id === null ? '_null_' : (string) $id;
 
-        $totalRegularHours = (float) $timesheets->sum('regular_hours');
-        $totalOtHours = (float) $timesheets->sum('overtime_hours');
-        $totalDtHours = (float) $timesheets->sum('double_time_hours');
-        $totalActualHours = $totalRegularHours + $totalOtHours + $totalDtHours;
+        $query = Timesheet::where('project_id', $project->id)
+            ->where('status', '!=', 'rejected')
+            ->with('costCode');
+        if ($filters['date_from'] ?? null) {
+            $query->whereDate('date', '>=', $filters['date_from']);
+        }
+        if ($filters['date_to'] ?? null) {
+            $query->whereDate('date', '<=', $filters['date_to']);
+        }
+        $timesheets = $query->get();
+        $byCc = $timesheets->groupBy(fn ($t) => $normalizeCcKey($t->cost_code_id));
 
-        $budgetHours = $project->manhourBudgets()->sum('budget_hours');
+        $manhourBudgets = $project->manhourBudgets()->with('costCode')->get();
 
-        $productivity = $totalActualHours > 0
-            ? round(($budgetHours / $totalActualHours) * 100, 2)
-            : 0;
+        $keys = $manhourBudgets->map(fn ($b) => $normalizeCcKey($b->cost_code_id))
+            ->merge($timesheets->map(fn ($t) => $normalizeCcKey($t->cost_code_id)))
+            ->unique()
+            ->sort()
+            ->values();
 
-        $forecastHours = $totalActualHours;
-        $variance = $budgetHours - $totalActualHours;
+        $rows = [];
+        foreach ($keys as $key) {
+            $ccId = $key === '_null_' ? null : (int) $key;
+            $group = $byCc->get($key, collect());
 
-        return [
-            'earned_hours' => $budgetHours,
-            'actual_hours' => $totalActualHours,
-            'productivity' => $productivity,
-            'forecast_hours' => $forecastHours,
-            'variance' => $variance,
-        ];
+            $actualHours = (float) $group->sum('total_hours');
+            $laborCost   = (float) $group->sum('total_cost');
+            $budgetHours = (float) $manhourBudgets
+                ->where('cost_code_id', $ccId)
+                ->sum('budget_hours');
+
+            // Forecast = max(budget, actual). If we're burning over budget, the
+            // honest forecast is at least the hours already worked; otherwise
+            // we trust the original budget as the completion target.
+            $forecastHours = max($budgetHours, $actualHours);
+
+            $budget = $manhourBudgets->firstWhere('cost_code_id', $ccId);
+            $firstTs = $group->first();
+            $code = $budget?->costCode?->code
+                ?? $firstTs?->costCode?->code
+                ?? ($ccId === null ? 'Unassigned' : 'N/A');
+            $name = $budget?->costCode?->name
+                ?? $firstTs?->costCode?->name
+                ?? ($ccId === null ? 'Unassigned' : 'N/A');
+
+            $rows[] = [
+                'code'           => $code,
+                'name'           => $name,
+                'actual_hours'   => $actualHours,
+                'budget_hours'   => $budgetHours,
+                'forecast_hours' => $forecastHours,
+                'labor_cost'     => $laborCost,
+            ];
+        }
+
+        return $rows;
     }
 
     protected function getTimesheetsForPeriod(Project $project, array $filters): \Illuminate\Support\Collection
@@ -718,49 +860,7 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
-        // Labor committed = non-rejected timesheet total_cost grouped by the
-        // timesheet's own cost code. Mirrors the HTML cost report so the PDF
-        // "Committed" column matches what the user sees on screen.
-        $laborByCostCode = $project->timesheets()
-            ->where('status', '!=', 'rejected')
-            ->get()
-            ->groupBy('cost_code_id');
-
-        $costCodeData = [];
-        // $line->commitments resolves via cost_code_id, so two budget lines with
-        // the same code (Direct + Indirect Labor) would double-count commitments.
-        // Aggregate commitments/invoices/labor once per cost code; accumulate
-        // budget per line so the split budgets still sum correctly.
-        $countedCostCodeIds = [];
-
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            $ccId = $line->cost_code_id;
-            if (!isset($costCodeData[$code])) {
-                $costCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'budget' => 0, 'committed' => 0, 'committed_vendor' => 0, 'committed_labor' => 0, 'invoiced' => 0, 'balance' => 0, 'percentage_complete' => 0];
-            }
-            $costCodeData[$code]['budget'] += (float) $line->amount;
-
-            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
-                $vendorCommitted = (float) $line->commitments->sum('amount');
-                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-                $invoiced        = (float) $line->invoices->sum('amount');
-
-                $costCodeData[$code]['committed']        += $vendorCommitted + $laborCommitted;
-                $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
-                $costCodeData[$code]['committed_labor']  += $laborCommitted;
-                $costCodeData[$code]['invoiced']         += $invoiced;
-                $countedCostCodeIds[] = $ccId;
-            }
-        }
-
-        foreach ($costCodeData as $code => $row) {
-            $costCodeData[$code]['balance'] = $row['budget'] - $row['committed'];
-            $costCodeData[$code]['percentage_complete'] = $row['budget'] > 0
-                ? round(($row['committed'] / $row['budget']) * 100, 2) : 0;
-        }
-
+        $costCodeData = $this->buildCostTypeBreakdown($project);
         $changeOrders = $project->changeOrders()->where('status', 'approved')->get();
         $manhourData = $this->getManHourData($project, $validated);
 
@@ -781,45 +881,14 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
-        $originalBudgetTotal = $budgetLines->sum('amount');
-        $approvedCoTotal = $project->changeOrders()->where('status', 'approved')->sum('amount');
+        $originalBudgetTotal = (float) $project->budgetLines()->sum('budget_amount');
+        $approvedCoTotal = (float) $project->changeOrders()->where('status', 'approved')->sum('amount');
         $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
 
-        // Labor committed folds into Forecast's Committed column the same
-        // way it does on the on-screen forecast + cost report.
-        $laborByCostCode = $project->timesheets()
-            ->where('status', '!=', 'rejected')
-            ->get()
-            ->groupBy('cost_code_id');
-
-        $costCodeData = [];
-        // Prevent double-counting when multiple budget lines share a cost code
-        $countedCostCodeIds = [];
-
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            $ccId = $line->cost_code_id;
-            if (!isset($costCodeData[$code])) {
-                $costCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'original_budget' => 0, 'forecast_budget' => 0, 'committed' => 0, 'committed_vendor' => 0, 'committed_labor' => 0, 'invoiced' => 0, 'balance' => 0];
-            }
-            $costCodeData[$code]['original_budget'] += (float) $line->amount;
-            $costCodeData[$code]['forecast_budget'] += (float) $line->amount;
-
-            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
-                $vendorCommitted = (float) $line->commitments->sum('amount');
-                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-                $invoiced        = (float) $line->invoices->sum('amount');
-
-                $costCodeData[$code]['committed']        += $vendorCommitted + $laborCommitted;
-                $costCodeData[$code]['committed_vendor'] += $vendorCommitted;
-                $costCodeData[$code]['committed_labor']  += $laborCommitted;
-                $costCodeData[$code]['invoiced']         += $invoiced;
-                $countedCostCodeIds[] = $ccId;
-            }
-        }
-        foreach ($costCodeData as $code => $row) {
-            $costCodeData[$code]['balance'] = $row['forecast_budget'] - $row['committed'];
+        $costCodeData = $this->buildCostTypeBreakdown($project);
+        foreach ($costCodeData as $i => $r) {
+            $costCodeData[$i]['original_budget'] = $r['budget'];
+            $costCodeData[$i]['forecast_budget'] = $r['budget'];
         }
 
         $manhourData = $this->getManHourForecastData($project, $validated);
@@ -852,25 +921,26 @@ class ReportController extends Controller
 
     public function profitLossPdf(Request $request, Project $project)
     {
-        $billingInvoices = BillingInvoice::where('project_id', $project->id)->where('status', 'paid')->get();
-        $totalRevenue = $billingInvoices->sum('total_amount');
+        // Match the on-screen P&L: include sent/partial invoices, not only paid.
+        $billingInvoices = BillingInvoice::where('project_id', $project->id)
+            ->whereIn('status', ['sent', 'paid', 'partial'])
+            ->get();
+        $totalRevenue = (float) $billingInvoices->sum('total_amount');
+
         $commitments = $project->commitments()->get();
         $invoices = $project->invoices()->get();
         $invoicedCommitmentIds = $invoices->pluck('commitment_id')->filter()->unique();
         $uninvoicedCommitments = $commitments->whereNotIn('id', $invoicedCommitmentIds);
-        $totalCosts = (float) $invoices->sum('amount') + (float) $uninvoicedCommitments->sum('amount');
+        $laborCost = (float) $project->timesheets()
+            ->where('status', '!=', 'rejected')
+            ->sum('total_cost');
+        $totalCosts = (float) $invoices->sum('amount')
+            + (float) $uninvoicedCommitments->sum('amount')
+            + $laborCost;
         $margin = $totalRevenue - $totalCosts;
         $marginPercentage = $totalRevenue > 0 ? round(($margin / $totalRevenue) * 100, 2) : 0;
 
-        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
-        $byCodeData = [];
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            if (!isset($byCodeData[$code])) {
-                $byCodeData[$code] = ['code' => $code, 'name' => $line->costCode?->name ?? 'Unassigned', 'cost' => 0];
-            }
-            $byCodeData[$code]['cost'] += $line->commitments->sum('amount') + $line->invoices->sum('amount');
-        }
+        $byCodeData = $this->buildCostTypeBreakdown($project);
 
         $pdf = Pdf::loadView('pdf.profit-loss', compact('project', 'totalRevenue', 'totalCosts', 'margin', 'marginPercentage', 'byCodeData'));
 
@@ -1012,74 +1082,61 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
-        // Include labor timesheets in Committed, same as the on-screen cost report
-        $laborByCostCode = $project->timesheets()
-            ->where('status', '!=', 'rejected')
-            ->get()
-            ->groupBy('cost_code_id');
+        $breakdown = $this->buildCostTypeBreakdown($project);
 
-        $costCodeData = [];
-        // See costReport(): avoid double-counting when two budget lines share a cost code
-        $countedCostCodeIds = [];
-
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            $ccId = $line->cost_code_id;
-            if (!isset($costCodeData[$code])) {
-                $costCodeData[$code] = [
-                    'code' => $code,
-                    'name' => $line->costCode?->name ?? 'Unassigned',
-                    'budget' => 0,
-                    'committed' => 0,
-                    'invoiced' => 0,
-                    'balance' => 0,
-                ];
-            }
-            $costCodeData[$code]['budget'] += (float) $line->amount;
-            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
-                $vendorCommitted = (float) $line->commitments->sum('amount');
-                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-                $costCodeData[$code]['committed'] += $vendorCommitted + $laborCommitted;
-                $costCodeData[$code]['invoiced']  += (float) $line->invoices->sum('amount');
-                $countedCostCodeIds[] = $ccId;
-            }
-        }
-        foreach ($costCodeData as $code => $row) {
-            $costCodeData[$code]['balance'] = $row['budget'] - $row['committed'];
-        }
-
-        $totals = ['budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
-        foreach ($costCodeData as $row) {
-            foreach ($totals as $k => $_) {
-                $totals[$k] += $row[$k];
-            }
-        }
-
-        $header = ['Cost Code', 'Name', 'Budget', 'Committed', 'Invoiced', 'Balance', '% Complete'];
+        // CSV output mirrors the on-screen hierarchy: cost-type header row,
+        // phase-code detail rows, subtotal row per cost type, then a grand total.
+        $header = ['Cost Type', 'Phase Code', 'Name', 'Budget', 'Committed', 'Invoiced', 'Balance', '% Complete'];
         $rows = [];
-        foreach ($costCodeData as $row) {
-            $pct = $row['budget'] > 0 ? round(($row['committed'] / $row['budget']) * 100, 2) : 0;
+        $grandTotals = ['budget' => 0.0, 'committed' => 0.0, 'invoiced' => 0.0, 'balance' => 0.0];
+
+        foreach ($breakdown as $r) {
+            if ($r['is_header'] ?? false) {
+                $rows[] = [strtoupper($r['cost_type'] ?? $r['name']), '', '', '', '', '', '', ''];
+                continue;
+            }
+            if ($r['is_group_total'] ?? false) {
+                $pct = $r['budget'] > 0 ? round(($r['committed'] / $r['budget']) * 100, 2) : 0;
+                $rows[] = [
+                    '',
+                    'Subtotal',
+                    $r['cost_type'] ?? '',
+                    number_format($r['budget'], 2, '.', ''),
+                    number_format($r['committed'], 2, '.', ''),
+                    number_format($r['invoiced'], 2, '.', ''),
+                    number_format($r['balance'], 2, '.', ''),
+                    $pct,
+                ];
+                $rows[] = []; // blank spacer
+                continue;
+            }
+            // Detail row
+            $pct = $r['budget'] > 0 ? round(($r['committed'] / $r['budget']) * 100, 2) : 0;
             $rows[] = [
-                $row['code'],
-                $row['name'],
-                number_format($row['budget'], 2, '.', ''),
-                number_format($row['committed'], 2, '.', ''),
-                number_format($row['invoiced'], 2, '.', ''),
-                number_format($row['balance'], 2, '.', ''),
+                $r['cost_type'] ?? '',
+                $r['code'],
+                $r['name'],
+                number_format($r['budget'], 2, '.', ''),
+                number_format($r['committed'], 2, '.', ''),
+                number_format($r['invoiced'], 2, '.', ''),
+                number_format($r['balance'], 2, '.', ''),
                 $pct,
             ];
+            foreach ($grandTotals as $k => $_) {
+                $grandTotals[$k] += (float) $r[$k];
+            }
         }
-        // Totals row
-        $totalPct = $totals['budget'] > 0 ? round(($totals['committed'] / $totals['budget']) * 100, 2) : 0;
+
+        $grandPct = $grandTotals['budget'] > 0
+            ? round(($grandTotals['committed'] / $grandTotals['budget']) * 100, 2)
+            : 0;
         $rows[] = [
-            'TOTAL',
-            '',
-            number_format($totals['budget'], 2, '.', ''),
-            number_format($totals['committed'], 2, '.', ''),
-            number_format($totals['invoiced'], 2, '.', ''),
-            number_format($totals['balance'], 2, '.', ''),
-            $totalPct,
+            '', 'GRAND TOTAL', '',
+            number_format($grandTotals['budget'], 2, '.', ''),
+            number_format($grandTotals['committed'], 2, '.', ''),
+            number_format($grandTotals['invoiced'], 2, '.', ''),
+            number_format($grandTotals['balance'], 2, '.', ''),
+            $grandPct,
         ];
 
         $filename = "cost-report-{$project->project_number}-" . now()->format('Ymd') . '.csv';
@@ -1093,82 +1150,63 @@ class ReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $budgetLines = $project->budgetLines()->with(['costCode', 'commitments', 'invoices'])->get();
-        $originalBudgetTotal = (float) $budgetLines->sum('amount');
+        $originalBudgetTotal = (float) $project->budgetLines()->sum('budget_amount');
         $approvedCoTotal = (float) $project->changeOrders()->where('status', 'approved')->sum('amount');
         $forecastBudgetTotal = $originalBudgetTotal + $approvedCoTotal;
 
-        // Include labor timesheets in Committed, same as on-screen forecast
-        $laborByCostCode = $project->timesheets()
-            ->where('status', '!=', 'rejected')
-            ->get()
-            ->groupBy('cost_code_id');
+        $breakdown = $this->buildCostTypeBreakdown($project);
 
-        $costCodeData = [];
-        // See costReport(): avoid double-counting when two budget lines share a cost code
-        $countedCostCodeIds = [];
-        foreach ($budgetLines as $line) {
-            $code = $line->costCode?->code ?? 'Unassigned';
-            $ccId = $line->cost_code_id;
-            if (!isset($costCodeData[$code])) {
-                $costCodeData[$code] = [
-                    'code' => $code,
-                    'name' => $line->costCode?->name ?? 'Unassigned',
-                    'original_budget' => 0,
-                    'forecast_budget' => 0,
-                    'committed' => 0,
-                    'invoiced' => 0,
-                    'balance' => 0,
-                ];
-            }
-            $costCodeData[$code]['original_budget'] += (float) $line->amount;
-            $costCodeData[$code]['forecast_budget'] += (float) $line->amount;
-
-            if ($ccId !== null && !in_array($ccId, $countedCostCodeIds, true)) {
-                $vendorCommitted = (float) $line->commitments->sum('amount');
-                $laborCommitted  = (float) ($laborByCostCode[$ccId] ?? collect())->sum('total_cost');
-                $costCodeData[$code]['committed'] += $vendorCommitted + $laborCommitted;
-                $costCodeData[$code]['invoiced']  += (float) $line->invoices->sum('amount');
-                $countedCostCodeIds[] = $ccId;
-            }
-        }
-        foreach ($costCodeData as $code => $row) {
-            $costCodeData[$code]['balance'] = $row['forecast_budget'] - $row['committed'];
-        }
-
-        $totals = ['original_budget' => 0, 'forecast_budget' => 0, 'committed' => 0, 'invoiced' => 0, 'balance' => 0];
-        foreach ($costCodeData as $row) {
-            foreach ($totals as $k => $_) {
-                $totals[$k] += $row[$k];
-            }
-        }
-
-        $header = ['Cost Code', 'Name', 'Original Budget', 'Forecast Budget', 'Committed', 'Invoiced', 'Variance (Budget - Committed)'];
+        $header = ['Cost Type', 'Phase Code', 'Name', 'Original Budget', 'Forecast Budget', 'Committed', 'Invoiced', 'Variance (Budget - Committed)'];
         $rows = [];
-        foreach ($costCodeData as $row) {
+        $grandTotals = ['original_budget' => 0.0, 'forecast_budget' => 0.0, 'committed' => 0.0, 'invoiced' => 0.0, 'balance' => 0.0];
+
+        foreach ($breakdown as $r) {
+            if ($r['is_header'] ?? false) {
+                $rows[] = [strtoupper($r['cost_type'] ?? $r['name']), '', '', '', '', '', '', ''];
+                continue;
+            }
+            if ($r['is_group_total'] ?? false) {
+                $rows[] = [
+                    '',
+                    'Subtotal',
+                    $r['cost_type'] ?? '',
+                    number_format($r['budget'], 2, '.', ''),
+                    number_format($r['budget'], 2, '.', ''),
+                    number_format($r['committed'], 2, '.', ''),
+                    number_format($r['invoiced'], 2, '.', ''),
+                    number_format($r['balance'], 2, '.', ''),
+                ];
+                $rows[] = [];
+                continue;
+            }
             $rows[] = [
-                $row['code'],
-                $row['name'],
-                number_format($row['original_budget'], 2, '.', ''),
-                number_format($row['forecast_budget'], 2, '.', ''),
-                number_format($row['committed'], 2, '.', ''),
-                number_format($row['invoiced'], 2, '.', ''),
-                number_format($row['balance'], 2, '.', ''),
+                $r['cost_type'] ?? '',
+                $r['code'],
+                $r['name'],
+                number_format($r['budget'], 2, '.', ''),
+                number_format($r['budget'], 2, '.', ''),
+                number_format($r['committed'], 2, '.', ''),
+                number_format($r['invoiced'], 2, '.', ''),
+                number_format($r['balance'], 2, '.', ''),
             ];
+            $grandTotals['original_budget'] += (float) $r['budget'];
+            $grandTotals['forecast_budget'] += (float) $r['budget'];
+            $grandTotals['committed']       += (float) $r['committed'];
+            $grandTotals['invoiced']        += (float) $r['invoiced'];
+            $grandTotals['balance']         += (float) $r['balance'];
         }
-        // Summary rows
+
         $rows[] = [
-            'TOTAL',
-            '',
-            number_format($totals['original_budget'], 2, '.', ''),
-            number_format($totals['forecast_budget'], 2, '.', ''),
-            number_format($totals['committed'], 2, '.', ''),
-            number_format($totals['invoiced'], 2, '.', ''),
-            number_format($totals['balance'], 2, '.', ''),
+            '', 'GRAND TOTAL', '',
+            number_format($grandTotals['original_budget'], 2, '.', ''),
+            number_format($grandTotals['forecast_budget'], 2, '.', ''),
+            number_format($grandTotals['committed'], 2, '.', ''),
+            number_format($grandTotals['invoiced'], 2, '.', ''),
+            number_format($grandTotals['balance'], 2, '.', ''),
         ];
-        $rows[] = []; // blank
-        $rows[] = ['Approved Change Orders', '', '', number_format($approvedCoTotal, 2, '.', ''), '', '', ''];
-        $rows[] = ['Forecast Total', '', number_format($originalBudgetTotal, 2, '.', ''), number_format($forecastBudgetTotal, 2, '.', ''), '', '', ''];
+        $rows[] = [];
+        $rows[] = ['Approved Change Orders', '', '', '', number_format($approvedCoTotal, 2, '.', ''), '', '', ''];
+        $rows[] = ['Forecast Total', '', '', number_format($originalBudgetTotal, 2, '.', ''), number_format($forecastBudgetTotal, 2, '.', ''), '', '', ''];
 
         $filename = "forecast-{$project->project_number}-" . now()->format('Ymd') . '.csv';
         return $this->streamCsv($filename, $header, $rows);

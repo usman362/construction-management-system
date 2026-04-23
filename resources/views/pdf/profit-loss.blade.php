@@ -50,30 +50,50 @@
         </tbody>
     </table>
 
-    {{-- Costs by Code --}}
+    {{-- Costs grouped by Cost Type & Phase Code --}}
     @if(count($byCodeData) > 0)
-    <div class="section-title">Cost Breakdown by Code</div>
+    @php
+        $detailRows = collect($byCodeData)
+            ->filter(fn ($r) => !($r['is_header'] ?? false) && !($r['is_group_total'] ?? false))
+            ->values();
+        $detailCostTotal = $detailRows->sum('cost');
+    @endphp
+    <div class="section-title">Cost Breakdown by Cost Type &amp; Phase Code</div>
     <table>
         <thead>
             <tr>
-                <th>Phase Code</th>
+                <th style="width: 15%">Cost Type</th>
+                <th style="width: 12%">Phase Code</th>
                 <th>Description</th>
-                <th class="text-right">Cost</th>
-                <th class="text-center">% of Total</th>
+                <th class="text-right" style="width: 15%">Cost</th>
+                <th class="text-center" style="width: 12%">% of Total</th>
             </tr>
         </thead>
         <tbody>
             @foreach($byCodeData as $data)
-            <tr>
-                <td><strong>{{ $data['code'] }}</strong></td>
-                <td>{{ $data['name'] }}</td>
-                <td class="text-right">${{ number_format($data['cost'], 2) }}</td>
-                <td class="text-center">{{ $totalCosts > 0 ? round(($data['cost'] / $totalCosts) * 100, 1) : 0 }}%</td>
-            </tr>
+                @if($data['is_header'] ?? false)
+                    <tr style="background:#e8edf3; font-weight:bold;">
+                        <td colspan="5" style="padding:6px 8px; color:#1e3a5f; text-transform:uppercase; letter-spacing:0.5px;">{{ $data['name'] ?? $data['cost_type'] ?? '' }}</td>
+                    </tr>
+                @elseif($data['is_group_total'] ?? false)
+                    <tr style="background:#f0f4f8; font-weight:bold;">
+                        <td colspan="3"><em>{{ $data['name'] ?? 'Subtotal' }}</em></td>
+                        <td class="text-right">${{ number_format($data['cost'] ?? 0, 2) }}</td>
+                        <td class="text-center">{{ $detailCostTotal > 0 ? round((($data['cost'] ?? 0) / $detailCostTotal) * 100, 1) : 0 }}%</td>
+                    </tr>
+                @else
+                    <tr>
+                        <td>{{ $data['cost_type'] ?? '' }}</td>
+                        <td><strong>{{ $data['code'] }}</strong></td>
+                        <td>{{ $data['name'] }}</td>
+                        <td class="text-right">${{ number_format($data['cost'] ?? 0, 2) }}</td>
+                        <td class="text-center">{{ $detailCostTotal > 0 ? round((($data['cost'] ?? 0) / $detailCostTotal) * 100, 1) : 0 }}%</td>
+                    </tr>
+                @endif
             @endforeach
             <tr class="totals-row">
-                <td colspan="2"><strong>TOTAL</strong></td>
-                <td class="text-right">${{ number_format(collect($byCodeData)->sum('cost'), 2) }}</td>
+                <td colspan="3"><strong>TOTAL</strong></td>
+                <td class="text-right">${{ number_format($detailCostTotal, 2) }}</td>
                 <td class="text-center">100%</td>
             </tr>
         </tbody>

@@ -62,11 +62,23 @@
 @endsection
 
 @section('content')
+    {{-- Detail-only rows power the summary totals (headers + subtotals
+         are view-only decorations and would double-count if summed). --}}
+    @php
+        $detailRows = collect($costCodeData)
+            ->filter(fn ($r) => !($r['is_header'] ?? false) && !($r['is_group_total'] ?? false))
+            ->values();
+        $totalBudget    = $detailRows->sum('budget');
+        $totalCommitted = $detailRows->sum('committed');
+        $totalInvoiced  = $detailRows->sum('invoiced');
+        $totalBalance   = $detailRows->sum('balance');
+    @endphp
+
     {{-- Summary Grid --}}
     <div class="summary-grid">
         <div class="summary-item">
             <div class="label">Original Budget</div>
-            <div class="value">${{ number_format(collect($costCodeData)->sum('budget'), 2) }}</div>
+            <div class="value">${{ number_format($totalBudget, 2) }}</div>
         </div>
         <div class="summary-item">
             <div class="label">Approved COs</div>
@@ -74,20 +86,20 @@
         </div>
         <div class="summary-item">
             <div class="label">Revised Budget</div>
-            <div class="value">${{ number_format(collect($costCodeData)->sum('budget') + $changeOrders->sum('amount'), 2) }}</div>
+            <div class="value">${{ number_format($totalBudget + $changeOrders->sum('amount'), 2) }}</div>
         </div>
         <div class="summary-item">
             <div class="label">Total Committed</div>
-            <div class="value">${{ number_format(collect($costCodeData)->sum('committed'), 2) }}</div>
+            <div class="value">${{ number_format($totalCommitted, 2) }}</div>
         </div>
-        <div class="summary-item {{ collect($costCodeData)->sum('balance') >= 0 ? 'positive' : 'negative' }}">
+        <div class="summary-item {{ $totalBalance >= 0 ? 'positive' : 'negative' }}">
             <div class="label">Remaining Balance</div>
-            <div class="value">${{ number_format(collect($costCodeData)->sum('balance'), 2) }}</div>
+            <div class="value">${{ number_format($totalBalance, 2) }}</div>
         </div>
     </div>
 
-    {{-- Cost Breakdown by Cost Type --}}
-    <div class="section-title">Cost Breakdown by Phase Code</div>
+    {{-- Cost Breakdown: Budget → Cost Type → Phase Code --}}
+    <div class="section-title">Cost Breakdown by Cost Type &amp; Phase Code</div>
     <table>
         <thead>
             <tr>
@@ -102,30 +114,33 @@
             </tr>
         </thead>
         <tbody>
-            @php
-                $totalBudget = 0;
-                $totalCommitted = 0;
-                $totalInvoiced = 0;
-                $totalBalance = 0;
-            @endphp
-
             @foreach($costCodeData as $data)
-            <tr>
-                <td><strong>{{ $data['code'] }}</strong></td>
-                <td>{{ $data['name'] }}</td>
-                <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
-                <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
-                <td class="text-right">${{ number_format($data['committed'], 2) }}</td>
-                <td class="text-right">${{ number_format($data['invoiced'], 2) }}</td>
-                <td class="text-right {{ $data['balance'] >= 0 ? 'under-budget' : 'over-budget' }}">${{ number_format($data['balance'], 2) }}</td>
-                <td class="text-center">{{ $data['percentage_complete'] }}%</td>
-            </tr>
-            @php
-                $totalBudget += $data['budget'];
-                $totalCommitted += $data['committed'];
-                $totalInvoiced += $data['invoiced'];
-                $totalBalance += $data['balance'];
-            @endphp
+                @if($data['is_header'] ?? false)
+                    <tr class="cost-type-header">
+                        <td colspan="8">{{ $data['name'] ?? $data['cost_type'] ?? '' }}</td>
+                    </tr>
+                @elseif($data['is_group_total'] ?? false)
+                    <tr class="cost-type-subtotal">
+                        <td colspan="2"><em>{{ $data['name'] ?? 'Subtotal' }}</em></td>
+                        <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
+                        <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
+                        <td class="text-right">${{ number_format($data['committed'], 2) }}</td>
+                        <td class="text-right">${{ number_format($data['invoiced'], 2) }}</td>
+                        <td class="text-right">${{ number_format($data['balance'], 2) }}</td>
+                        <td class="text-center">{{ $data['percentage_complete'] }}%</td>
+                    </tr>
+                @else
+                    <tr class="sub-line">
+                        <td><strong>{{ $data['code'] }}</strong></td>
+                        <td>{{ $data['name'] }}</td>
+                        <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
+                        <td class="text-right">${{ number_format($data['budget'], 2) }}</td>
+                        <td class="text-right">${{ number_format($data['committed'], 2) }}</td>
+                        <td class="text-right">${{ number_format($data['invoiced'], 2) }}</td>
+                        <td class="text-right {{ $data['balance'] >= 0 ? 'under-budget' : 'over-budget' }}">${{ number_format($data['balance'], 2) }}</td>
+                        <td class="text-center">{{ $data['percentage_complete'] }}%</td>
+                    </tr>
+                @endif
             @endforeach
 
             <tr class="grand-total">

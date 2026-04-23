@@ -19,10 +19,36 @@
         font-size: 11px;
         padding: 8px;
     }
+    .cost-type-header td {
+        background: #e8edf3;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #1e3a5f;
+        padding: 6px 8px;
+        border-bottom: 2px solid #1e3a5f;
+    }
+    .cost-type-subtotal td {
+        background: #f0f4f8;
+        font-weight: bold;
+        border-top: 1px solid #ccc;
+    }
 </style>
 @endsection
 
 @section('content')
+    {{-- Detail-only rows power totals (header + subtotal rows are decoration). --}}
+    @php
+        $detailRows = collect($costCodeData)
+            ->filter(fn ($r) => !($r['is_header'] ?? false) && !($r['is_group_total'] ?? false))
+            ->values();
+        $totalOriginal   = $detailRows->sum('original_budget');
+        $totalForecast   = $detailRows->sum('forecast_budget');
+        $totalCommitted  = $detailRows->sum('committed');
+        $totalInvoiced   = $detailRows->sum('invoiced');
+        $totalBalance    = $detailRows->sum('balance');
+    @endphp
+
     {{-- Budget Summary --}}
     <div class="summary-grid">
         <div class="summary-item">
@@ -39,16 +65,16 @@
         </div>
         <div class="summary-item">
             <div class="label">Total Committed</div>
-            <div class="value">${{ number_format(collect($costCodeData)->sum('committed'), 2) }}</div>
+            <div class="value">${{ number_format($totalCommitted, 2) }}</div>
         </div>
-        <div class="summary-item {{ ($forecastBudgetTotal - collect($costCodeData)->sum('committed')) >= 0 ? 'positive' : 'negative' }}">
+        <div class="summary-item {{ ($forecastBudgetTotal - $totalCommitted) >= 0 ? 'positive' : 'negative' }}">
             <div class="label">Projected Balance</div>
-            <div class="value">${{ number_format($forecastBudgetTotal - collect($costCodeData)->sum('committed'), 2) }}</div>
+            <div class="value">${{ number_format($forecastBudgetTotal - $totalCommitted, 2) }}</div>
         </div>
     </div>
 
-    {{-- Forecast by Phase Code --}}
-    <div class="section-title">Forecast by Phase Code</div>
+    {{-- Forecast by Cost Type & Phase Code --}}
+    <div class="section-title">Forecast by Cost Type &amp; Phase Code</div>
     <table>
         <thead>
             <tr>
@@ -63,33 +89,35 @@
             </tr>
         </thead>
         <tbody>
-            @php
-                $totalOriginal = 0;
-                $totalForecast = 0;
-                $totalCommitted = 0;
-                $totalInvoiced = 0;
-                $totalBalance = 0;
-            @endphp
-
             @foreach($costCodeData as $data)
-            @php
-                $variance = $data['forecast_budget'] - $data['committed'];
-                $totalOriginal += $data['original_budget'];
-                $totalForecast += $data['forecast_budget'];
-                $totalCommitted += $data['committed'];
-                $totalInvoiced += $data['invoiced'];
-                $totalBalance += $data['balance'];
-            @endphp
-            <tr>
-                <td><strong>{{ $data['code'] }}</strong></td>
-                <td>{{ $data['name'] }}</td>
-                <td class="text-right">${{ number_format($data['original_budget'], 2) }}</td>
-                <td class="text-right">${{ number_format($data['forecast_budget'], 2) }}</td>
-                <td class="text-right">${{ number_format($data['committed'], 2) }}</td>
-                <td class="text-right">${{ number_format($data['invoiced'], 2) }}</td>
-                <td class="text-right" style="color: {{ $data['balance'] >= 0 ? '#16a34a' : '#dc2626' }}">${{ number_format($data['balance'], 2) }}</td>
-                <td class="text-center {{ $variance >= 0 ? 'forecast-variance-positive' : 'forecast-variance-negative' }}">${{ number_format($variance, 2) }}</td>
-            </tr>
+                @if($data['is_header'] ?? false)
+                    <tr class="cost-type-header">
+                        <td colspan="8">{{ $data['name'] ?? $data['cost_type'] ?? '' }}</td>
+                    </tr>
+                @elseif($data['is_group_total'] ?? false)
+                    @php $subVariance = ($data['forecast_budget'] ?? $data['budget'] ?? 0) - ($data['committed'] ?? 0); @endphp
+                    <tr class="cost-type-subtotal">
+                        <td colspan="2"><em>{{ $data['name'] ?? 'Subtotal' }}</em></td>
+                        <td class="text-right">${{ number_format($data['original_budget'] ?? $data['budget'] ?? 0, 2) }}</td>
+                        <td class="text-right">${{ number_format($data['forecast_budget'] ?? $data['budget'] ?? 0, 2) }}</td>
+                        <td class="text-right">${{ number_format($data['committed'] ?? 0, 2) }}</td>
+                        <td class="text-right">${{ number_format($data['invoiced'] ?? 0, 2) }}</td>
+                        <td class="text-right">${{ number_format($data['balance'] ?? 0, 2) }}</td>
+                        <td class="text-center {{ $subVariance >= 0 ? 'forecast-variance-positive' : 'forecast-variance-negative' }}">${{ number_format($subVariance, 2) }}</td>
+                    </tr>
+                @else
+                    @php $variance = ($data['forecast_budget'] ?? 0) - ($data['committed'] ?? 0); @endphp
+                    <tr>
+                        <td><strong>{{ $data['code'] }}</strong></td>
+                        <td>{{ $data['name'] }}</td>
+                        <td class="text-right">${{ number_format($data['original_budget'] ?? 0, 2) }}</td>
+                        <td class="text-right">${{ number_format($data['forecast_budget'] ?? 0, 2) }}</td>
+                        <td class="text-right">${{ number_format($data['committed'] ?? 0, 2) }}</td>
+                        <td class="text-right">${{ number_format($data['invoiced'] ?? 0, 2) }}</td>
+                        <td class="text-right" style="color: {{ ($data['balance'] ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}">${{ number_format($data['balance'] ?? 0, 2) }}</td>
+                        <td class="text-center {{ $variance >= 0 ? 'forecast-variance-positive' : 'forecast-variance-negative' }}">${{ number_format($variance, 2) }}</td>
+                    </tr>
+                @endif
             @endforeach
 
             <tr class="grand-total">
@@ -104,24 +132,37 @@
         </tbody>
     </table>
 
-    {{-- Manhour Forecast --}}
+    {{-- Manhour Forecast Summary --}}
+    @php
+        $mhRows = is_array($manhourData) ? array_values($manhourData) : [];
+        $mhTotalBudget   = collect($mhRows)->sum('budget_hours');
+        $mhTotalActual   = collect($mhRows)->sum('actual_hours');
+        $mhTotalForecast = collect($mhRows)->sum('forecast_hours');
+        $mhTotalCost     = collect($mhRows)->sum('labor_cost');
+        $mhVariance      = $mhTotalBudget - $mhTotalActual;
+        $mhProductivity  = $mhTotalActual > 0 ? round(($mhTotalBudget / $mhTotalActual) * 100, 1) : 0;
+    @endphp
     <div class="section-title">Manhour Forecast</div>
     <div class="summary-grid">
         <div class="summary-item">
             <div class="label">Budgeted Hours</div>
-            <div class="value">{{ number_format($manhourData['earned_hours'], 1) }}</div>
+            <div class="value">{{ number_format($mhTotalBudget, 1) }}</div>
         </div>
         <div class="summary-item">
             <div class="label">Actual Hours</div>
-            <div class="value">{{ number_format($manhourData['actual_hours'], 1) }}</div>
+            <div class="value">{{ number_format($mhTotalActual, 1) }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">Forecast Hours</div>
+            <div class="value">{{ number_format($mhTotalForecast, 1) }}</div>
         </div>
         <div class="summary-item">
             <div class="label">Productivity</div>
-            <div class="value">{{ $manhourData['productivity'] }}%</div>
+            <div class="value">{{ $mhProductivity }}%</div>
         </div>
-        <div class="summary-item {{ $manhourData['variance'] >= 0 ? 'positive' : 'negative' }}">
+        <div class="summary-item {{ $mhVariance >= 0 ? 'positive' : 'negative' }}">
             <div class="label">Hours Variance</div>
-            <div class="value">{{ number_format($manhourData['variance'], 1) }} hrs</div>
+            <div class="value">{{ number_format($mhVariance, 1) }} hrs</div>
         </div>
     </div>
 @endsection

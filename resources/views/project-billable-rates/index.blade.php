@@ -434,20 +434,27 @@
         const otBase = hasExplicitOtBase ? baseOtRate : baseRate * 1.5;
         const dtBase = baseRate * 2;
 
-        // OT/DT populate when the user has given us ANY OT signal — either an
-        // explicit Base OT Hourly Rate OR OT burden percentages. If only OT
-        // burdens are entered, apply them to the OT base. If only the Base OT
-        // rate is entered (no OT burdens yet), fall back to the ST markups so
-        // the preview reflects the OT base the user already typed. When the
-        // user has entered nothing OT-specific, show "—".
+        // OT / DT rules (per client):
+        //   1. OT burdens entered   → OT = OT base × (1 + OT markup)
+        //   2. Only Base OT entered → OT = Base OT raw (NO markup — never inherit
+        //      ST burdens, OT carries its own burdens or none at all)
+        //   3. Neither entered       → OT blank
+        // Same logic for DT using base × 2 as the DT base.
         const hasOtMarkup = otMarkup > 0;
-        const showOt = hasExplicitOtBase || hasOtMarkup;
-        const effectiveOtMarkup = hasOtMarkup ? otMarkup : stMarkup;
+        let ot = null;
+        let dt = null;
+        if (hasOtMarkup) {
+            ot = otBase * (1 + otMarkup);
+            dt = dtBase * (1 + otMarkup);
+        } else if (hasExplicitOtBase) {
+            ot = otBase;         // raw Base OT, no burdens
+            dt = baseRate * 2;   // raw DT base, no burdens
+        }
 
         return {
             st: stBase * (1 + stMarkup),
-            ot: showOt ? otBase * (1 + effectiveOtMarkup) : null,
-            dt: showOt ? dtBase * (1 + effectiveOtMarkup) : null,
+            ot: ot,
+            dt: dt,
             hasOtMarkup: hasOtMarkup,
         };
     }

@@ -62,6 +62,28 @@
                             $grandTotalBalance = 0;
                         @endphp
                         @foreach($costData as $item)
+                            @if($item['is_header'] ?? false)
+                                {{-- Cost-type section header --}}
+                                <tr class="bg-blue-50 border border-gray-300">
+                                    <td colspan="6" class="border border-gray-300 px-4 py-2 font-bold text-gray-800 uppercase tracking-wide">{{ $item['name'] }}</td>
+                                </tr>
+                                @continue
+                            @endif
+                            @if($item['is_group_total'] ?? false)
+                                {{-- Cost-type subtotal row --}}
+                                @php
+                                    $subPct = ($item['budget'] ?? 0) > 0 ? (($item['committed'] ?? 0) / ($item['budget'] ?? 0)) * 100 : 0;
+                                @endphp
+                                <tr class="bg-blue-50 border border-gray-300 font-semibold">
+                                    <td class="border border-gray-300 px-4 py-2 italic">{{ $item['name'] }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['budget'] ?? 0, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['committed'] ?? 0, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['invoiced'] ?? 0, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['balance'] ?? 0, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($subPct, 1) }}%</td>
+                                </tr>
+                                @continue
+                            @endif
                             @php
                                 $grandTotalBudget += $item['budget'] ?? 0;
                                 $grandTotalCommitted += $item['committed'] ?? 0;
@@ -71,7 +93,7 @@
                                 $bgClass = $rowClass % 2 === 0 ? 'bg-gray-50' : 'bg-white';
                                 $rowClass++;
                             @endphp
-                            <tr class="{{ $bgClass }} border border-gray-300 {{ $item['is_header'] ?? false ? 'font-bold bg-blue-50' : '' }}">
+                            <tr class="{{ $bgClass }} border border-gray-300">
                                 <td class="border border-gray-300 px-4 py-2 {{ $item['indent'] ?? false ? 'pl-8' : '' }}">{{ $item['code'] ?? 'N/A' }} - {{ $item['name'] ?? 'N/A' }}</td>
                                 <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['budget'] ?? 0, 2) }}</td>
                                 <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['committed'] ?? 0, 2) }}</td>

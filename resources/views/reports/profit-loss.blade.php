@@ -37,6 +37,7 @@
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="bg-blue-100 border border-gray-300">
+                        <th class="border border-gray-300 px-4 py-2 text-left font-bold">Cost Type</th>
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Phase Code</th>
                         <th class="border border-gray-300 px-4 py-2 text-left font-bold">Name</th>
                         <th class="border border-gray-300 px-4 py-2 text-right font-bold">Revenue</th>
@@ -52,6 +53,26 @@
                         $rowClass = 0;
                     @endphp
                     @foreach($plData as $item)
+                        @if($item['is_header'] ?? false)
+                            <tr class="bg-blue-50 border border-gray-300">
+                                <td colspan="7" class="border border-gray-300 px-4 py-2 font-bold text-gray-800 uppercase tracking-wide">{{ $item['name'] ?? $item['cost_type'] ?? '' }}</td>
+                            </tr>
+                            @continue
+                        @endif
+                        @if($item['is_group_total'] ?? false)
+                            @php
+                                $subProfit = ($item['revenue'] ?? 0) - ($item['cost'] ?? 0);
+                                $subMargin = ($item['revenue'] ?? 0) > 0 ? ($subProfit / ($item['revenue'] ?? 0)) * 100 : 0;
+                            @endphp
+                            <tr class="bg-blue-50 border border-gray-300 font-semibold">
+                                <td class="border border-gray-300 px-4 py-2 italic" colspan="3">{{ $item['name'] ?? 'Subtotal' }}</td>
+                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['revenue'] ?? 0, 2) }}</td>
+                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['cost'] ?? 0, 2) }}</td>
+                                <td class="border border-gray-300 px-4 py-2 text-right {{ $subProfit >= 0 ? 'text-green-600' : 'text-red-600' }}">${{ number_format($subProfit, 2) }}</td>
+                                <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($subMargin, 1) }}%</td>
+                            </tr>
+                            @continue
+                        @endif
                         @php
                             $totalRevenue += $item['revenue'] ?? 0;
                             $totalCost += $item['cost'] ?? 0;
@@ -61,6 +82,7 @@
                             $rowClass++;
                         @endphp
                         <tr class="{{ $bgClass }} border border-gray-300">
+                            <td class="border border-gray-300 px-4 py-2 text-gray-600">{{ $item['cost_type'] ?? '' }}</td>
                             <td class="border border-gray-300 px-4 py-2 font-semibold">{{ $item['code'] ?? 'N/A' }}</td>
                             <td class="border border-gray-300 px-4 py-2">{{ $item['name'] ?? 'N/A' }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['revenue'] ?? 0, 2) }}</td>
@@ -72,7 +94,7 @@
                         </tr>
                     @endforeach
                     <tr class="bg-blue-100 border border-gray-300 font-bold">
-                        <td colspan="2" class="border border-gray-300 px-4 py-2">TOTALS</td>
+                        <td colspan="3" class="border border-gray-300 px-4 py-2">TOTALS</td>
                         <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($totalRevenue, 2) }}</td>
                         <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($totalCost, 2) }}</td>
                         <td class="border border-gray-300 px-4 py-2 text-right font-bold {{ ($totalRevenue - $totalCost) >= 0 ? 'text-green-600' : 'text-red-600' }}">
@@ -117,10 +139,12 @@
             const canvas = document.getElementById('plChart');
             if (!canvas || typeof Chart === 'undefined') return;
 
-            const plData = @json($plData);
+            const rawData = @json($plData);
+            // Strip section headers and subtotal rows — chart only shows detail rows.
+            const plData = (rawData || []).filter(r => !r.is_header && !r.is_group_total);
             if (!plData || plData.length === 0) return;
 
-            const labels   = plData.map(r => r.code + (r.name ? ' — ' + r.name : ''));
+            const labels   = plData.map(r => (r.cost_type ? r.cost_type + ' · ' : '') + (r.code || '') + (r.name ? ' — ' + r.name : ''));
             const revenue  = plData.map(r => Number(r.revenue) || 0);
             const costs    = plData.map(r => Number(r.cost) || 0);
             const profit   = plData.map((r, i) => revenue[i] - costs[i]);

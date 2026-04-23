@@ -84,6 +84,27 @@
                             $forecastGrandBalance = 0;
                         @endphp
                         @foreach($costData as $item)
+                            @if($item['is_header'] ?? false)
+                                <tr class="bg-blue-50 border border-gray-300">
+                                    <td colspan="6" class="border border-gray-300 px-4 py-2 font-bold text-gray-800 uppercase tracking-wide">{{ $item['name'] }}</td>
+                                </tr>
+                                @continue
+                            @endif
+                            @if($item['is_group_total'] ?? false)
+                                @php
+                                    $subBudget = $item['forecast_budget'] ?? $item['budget'] ?? 0;
+                                    $subPct = $subBudget > 0 ? (($item['committed'] ?? 0) / $subBudget) * 100 : 0;
+                                @endphp
+                                <tr class="bg-blue-50 border border-gray-300 font-semibold">
+                                    <td class="border border-gray-300 px-4 py-2 italic">{{ $item['name'] }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($subBudget, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['committed'] ?? 0, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['invoiced'] ?? 0, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['balance'] ?? 0, 2) }}</td>
+                                    <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($subPct, 1) }}%</td>
+                                </tr>
+                                @continue
+                            @endif
                             @php
                                 $forecastBudget = $item['forecast_budget'] ?? $item['budget'] ?? 0;
                                 $forecastGrandBudget += $forecastBudget;
@@ -95,7 +116,7 @@
                                 $bgClass = $rowClass % 2 === 0 ? 'bg-gray-50' : 'bg-white';
                                 $rowClass++;
                             @endphp
-                            <tr class="{{ $bgClass }} border border-gray-300 {{ $item['is_header'] ?? false ? 'font-bold bg-blue-50' : '' }}">
+                            <tr class="{{ $bgClass }} border border-gray-300">
                                 <td class="border border-gray-300 px-4 py-2 {{ $item['indent'] ?? false ? 'pl-8' : '' }}">{{ $item['code'] ?? 'N/A' }} - {{ $item['name'] ?? 'N/A' }}</td>
                                 <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($forecastBudget, 2) }}</td>
                                 <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['committed'] ?? 0, 2) }}</td>
