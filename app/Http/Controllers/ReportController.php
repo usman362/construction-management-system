@@ -414,10 +414,36 @@ class ReportController extends Controller
             'project_id' => 'nullable|exists:projects,id',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-            'group_by' => 'nullable|in:employee,project,date',
+            'group_by' => 'nullable|in:employee,project,date,weekly',
+            'week_ending' => 'nullable|date',
         ]);
 
         $groupBy = $validated['group_by'] ?? 'employee';
+
+        // ── Weekly matrix view (WEEKLY TIMESHEET spreadsheet layout) ──
+        // Pivots a project's timesheets over Mon..Sun ending on week_ending,
+        // grouped by shift, rows per employee with ST/OT/Per Diem per day.
+        if ($groupBy === 'weekly') {
+            $weekly = $this->buildWeeklyTimesheetMatrix(
+                $validated['project_id'] ?? null,
+                $validated['week_ending'] ?? null
+            );
+
+            return view('reports.timesheet-report', [
+                'groupedData' => collect(),
+                'summary' => [
+                    'total_hours' => $weekly['grand_st'] + $weekly['grand_ot'],
+                    'total_cost' => $weekly['grand_cost'],
+                    'total_billable' => $weekly['grand_billable'],
+                    'avg_hours_per_day' => 0,
+                ],
+                'groupBy' => $groupBy,
+                'weekly' => $weekly,
+                'employees' => Employee::orderBy('first_name')->get(),
+                'projects' => Project::orderBy('name')->get(),
+                'export' => $request->get('export'),
+            ]);
+        }
 
         // Include all timesheets (including drafts) — client needs to see
         // everything entered, regardless of approval status.
@@ -504,10 +530,172 @@ class ReportController extends Controller
             'groupedData' => $groupedData,
             'summary' => $summary,
             'groupBy' => $groupBy,
+            'weekly' => null,
             'employees' => Employee::orderBy('first_name')->get(),
             'projects' => Project::orderBy('name')->get(),
             'export' => $request->get('export'),
         ]);
+    }
+
+    /**
+     * Build a weekly timesheet pivot matrix for the WEEKLY TIMESHEET layout.
+     *
+     * Returns a structure the blade view can render directly:
+     *   [
+     *     'project'      => Project|null,
+     *     'week_ending'  => Carbon,
+     *     'days'         => [Carbon x 7],   // Mon..Sun ending on week_ending
+     *     'shifts'       => [
+     *        shift_name => [
+     *           'multiplier' => float,
+     *           'employees'  => [
+     *               [id, name, classification, craft, days=>[iso=>[st,ot,pd]], st_total, ot_total, pd_total, cost, billable],
+     *           ],
+     *           'day_totals' => [iso => [st, ot, pd]],
+     *           'shift_st' => .., 'shift_ot' => .., 'shift_pd' => ..,
+     *           'shift_cost' => .., 'shift_billable' => ..,
+     *        ],
+     *     ],
+     *     'grand_st', 'grand_ot', 'grand_pd', 'grand_cost', 'grand_billable',
+     *     'day_totals' => [iso => [st, ot, pd]],
+     *   ]
+     */
+    protected function buildWeeklyTimesheetMatrix(?int $projectId, ?string $weekEndingInput): array
+    {
+        // Default week ending = upcoming Sunday (or today if today is Sunday).
+        $weekEnding = $weekEndingInput
+            ? \Carbon\Carbon::parse($weekEndingInput)->startOfDay()
+            : \Carbon\Carbon::now()->endOfWeek(\Carbon\Carbon::SUNDAY)->startOfDay();
+
+        // Build Mon..Sun ending on the chosen Sunday.
+        $weekStart = $weekEnding->copy()->subDays(6);
+        $days = [];
+        for ($i = 0; $i < 7; $i++) {
+            $days[] = $weekStart->copy()->addDays($i);
+        }
+
+        $project = $projectId ? Project::with('client')->find($projectId) : null;
+
+        // Zero-initialized day totals template keyed by ISO date.
+        $zeroDays = [];
+        foreach ($days as $d) {
+            $zeroDays[$d->format('Y-m-d')] = ['st' => 0.0, 'ot' => 0.0, 'pd' => 0.0];
+        }
+
+        $shifts = [];
+        $grandDayTotals = $zeroDays;
+        $grandSt = 0.0; $grandOt = 0.0; $grandPd = 0.0; $grandCost = 0.0; $grandBillable = 0.0;
+
+        if ($project) {
+            $query = Timesheet::with(['employee.craft', 'shift', 'costAllocations'])
+                ->where('project_id', $project->id)
+                ->whereBetween('date', [$weekStart->toDateString(), $weekEnding->toDateString()]);
+
+            $timesheets = $query->get();
+
+            // Pivot: shift_name → employee_id → date_iso → [st, ot, pd]
+            foreach ($timesheets->groupBy(fn ($t) => $t->shift->name ?? 'UNASSIGNED') as $shiftName => $shiftRows) {
+                $shiftEmployees = [];
+                $shiftDayTotals = $zeroDays;
+                $shiftSt = 0.0; $shiftOt = 0.0; $shiftPd = 0.0; $shiftCost = 0.0; $shiftBillable = 0.0;
+                $multiplier = optional($shiftRows->first()->shift)->multiplier ?? 1.0;
+
+                foreach ($shiftRows->groupBy('employee_id') as $empId => $empRows) {
+                    $emp = $empRows->first()->employee;
+                    $empName = $emp ? trim($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                    $classification = $emp->classification
+                        ?? ($emp->craft->name ?? $emp->legacy_craft ?? '');
+
+                    $empDays = $zeroDays;
+                    $empSt = 0.0; $empOt = 0.0; $empPd = 0.0; $empCost = 0.0; $empBillable = 0.0;
+
+                    foreach ($empRows as $t) {
+                        $iso = $t->date?->format('Y-m-d');
+                        if (!$iso || !isset($empDays[$iso])) continue;
+
+                        $st = (float) $t->regular_hours;
+                        $ot = (float) $t->overtime_hours + (float) $t->double_time_hours;
+                        // Per-diem lives on cost allocations (sum per timesheet).
+                        $pd = (float) $t->costAllocations->sum('per_diem_amount');
+
+                        $empDays[$iso]['st'] += $st;
+                        $empDays[$iso]['ot'] += $ot;
+                        $empDays[$iso]['pd'] += $pd;
+                        $shiftDayTotals[$iso]['st'] += $st;
+                        $shiftDayTotals[$iso]['ot'] += $ot;
+                        $shiftDayTotals[$iso]['pd'] += $pd;
+                        $grandDayTotals[$iso]['st'] += $st;
+                        $grandDayTotals[$iso]['ot'] += $ot;
+                        $grandDayTotals[$iso]['pd'] += $pd;
+
+                        $empSt += $st;
+                        $empOt += $ot;
+                        $empPd += $pd;
+                        $empCost += (float) $t->total_cost;
+                        $empBillable += (float) $t->billable_amount;
+                    }
+
+                    $shiftEmployees[] = [
+                        'id' => $empId,
+                        'name' => $empName,
+                        'classification' => $classification,
+                        'days' => $empDays,
+                        'st_total' => $empSt,
+                        'ot_total' => $empOt,
+                        'pd_total' => $empPd,
+                        'cost' => $empCost,
+                        'billable' => $empBillable,
+                    ];
+
+                    $shiftSt += $empSt;
+                    $shiftOt += $empOt;
+                    $shiftPd += $empPd;
+                    $shiftCost += $empCost;
+                    $shiftBillable += $empBillable;
+                }
+
+                // Sort employees alphabetically for a predictable layout.
+                usort($shiftEmployees, fn ($a, $b) => strcmp($a['name'], $b['name']));
+
+                $shifts[$shiftName] = [
+                    'multiplier' => (float) $multiplier,
+                    'employees' => $shiftEmployees,
+                    'day_totals' => $shiftDayTotals,
+                    'shift_st' => $shiftSt,
+                    'shift_ot' => $shiftOt,
+                    'shift_pd' => $shiftPd,
+                    'shift_cost' => $shiftCost,
+                    'shift_billable' => $shiftBillable,
+                ];
+
+                $grandSt += $shiftSt;
+                $grandOt += $shiftOt;
+                $grandPd += $shiftPd;
+                $grandCost += $shiftCost;
+                $grandBillable += $shiftBillable;
+            }
+
+            // Stable shift ordering: DAY first, NIGHT second, others by name.
+            uksort($shifts, function ($a, $b) {
+                $rank = fn ($n) => str_contains(strtoupper($n), 'DAY') ? 0
+                    : (str_contains(strtoupper($n), 'NIGHT') ? 1 : 2);
+                return [$rank($a), $a] <=> [$rank($b), $b];
+            });
+        }
+
+        return [
+            'project' => $project,
+            'week_ending' => $weekEnding,
+            'week_start' => $weekStart,
+            'days' => $days,
+            'shifts' => $shifts,
+            'day_totals' => $grandDayTotals,
+            'grand_st' => $grandSt,
+            'grand_ot' => $grandOt,
+            'grand_pd' => $grandPd,
+            'grand_cost' => $grandCost,
+            'grand_billable' => $grandBillable,
+        ];
     }
 
     public function profitLoss(Request $request, Project $project): View
@@ -983,10 +1171,26 @@ class ReportController extends Controller
             'project_id' => 'nullable|exists:projects,id',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-            'group_by' => 'nullable|in:employee,project,date',
+            'group_by' => 'nullable|in:employee,project,date,weekly',
+            'week_ending' => 'nullable|date',
         ]);
 
         $groupBy = $validated['group_by'] ?? 'employee';
+
+        // Weekly matrix — dedicated PDF layout to match the WEEKLY TIMESHEET sheet.
+        if ($groupBy === 'weekly') {
+            $weekly = $this->buildWeeklyTimesheetMatrix(
+                $validated['project_id'] ?? null,
+                $validated['week_ending'] ?? null
+            );
+
+            $pdf = Pdf::loadView('pdf.weekly-timesheet', compact('weekly'));
+            $pdf->setPaper('a4', 'landscape');
+            $suffix = $weekly['week_ending']->format('Y-m-d');
+
+            return $pdf->download("weekly-timesheet-{$suffix}.pdf");
+        }
+
         $query = Timesheet::with(['employee', 'project']);
 
         if ($validated['employee_id'] ?? null) $query->where('employee_id', $validated['employee_id']);
