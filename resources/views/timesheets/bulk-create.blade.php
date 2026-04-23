@@ -138,6 +138,15 @@
                         </button>
                     </div>
                 </div>
+                <div class="mt-3 flex gap-2 flex-wrap text-xs">
+                    <button type="button" onclick="setAllPresent(true)" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded">
+                        Mark all present
+                    </button>
+                    <button type="button" onclick="setAllPresent(false)" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded">
+                        Mark all absent
+                    </button>
+                    <span class="text-[11px] text-blue-700 self-center ml-2">Unticked rows will be skipped — no timesheet created for absent employees.</span>
+                </div>
             </div>
 
             <!-- Crew Members Table -->
@@ -146,6 +155,7 @@
                     <thead class="bg-gray-100 border-b">
                         <tr>
                             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
+                            <th class="px-2 py-3 text-center text-sm font-semibold text-gray-700" title="Untick to mark this employee absent — no timesheet will be created for them.">Present</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Enter hours worked. System splits into Reg/OT using the weekly 40-hr rule.">Hours Worked</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Tick to treat this entry as OT regardless of the weekly total.">Force OT</th>
                             <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Reg</th>
@@ -167,6 +177,11 @@
                                     <div>{{ $employee->first_name }} {{ $employee->last_name }}</div>
                                     <div class="week-hours-badge text-[11px] text-gray-500 mt-0.5">Week so far: —</div>
                                     <input type="hidden" name="entries[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}" class="employee-id">
+                                </td>
+                                <td class="px-2 py-3 text-center">
+                                    {{-- Present: default ON. If unticked, the row is skipped on save
+                                         (no timesheet is created for absent employees). --}}
+                                    <input type="checkbox" name="entries[{{ $loop->index }}][present]" value="1" checked class="present-check rounded border-gray-300 text-green-600 w-5 h-5" onchange="togglePresent(this)">
                                 </td>
                                 <td class="px-2 py-3 text-center">
                                     {{-- Hours worked: server splits Reg/OT using 40-hr/week rule --}}
@@ -220,7 +235,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="13" class="px-6 py-4 text-center text-gray-500">
+                                <td colspan="14" class="px-6 py-4 text-center text-gray-500">
                                     Select a crew to view members
                                 </td>
                             </tr>
@@ -359,6 +374,41 @@
         if (typeof Toast !== 'undefined') {
             Toast.fire({icon:'success', title:'Applied to all rows'});
         }
+    }
+
+    // Present toggle: visually dim the row and disable inputs when absent so
+    // the user can't accidentally type hours or tick per-diem for a no-show.
+    // Unchecked rows are dropped server-side in bulkStore(), so nothing gets
+    // saved for absent employees.
+    function togglePresent(checkbox) {
+        const row = checkbox.closest('tr');
+        if (!row) return;
+        const absent = !checkbox.checked;
+        row.classList.toggle('opacity-50', absent);
+        row.classList.toggle('bg-gray-100', absent);
+        // Disable the data-entry inputs — but NOT the employee_id hidden input
+        // or the Present checkbox itself.
+        row.querySelectorAll('input, select').forEach(el => {
+            if (el === checkbox) return;
+            if (el.type === 'hidden') return;
+            el.disabled = absent;
+        });
+        // Also zero out hours + uncheck per-diem so no lingering values get
+        // submitted if the user re-ticks Present later without reviewing.
+        if (absent) {
+            const hw = row.querySelector('.hours-worked');
+            if (hw) { hw.value = ''; distributeHours(hw); }
+            row.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                if (cb !== checkbox) cb.checked = false;
+            });
+        }
+    }
+
+    function setAllPresent(present) {
+        document.querySelectorAll('.present-check').forEach(cb => {
+            cb.checked = present;
+            togglePresent(cb);
+        });
     }
 
     // First load: if the date field is pre-filled (old() or defaults), fetch.

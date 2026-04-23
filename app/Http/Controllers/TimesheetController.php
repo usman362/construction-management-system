@@ -604,6 +604,7 @@ class TimesheetController extends Controller
             'cost_type_id' => 'nullable|exists:cost_types,id',
             'entries' => 'required|array|min:1',
             'entries.*.employee_id' => 'required|exists:employees,id',
+            'entries.*.present' => 'nullable|boolean',
             'entries.*.work_order_number' => 'nullable|string|max:100',
             // Preferred path: single "hours_worked" input per row → calculator splits.
             'entries.*.hours_worked' => 'nullable|numeric|min:0',
@@ -626,7 +627,15 @@ class TimesheetController extends Controller
         $project = \App\Models\Project::find($validated['project_id']);
         $projectPerDiem = (float) ($project->default_per_diem_rate ?? 0);
 
+        $skipped = 0;
         foreach ($validated['entries'] as $entry) {
+            // Skip absent employees — the "Present" checkbox on the bulk form
+            // defaults ON, so unchecked rows mean the foreman marked them absent.
+            // No timesheet is created for them, keeping reports clean.
+            if (empty($entry['present'])) {
+                $skipped++;
+                continue;
+            }
             $employee = Employee::findOrFail($entry['employee_id']);
             $forceOT = !empty($entry['force_overtime']);
             $split = $this->resolveHourSplit(
@@ -685,17 +694,21 @@ class TimesheetController extends Controller
             $timesheets[] = $timesheet;
         }
 
+        $msg = count($timesheets) . ' timesheet' . (count($timesheets) === 1 ? '' : 's') . ' created'
+            . ($skipped > 0 ? ", {$skipped} absent " . ($skipped === 1 ? 'employee' : 'employees') . ' skipped' : '')
+            . '.';
+
         // If traditional form POST (not AJAX), redirect back with success message
         if (!$request->ajax() && !$request->wantsJson()) {
-            return redirect()->route('timesheets.index')
-                ->with('success', count($timesheets) . ' timesheets created successfully.');
+            return redirect()->route('timesheets.index')->with('success', $msg);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Bulk timesheets created successfully.',
+            'message' => $msg,
             'timesheets' => $timesheets,
             'count' => count($timesheets),
+            'skipped' => $skipped,
         ], 201);
     }
 
