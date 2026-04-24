@@ -68,29 +68,49 @@
             <span class="text-xs text-gray-500">{{ count($recentProjects ?? []) }} active</span>
         </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table class="w-full">
+            <table id="dashboardProjectsTable" class="w-full">
                 <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                    {{-- Column headers are click-to-sort. `data-sort-type` tells the JS
+                         which comparator to use ('string' / 'number' / 'date'). The first
+                         click sorts ascending; a second click on the same column toggles
+                         to descending. An arrow indicator shows the current direction. --}}
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Project #</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Project</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Client</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Estimate</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Budget</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">% Committed</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Profit Margin</th>
+                        <th data-sort-type="string" class="dash-sort px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            Project # <span class="sort-ind text-gray-400">↕</span>
+                        </th>
+                        <th data-sort-type="string" class="dash-sort px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            Project <span class="sort-ind text-gray-400">↕</span>
+                        </th>
+                        <th data-sort-type="string" class="dash-sort px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            Client <span class="sort-ind text-gray-400">↕</span>
+                        </th>
+                        <th data-sort-type="string" class="dash-sort px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            Status <span class="sort-ind text-gray-400">↕</span>
+                        </th>
+                        <th data-sort-type="number" class="dash-sort px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            Estimate <span class="sort-ind text-gray-400">↕</span>
+                        </th>
+                        <th data-sort-type="number" class="dash-sort px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            Budget <span class="sort-ind text-gray-400">↕</span>
+                        </th>
+                        <th data-sort-type="number" class="dash-sort px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            % Committed <span class="sort-ind text-gray-400">↕</span>
+                        </th>
+                        <th data-sort-type="number" class="dash-sort px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100">
+                            Profit Margin <span class="sort-ind text-gray-400">↕</span>
+                        </th>
                         <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     @forelse($recentProjects ?? [] as $project)
                         <tr class="hover:bg-gray-50 transition">
-                            <td class="px-4 py-4 whitespace-nowrap font-mono text-sm font-semibold text-blue-700">{{ $project->project_number ?? '—' }}</td>
-                            <td class="px-4 py-4 whitespace-nowrap">
+                            <td data-sort-value="{{ $project->project_number ?? '' }}" class="px-4 py-4 whitespace-nowrap font-mono text-sm font-semibold text-blue-700">{{ $project->project_number ?? '—' }}</td>
+                            <td data-sort-value="{{ $project->name ?? '' }}" class="px-4 py-4 whitespace-nowrap">
                                 <p class="font-medium text-gray-900">{{ $project->name ?? 'N/A' }}</p>
                             </td>
-                            <td class="px-4 py-4 whitespace-nowrap text-gray-600">{{ $project->client?->name ?? 'N/A' }}</td>
-                            <td class="px-4 py-4 whitespace-nowrap">
+                            <td data-sort-value="{{ $project->client?->name ?? '' }}" class="px-4 py-4 whitespace-nowrap text-gray-600">{{ $project->client?->name ?? 'N/A' }}</td>
+                            <td data-sort-value="{{ $project->status ?? '' }}" class="px-4 py-4 whitespace-nowrap">
                                 @if(($project->status ?? null) === 'active')
                                     <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
                                 @elseif(($project->status ?? null) === 'completed')
@@ -105,9 +125,9 @@
                                     <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{{ ucfirst($project->status ?? 'Unknown') }}</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->estimate ?? 0, 2) }}</td>
-                            <td class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->budget ?? 0, 2) }}</td>
-                            <td class="px-4 py-4 whitespace-nowrap">
+                            <td data-sort-value="{{ (float) ($project->dashboard_estimate ?? $project->estimate ?? 0) }}" class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->dashboard_estimate ?? $project->estimate ?? 0, 2) }}</td>
+                            <td data-sort-value="{{ (float) ($project->budget ?? 0) }}" class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->budget ?? 0, 2) }}</td>
+                            <td data-sort-value="{{ (float) ($project->committed_percentage ?? 0) }}" class="px-4 py-4 whitespace-nowrap">
                                 <div class="flex items-center space-x-2">
                                     <div class="w-16 bg-gray-200 rounded-full h-2">
                                         <div class="bg-blue-600 h-2 rounded-full" style="width: {{ ($project->committed_percentage ?? 0) }}%"></div>
@@ -115,7 +135,7 @@
                                     <span class="text-sm text-gray-600">{{ ($project->committed_percentage ?? 0) }}%</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-4 whitespace-nowrap">
+                            <td data-sort-value="{{ (float) ($project->profit_margin ?? 0) }}" class="px-4 py-4 whitespace-nowrap">
                                 <span class="font-medium {{ ($project->profit_margin ?? 0) >= 0 ? 'text-green-600' : 'text-red-600' }}">
                                     {{ ($project->profit_margin ?? 0) >= 0 ? '+' : '' }}{{ number_format($project->profit_margin ?? 0, 1) }}%
                                 </span>
@@ -275,5 +295,48 @@
         if (!projectId) { alert('Please select a project first.'); return; }
         window.location.href = window.BASE_URL+'/projects/' + projectId + '/change-orders';
     }
+
+    // ─── Dashboard Projects table: client-side sort ────────────────────
+    // Click a header → sort rows by that column. Click same header again
+    // to reverse direction. Numeric columns expose their raw value via
+    // `data-sort-value` on the <td> so "$538,865.74" compares as a number.
+    (function () {
+        const table = document.getElementById('dashboardProjectsTable');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        const headers = table.querySelectorAll('th.dash-sort');
+
+        headers.forEach((th, idx) => {
+            th.addEventListener('click', () => {
+                const type = th.dataset.sortType || 'string';
+                const current = th.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+
+                // Reset all arrow indicators, then mark the active one.
+                headers.forEach(h => {
+                    h.dataset.sortDir = '';
+                    const ind = h.querySelector('.sort-ind');
+                    if (ind) { ind.textContent = '↕'; ind.className = 'sort-ind text-gray-400'; }
+                });
+                th.dataset.sortDir = current;
+                const ind = th.querySelector('.sort-ind');
+                if (ind) { ind.textContent = current === 'asc' ? '↑' : '↓'; ind.className = 'sort-ind text-blue-600'; }
+
+                // Skip the empty-state row (colspan=9) if it's the only one.
+                const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.children.length > 1);
+                rows.sort((a, b) => {
+                    const av = (a.children[idx]?.dataset.sortValue ?? a.children[idx]?.textContent ?? '').trim();
+                    const bv = (b.children[idx]?.dataset.sortValue ?? b.children[idx]?.textContent ?? '').trim();
+                    let cmp;
+                    if (type === 'number') {
+                        cmp = (parseFloat(av) || 0) - (parseFloat(bv) || 0);
+                    } else {
+                        cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' });
+                    }
+                    return current === 'asc' ? cmp : -cmp;
+                });
+                rows.forEach(r => tbody.appendChild(r));
+            });
+        });
+    })();
     </script>
 @endsection

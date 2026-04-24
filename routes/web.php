@@ -338,6 +338,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
         Route::get('admin/time-clock', [\App\Http\Controllers\TimeClockController::class, 'adminIndex'])->name('time-clock.admin');
         Route::post('admin/time-clock/convert', [\App\Http\Controllers\TimeClockController::class, 'convertToTimesheet'])->name('time-clock.convert');
+        Route::post('admin/time-clock/{entry}', [\App\Http\Controllers\TimeClockController::class, 'updateEntry'])->name('time-clock.update');
         Route::post('admin/time-clock/{entry}/void', [\App\Http\Controllers\TimeClockController::class, 'void'])->name('time-clock.void');
     });
 

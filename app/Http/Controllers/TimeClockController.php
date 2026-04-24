@@ -16,8 +16,12 @@ use Illuminate\View\View;
 class TimeClockController extends Controller
 {
     /**
-     * Mobile "My Time" page — shows current open punch (if any) and recent
-     * history, plus project picker + big clock-in button.
+     * Mobile "My Time" page — shows current open punch (if any), recent
+     * history, project picker + big Clock In / Clock Out buttons.
+     *
+     * Each user is locked to their own employee record (matched by email).
+     * Cost code is NOT picked by the worker — the supervisor assigns it
+     * later on the review page, before converting to a timesheet.
      */
     public function index(Request $request): View
     {
@@ -40,35 +44,39 @@ class TimeClockController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'project_number', 'latitude', 'longitude', 'geofence_radius_m']);
 
-        // If a user has a matching employee (by email), pre-fill it. Otherwise
-        // the UI shows an employee picker — common for supervisors logging crew time.
-        $matchedEmployee = Employee::where('email', $user->email)->first();
-        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'employee_number']);
+        // Each worker only ever sees themselves. If their login email doesn't
+        // match any employee record, the UI asks them to contact their
+        // supervisor rather than letting them clock in as someone else.
+        $myEmployee = Employee::where('email', $user->email)->first();
 
-        $costCodes = CostCode::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
-
-        return view('time-clock.index', compact(
-            'openEntry', 'recent', 'projects', 'matchedEmployee', 'employees', 'costCodes'
-        ));
+        return view('time-clock.index', compact('openEntry', 'recent', 'projects', 'myEmployee'));
     }
 
     /**
      * Start a new punch. Captures GPS + compares to project geofence.
-     * Returns JSON so the mobile UI can update without reloading.
+     * Always clocks in as the logged-in user's linked employee —
+     * no employee selection happens client-side.
      */
     public function clockIn(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'project_id'  => 'required|exists:projects,id',
-            'employee_id' => 'nullable|exists:employees,id',
-            'cost_code_id'=> 'nullable|exists:cost_codes,id',
-            'lat'         => 'nullable|numeric|between:-90,90',
-            'lng'         => 'nullable|numeric|between:-180,180',
-            'accuracy_m'  => 'nullable|integer|min:0|max:65535',
-            'notes'       => 'nullable|string|max:500',
+            'project_id' => 'required|exists:projects,id',
+            'lat'        => 'nullable|numeric|between:-90,90',
+            'lng'        => 'nullable|numeric|between:-180,180',
+            'accuracy_m' => 'nullable|integer|min:0|max:65535',
+            'notes'      => 'nullable|string|max:500',
         ]);
 
         $user = $request->user();
+
+        // Server-side employee lookup — the worker cannot clock in as anyone else.
+        $myEmployee = Employee::where('email', $user->email)->first();
+        if (!$myEmployee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your login is not linked to an employee profile. Please contact your supervisor to set this up before clocking in.',
+            ], 422);
+        }
 
         // One open punch at a time — prevents forgotten clock-outs piling up.
         $existingOpen = TimeClockEntry::where('user_id', $user->id)->where('status', 'open')->first();
@@ -84,14 +92,15 @@ class TimeClockController extends Controller
         $lat = isset($data['lat']) ? (float) $data['lat'] : null;
         $lng = isset($data['lng']) ? (float) $data['lng'] : null;
 
-        $distance   = $project->distanceToMeters($lat, $lng);
-        $within     = $project->isWithinGeofence($lat, $lng);
+        $distance = $project->distanceToMeters($lat, $lng);
+        $within   = $project->isWithinGeofence($lat, $lng);
 
         $entry = TimeClockEntry::create([
             'user_id'             => $user->id,
-            'employee_id'         => $data['employee_id'] ?? null,
+            'employee_id'         => $myEmployee->id,
             'project_id'          => $project->id,
-            'cost_code_id'        => $data['cost_code_id'] ?? null,
+            // cost_code_id intentionally null — supervisor sets this during review.
+            'cost_code_id'        => null,
             'clock_in_at'         => now(),
             'clock_in_lat'        => $lat,
             'clock_in_lng'        => $lng,
@@ -160,18 +169,49 @@ class TimeClockController extends Controller
         $entries = $query->orderByDesc('clock_in_at')->paginate(30)->withQueryString();
 
         return view('time-clock.admin', [
-            'entries'   => $entries,
-            'projects'  => Project::orderBy('name')->get(['id', 'name', 'project_number']),
-            'users'     => \App\Models\User::orderBy('name')->get(['id', 'name']),
+            'entries'      => $entries,
+            'projects'     => Project::orderBy('name')->get(['id', 'name', 'project_number']),
+            'users'        => \App\Models\User::orderBy('name')->get(['id', 'name']),
+            'costCodes'    => CostCode::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
             'statusLabels' => TimeClockEntry::$statusLabels,
-            'filters'   => $request->only(['project_id', 'user_id', 'status', 'outside_geofence', 'from', 'to']),
+            'filters'      => $request->only(['project_id', 'user_id', 'status', 'outside_geofence', 'from', 'to']),
+        ]);
+    }
+
+    /**
+     * Supervisor action: assign the cost code (and optionally the employee
+     * or notes) to an existing punch before conversion. The worker never
+     * sees this field — it's the supervisor's job to code the time.
+     */
+    public function updateEntry(Request $request, TimeClockEntry $entry): JsonResponse
+    {
+        $data = $request->validate([
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'employee_id'  => 'nullable|exists:employees,id',
+            'notes'        => 'nullable|string|max:1000',
+        ]);
+
+        if ($entry->status === 'converted') {
+            return response()->json(['success' => false, 'message' => 'Cannot edit a converted punch. Edit the linked timesheet instead.'], 422);
+        }
+
+        $entry->update($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Punch updated.',
+            'entry'   => $entry->fresh(['project', 'employee', 'costCode']),
         ]);
     }
 
     /**
      * Convert one or more closed punches into a single-day timesheet.
-     * Groups selected entries by (employee, project, date); each group
-     * becomes one Timesheet row with summed hours.
+     * Groups selected entries by (employee, project, cost_code, date); each
+     * group becomes one Timesheet row with summed hours.
+     *
+     * Cost code is REQUIRED on every selected punch — the supervisor assigns
+     * it on this page before converting. We fail loudly if any punch is
+     * missing one so time never lands on a timesheet uncoded.
      */
     public function convertToTimesheet(Request $request): JsonResponse|RedirectResponse
     {
@@ -192,10 +232,35 @@ class TimeClockController extends Controller
             ], 422);
         }
 
-        $created = 0;
-        DB::transaction(function () use ($entries, $request, &$created) {
-            $groups = $entries->groupBy(fn ($e) => $e->employee_id . '|' . $e->project_id . '|' . $e->clock_in_at->toDateString());
+        // Guard: block conversion when any selected punch is missing a cost code.
+        $uncoded = $entries->whereNull('cost_code_id');
+        if ($uncoded->isNotEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Assign a cost code to every selected punch before converting. Missing on: '
+                    . $uncoded->pluck('id')->implode(', '),
+            ], 422);
+        }
 
+        // DB-level unique on timesheets is (employee_id, project_id, date), so
+        // we group by those three. If a supervisor assigned DIFFERENT cost
+        // codes to punches for the same worker/project/day, reject — they
+        // need to fix the codes before conversion (or split over two days).
+        $groups = $entries->groupBy(fn ($e) => $e->employee_id . '|' . $e->project_id . '|' . $e->clock_in_at->toDateString());
+
+        foreach ($groups as $key => $group) {
+            $codes = $group->pluck('cost_code_id')->unique();
+            if ($codes->count() > 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Punches on the same day for the same worker/project must share one cost code before converting. Fix punches: '
+                        . $group->pluck('id')->implode(', '),
+                ], 422);
+            }
+        }
+
+        $created = 0;
+        DB::transaction(function () use ($groups, &$created) {
             foreach ($groups as $group) {
                 $first = $group->first();
                 $totalHours = (float) $group->sum('hours');
@@ -209,6 +274,7 @@ class TimeClockController extends Controller
                         'date'        => $first->clock_in_at->toDateString(),
                     ],
                     [
+                        'cost_code_id'   => $first->cost_code_id,
                         'regular_hours'  => $regular,
                         'overtime_hours' => $overtime,
                         'total_hours'    => $totalHours,

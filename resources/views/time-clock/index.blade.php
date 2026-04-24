@@ -49,9 +49,29 @@
         <div class="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
             <h3 class="text-base font-semibold text-gray-900">Start a new punch</h3>
 
+            {{-- Worker identity: locked to the logged-in user's matched employee.
+                 If no match, the "Clock In" button is disabled — they must contact
+                 their supervisor, not pick someone else from a list. --}}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Clocking in as</label>
+                @if($myEmployee)
+                    <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <div class="text-base font-semibold text-gray-900">
+                            {{ $myEmployee->first_name }} {{ $myEmployee->last_name }}
+                        </div>
+                    </div>
+                @else
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                        Your login is not linked to an employee profile.
+                        Please contact your supervisor before clocking in.
+                    </div>
+                @endif
+            </div>
+
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
-                <select id="ciProjectId" class="w-full border border-gray-300 rounded-lg px-3 py-3 text-base">
+                <select id="ciProjectId" class="w-full border border-gray-300 rounded-lg px-3 py-3 text-base" {{ $myEmployee ? '' : 'disabled' }}>
                     <option value="">— Select project —</option>
                     @foreach($projects as $p)
                         <option value="{{ $p->id }}" data-lat="{{ $p->latitude }}" data-lng="{{ $p->longitude }}" data-radius="{{ $p->geofence_radius_m }}">
@@ -62,40 +82,16 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Employee {{ $matchedEmployee ? '' : '*' }}</label>
-                <select id="ciEmployeeId" class="w-full border border-gray-300 rounded-lg px-3 py-3 text-base">
-                    <option value="">— Select —</option>
-                    @foreach($employees as $e)
-                        <option value="{{ $e->id }}" @selected($matchedEmployee && $matchedEmployee->id === $e->id)>
-                            {{ $e->employee_number ? '#' . $e->employee_number . ' — ' : '' }}{{ $e->first_name }} {{ $e->last_name }}
-                        </option>
-                    @endforeach
-                </select>
-                @if(!$matchedEmployee)
-                    <p class="text-xs text-gray-500 mt-1">No employee matches your login email — please pick from the list.</p>
-                @endif
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cost Code (optional)</label>
-                <select id="ciCostCodeId" class="w-full border border-gray-300 rounded-lg px-3 py-3 text-base">
-                    <option value="">— None —</option>
-                    @foreach($costCodes as $c)
-                        <option value="{{ $c->id }}">{{ $c->code }} — {{ $c->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea id="ciNotes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. starting pour at slab B"></textarea>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                <textarea id="ciNotes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. starting pour at slab B" {{ $myEmployee ? '' : 'disabled' }}></textarea>
             </div>
 
             <div id="projectGeoFeedback" class="hidden text-xs rounded-lg p-2"></div>
 
-            <button type="button" onclick="doClockIn()" class="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-lg py-5 rounded-xl shadow-md transition">
+            <button type="button" onclick="doClockIn()" class="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-lg py-5 rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed" {{ $myEmployee ? '' : 'disabled' }}>
                 Clock In
             </button>
+            <p class="text-xs text-gray-500 text-center">Your supervisor assigns the cost code later during review — just clock in and out.</p>
         </div>
     @endif
 
@@ -216,17 +212,16 @@ function showActionStatus(kind, msg) {
 }
 
 async function doClockIn() {
+    const projSel = document.getElementById('ciProjectId');
+    const notes   = document.getElementById('ciNotes');
     const payload = {
-        project_id:   document.getElementById('ciProjectId').value,
-        employee_id:  document.getElementById('ciEmployeeId').value || null,
-        cost_code_id: document.getElementById('ciCostCodeId').value || null,
-        notes:        document.getElementById('ciNotes').value || null,
-        lat:          currentPosition?.lat ?? null,
-        lng:          currentPosition?.lng ?? null,
-        accuracy_m:   currentPosition?.accuracy ?? null,
+        project_id: projSel?.value,
+        notes:      notes?.value || null,
+        lat:        currentPosition?.lat ?? null,
+        lng:        currentPosition?.lng ?? null,
+        accuracy_m: currentPosition?.accuracy ?? null,
     };
     if (!payload.project_id) { showActionStatus('error', 'Select a project first.'); return; }
-    if (!payload.employee_id) { showActionStatus('error', 'Select an employee first.'); return; }
 
     const r = await fetch(TC_BASE + '/clock-in', {
         method: 'POST',

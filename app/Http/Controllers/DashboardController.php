@@ -14,10 +14,34 @@ class DashboardController extends Controller
     public function index(): View
     {
         // ── Active projects (non-closed/completed) ──
+        // Eager-load `estimates` so we can fall back to the sum of approved
+        // estimate records when the project's direct `estimate` column is
+        // empty. Clients often build estimates through the Estimates module
+        // rather than typing a single number into the project form, so the
+        // dashboard should pick up either source.
         $activeProjects = Project::whereNotIn('status', ['closed', 'completed'])
-            ->with(['client', 'commitments', 'invoices'])
+            ->with(['client', 'commitments', 'invoices', 'estimates'])
             ->orderBy('created_at', 'desc')
             ->get();
+
+        // Compute a single `dashboard_estimate` value per project:
+        //   1. Direct `estimate` column if > 0
+        //   2. Otherwise, sum of approved Estimate records
+        //   3. Otherwise, `contract_value` (last-resort fallback)
+        foreach ($activeProjects as $p) {
+            $direct = (float) ($p->estimate ?? 0);
+            if ($direct > 0) {
+                $p->dashboard_estimate = $direct;
+                continue;
+            }
+            $approvedSum = (float) $p->estimates->where('status', 'approved')->sum('total_amount');
+            if ($approvedSum > 0) {
+                $p->dashboard_estimate = $approvedSum;
+                continue;
+            }
+            $anySum = (float) $p->estimates->sum('total_amount');
+            $p->dashboard_estimate = $anySum > 0 ? $anySum : (float) ($p->contract_value ?? 0);
+        }
 
         $activeProjectsCount = $activeProjects->count();
 

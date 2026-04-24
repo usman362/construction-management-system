@@ -90,6 +90,7 @@
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Clocked In</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Clocked Out</th>
                         <th class="px-3 py-2 text-right font-medium text-gray-600">Hours</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-600">Cost Code <span class="text-[10px] text-gray-400 font-normal">(assign)</span></th>
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Geofence</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Status</th>
                         <th class="px-3 py-2 text-center font-medium text-gray-600">Actions</th>
@@ -118,6 +119,28 @@
                                 {{ $e->clock_out_at ? $e->clock_out_at->format('M j, g:iA') : '—' }}
                             </td>
                             <td class="px-3 py-2 text-right font-medium">{{ $e->hours !== null ? number_format((float)$e->hours, 2) : '—' }}</td>
+                            <td class="px-3 py-2">
+                                @if(in_array($e->status, ['closed', 'open']))
+                                    <select class="tc-code w-full border border-gray-300 rounded px-2 py-1 text-xs"
+                                            data-entry-id="{{ $e->id }}"
+                                            onchange="updateCostCode(this)">
+                                        <option value="">— none —</option>
+                                        @foreach($costCodes as $c)
+                                            <option value="{{ $c->id }}" @selected($e->cost_code_id === $c->id)>
+                                                {{ $c->code }} — {{ $c->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if(!$e->cost_code_id && $e->status === 'closed')
+                                        <div class="text-[10px] text-amber-700 mt-0.5">⚠ needs code</div>
+                                    @endif
+                                @elseif($e->costCode)
+                                    <span class="text-xs font-mono text-gray-700">{{ $e->costCode->code }}</span>
+                                    <div class="text-[10px] text-gray-500">{{ $e->costCode->name }}</div>
+                                @else
+                                    <span class="text-xs text-gray-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-3 py-2 text-xs">
                                 @if($e->within_geofence === true)
                                     <span class="text-green-700 font-semibold">✓ On site</span>
@@ -189,6 +212,23 @@ async function convertSelected() {
     if (!r.ok) { showTcStatus('error', body.message || 'Conversion failed.'); return; }
     showTcStatus('ok', body.message);
     setTimeout(() => location.reload(), 900);
+}
+
+async function updateCostCode(sel) {
+    const id = sel.dataset.entryId;
+    const val = sel.value || null;
+    const r = await fetch(window.BASE_URL + '/admin/time-clock/' + id, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+        body: JSON.stringify({ cost_code_id: val }),
+    });
+    const body = await r.json();
+    if (!r.ok) { showTcStatus('error', body.message || 'Update failed.'); return; }
+    showTcStatus('ok', 'Cost code saved.');
+
+    // Clear the "needs code" warning below the select if a code is now set.
+    const warn = sel.parentElement.querySelector('div.text-amber-700');
+    if (warn && val) warn.remove();
 }
 
 async function voidEntry(id) {
