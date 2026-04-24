@@ -9,71 +9,60 @@
         <p class="text-blue-100">{{ now()->format('l, F j, Y') }} - Manage your construction projects with ease</p>
     </div>
 
-    <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    {{-- ═══════════════════════════════════════════════════════════════════
+         KPI TILES — click-through where a destination makes sense.
+         Tile set redesigned in Phase 1 to surface risk signals at a glance:
+         over-budget projects, near-budget projects, expiring certs.
+         ═══════════════════════════════════════════════════════════════════ --}}
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <!-- Active Projects -->
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-600">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Active Projects</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ $stats['activeProjects'] ?? 0 }}</p>
-                </div>
-                <div class="bg-blue-100 rounded-full p-3">
-                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
+        <a href="{{ route('projects.index') }}" class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border-l-4 border-blue-600 block">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Active Projects</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ $stats['activeProjects'] ?? 0 }}</p>
+            <p class="text-[11px] text-blue-600 mt-1">View all &rarr;</p>
+        </a>
 
-        <!-- Total Employees -->
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-600">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Total Employees</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ $stats['totalEmployees'] ?? 0 }}</p>
-                </div>
-                <div class="bg-green-100 rounded-full p-3">
-                    <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292m0-5.292a4 4 0 100 5.292m0-5.292A4.353 4.353 0 005.364 9M9 9H5.364m0 0a4 4 0 010 5.292m13.5-2.646a4 4 0 010-5.292m0 5.292A4.353 4.353 0 0118.636 9m-13.272 0h13.272"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
+        <!-- Over Budget (risk: committed exceeds budget) -->
+        <a href="#certifications-watch" onclick="document.getElementById('projects-section').scrollIntoView({behavior:'smooth'}); return false;" class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border-l-4 {{ ($stats['overBudget'] ?? 0) > 0 ? 'border-red-600' : 'border-gray-300' }} block">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Over Budget</p>
+            <p class="text-3xl font-bold {{ ($stats['overBudget'] ?? 0) > 0 ? 'text-red-600' : 'text-gray-900' }} mt-2">{{ $stats['overBudget'] ?? 0 }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">Committed &gt; budget</p>
+        </a>
 
-        <!-- Pending Timesheets -->
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-600">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Pending Timesheets</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ $stats['pendingTimesheets'] ?? 0 }}</p>
-                </div>
-                <div class="bg-yellow-100 rounded-full p-3">
-                    <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
+        <!-- Near Budget (90-100% committed — early warning) -->
+        <a href="#projects-section" onclick="document.getElementById('projects-section').scrollIntoView({behavior:'smooth'}); return false;" class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border-l-4 {{ ($stats['nearBudget'] ?? 0) > 0 ? 'border-amber-500' : 'border-gray-300' }} block">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">&ge;90% Committed</p>
+            <p class="text-3xl font-bold {{ ($stats['nearBudget'] ?? 0) > 0 ? 'text-amber-600' : 'text-gray-900' }} mt-2">{{ $stats['nearBudget'] ?? 0 }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">Approaching budget</p>
+        </a>
+
+        <!-- Pending Timesheet Approvals -->
+        <a href="{{ route('timesheets.index') }}?status=pending" class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border-l-4 border-yellow-500 block">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Pending T-Sheets</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ $stats['pendingTimesheets'] ?? 0 }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">Awaiting approval</p>
+        </a>
 
         <!-- Open Change Orders -->
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-600">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Open Change Orders</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ $stats['openChangeOrders'] ?? 0 }}</p>
-                </div>
-                <div class="bg-red-100 rounded-full p-3">
-                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                </div>
-            </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-purple-600 block">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Open COs</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ $stats['openChangeOrders'] ?? 0 }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">Pending approval</p>
         </div>
+
+        <!-- Expiring Certifications (combined: expired + next 30 days) -->
+        @php $certAlerts = ($stats['expiredCerts'] ?? 0) + ($stats['expiring30Certs'] ?? 0); @endphp
+        <a href="#certifications-watch" onclick="document.getElementById('certifications-watch').scrollIntoView({behavior:'smooth'}); return false;" class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border-l-4 {{ $certAlerts > 0 ? 'border-rose-600' : 'border-green-600' }} block">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Cert Alerts</p>
+            <p class="text-3xl font-bold {{ $certAlerts > 0 ? 'text-rose-600' : 'text-gray-900' }} mt-2">{{ $certAlerts }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">
+                {{ $stats['expiredCerts'] ?? 0 }} expired &bull; {{ $stats['expiring30Certs'] ?? 0 }} in 30d
+            </p>
+        </a>
     </div>
 
     <!-- Recent Projects Table -->
-    <div class="bg-white rounded-lg shadow mb-8">
+    <div id="projects-section" class="bg-white rounded-lg shadow mb-8">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 class="text-lg font-bold text-gray-900">Projects</h3>
             <span class="text-xs text-gray-500">{{ count($recentProjects ?? []) }} active</span>
@@ -140,6 +129,100 @@
                     @empty
                         <tr>
                             <td colspan="9" class="px-6 py-4 text-center text-gray-500">No projects found. Create your first project to get started.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════════
+         CERTIFICATIONS WATCH — Phase 1 widget
+         Pulls every cert with an expiry_date, buckets by urgency, and shows
+         the 20 most urgent so the PM/admin can renew before they lapse.
+         ═══════════════════════════════════════════════════════════════════ --}}
+    <div id="certifications-watch" class="bg-white rounded-lg shadow mb-8">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+                <h3 class="text-lg font-bold text-gray-900">Certifications Watch</h3>
+                <span class="text-xs text-gray-500">Next 90 days + already expired</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs">
+                <span class="px-2 py-1 rounded-full bg-rose-100 text-rose-800 font-semibold">
+                    {{ $stats['expiredCerts'] ?? 0 }} Expired
+                </span>
+                <span class="px-2 py-1 rounded-full bg-red-100 text-red-800 font-semibold">
+                    {{ $stats['expiring30Certs'] ?? 0 }} in 30 days
+                </span>
+                <span class="px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">
+                    {{ $stats['expiring60Certs'] ?? 0 }} in 31–60 days
+                </span>
+                <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 font-semibold">
+                    {{ $stats['expiring90Certs'] ?? 0 }} in 61–90 days
+                </span>
+            </div>
+        </div>
+        <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Employee</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Certification</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Issuing Authority</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Expiry Date</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @forelse($certWatchList ?? [] as $cert)
+                        @php
+                            $days = (int) floor(\Carbon\Carbon::now()->startOfDay()->diffInDays($cert->expiry_date, false));
+                            // Bucket for badge styling:
+                            if ($days < 0)        { $badge = 'bg-rose-100 text-rose-800';    $label = 'Expired ' . abs($days) . 'd ago'; }
+                            elseif ($days <= 30)  { $badge = 'bg-red-100 text-red-800';      $label = 'Expires in ' . $days . 'd'; }
+                            elseif ($days <= 60)  { $badge = 'bg-amber-100 text-amber-800';  $label = 'Expires in ' . $days . 'd'; }
+                            else                  { $badge = 'bg-yellow-100 text-yellow-800';$label = 'Expires in ' . $days . 'd'; }
+                        @endphp
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <p class="font-medium text-gray-900">{{ $cert->employee?->first_name }} {{ $cert->employee?->last_name }}</p>
+                                @if($cert->employee?->employee_number)
+                                    <p class="text-[11px] text-gray-500 font-mono">#{{ $cert->employee->employee_number }}</p>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <p class="text-sm text-gray-900">{{ $cert->name }}</p>
+                                @if($cert->certification_number)
+                                    <p class="text-[11px] text-gray-500">#{{ $cert->certification_number }}</p>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ $cert->issuing_authority ?? '—' }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-center text-sm text-gray-900 font-semibold">
+                                {{ $cert->expiry_date->format('M j, Y') }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-center">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {{ $badge }}">{{ $label }}</span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-center">
+                                @if($cert->employee_id)
+                                    <a href="{{ route('employees.show', $cert->employee_id) }}" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-blue-600 hover:bg-blue-50" title="Open employee">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    </a>
+                                @endif
+                                @if($cert->file_path)
+                                    <a href="{{ route('certifications.download', $cert->id) }}" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-600 hover:bg-gray-100" title="Download file">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                                    </a>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                                <svg class="w-10 h-10 text-green-500 mx-auto mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                All certifications are current. Nothing expires in the next 90 days.
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

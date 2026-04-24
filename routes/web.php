@@ -74,6 +74,9 @@ Route::middleware('auth')->group(function () {
         Route::get('admin/system/status', [SystemMaintenanceController::class, 'status'])->name('admin.system.status');
         Route::post('admin/system/clear-cache', [SystemMaintenanceController::class, 'clearCache'])->name('admin.system.clear-cache');
         Route::post('admin/system/storage-link', [SystemMaintenanceController::class, 'storageLink'])->name('admin.system.storage-link');
+
+        // Audit Log — Admin only (append-only history of changes to Timesheets, COs, Invoices)
+        Route::get('admin/audit-logs', [\App\Http\Controllers\AuditLogController::class, 'index'])->name('admin.audit-logs.index');
     });
 
     // ─── Documents (polymorphic — any authenticated user can view/download) ──
@@ -128,6 +131,26 @@ Route::middleware('auth')->group(function () {
         // Commitments — Admin, PM, Accountant
         Route::middleware('role:admin,project_manager,accountant')->group(function () {
             Route::resource('commitments', CommitmentController::class);
+        });
+
+        // Lien Waivers (project-scoped) — Admin, PM, Accountant
+        Route::middleware('role:admin,project_manager,accountant')->group(function () {
+            Route::get('lien-waivers', [\App\Http\Controllers\LienWaiverController::class, 'projectIndex'])->name('lien-waivers.index');
+            Route::post('lien-waivers', [\App\Http\Controllers\LienWaiverController::class, 'store'])->name('lien-waivers.store');
+            Route::get('lien-waivers/{lienWaiver}', [\App\Http\Controllers\LienWaiverController::class, 'show'])->name('lien-waivers.show');
+            Route::put('lien-waivers/{lienWaiver}', [\App\Http\Controllers\LienWaiverController::class, 'update'])->name('lien-waivers.update');
+            Route::delete('lien-waivers/{lienWaiver}', [\App\Http\Controllers\LienWaiverController::class, 'destroy'])->name('lien-waivers.destroy');
+        });
+
+        // RFIs (project-scoped) — Admin, PM, Field (field users can submit + view)
+        Route::middleware('role:admin,project_manager,field_user')->group(function () {
+            Route::get('rfis', [\App\Http\Controllers\RfiController::class, 'projectIndex'])->name('rfis.index');
+            Route::post('rfis', [\App\Http\Controllers\RfiController::class, 'store'])->name('rfis.store');
+            Route::get('rfis/{rfi}', [\App\Http\Controllers\RfiController::class, 'show'])->name('rfis.show');
+            Route::put('rfis/{rfi}', [\App\Http\Controllers\RfiController::class, 'update'])->name('rfis.update');
+            Route::delete('rfis/{rfi}', [\App\Http\Controllers\RfiController::class, 'destroy'])->name('rfis.destroy');
+            Route::post('rfis/{rfi}/respond', [\App\Http\Controllers\RfiController::class, 'respond'])->name('rfis.respond');
+            Route::post('rfis/{rfi}/close', [\App\Http\Controllers\RfiController::class, 'close'])->name('rfis.close');
         });
 
         // Manhour Budgets — Admin, PM
@@ -290,6 +313,32 @@ Route::middleware('auth')->group(function () {
         Route::post('billing/{billingInvoice}/send', [BillingController::class, 'send'])->name('billing.send');
         Route::post('billing/{billingInvoice}/mark-paid', [BillingController::class, 'markPaid'])->name('billing.mark-paid');
         Route::get('billing/{billingInvoice}/pdf', [BillingController::class, 'downloadPdf'])->name('billing.pdf');
+
+        // Mark retainage released (project-scoped)
+        Route::post('billing/{billingInvoice}/release-retainage', [BillingController::class, 'releaseRetainage'])->name('billing.release-retainage');
+    });
+
+    // ─── Lien Waivers — Admin, PM, Accountant ────────────────────
+    Route::middleware('role:admin,project_manager,accountant')->group(function () {
+        Route::get('lien-waivers', [\App\Http\Controllers\LienWaiverController::class, 'index'])->name('lien-waivers.index');
+    });
+
+    // ─── RFIs — Admin, PM, Field User ────────────────────────────
+    Route::middleware('role:admin,project_manager,field_user')->group(function () {
+        Route::get('rfis', [\App\Http\Controllers\RfiController::class, 'index'])->name('rfis.index');
+    });
+
+    // ─── Mobile Time Clock — everyone who can touch a timesheet ───
+    // "My Time" is open to anyone logged in; they can only see their own punches.
+    Route::get('my-time', [\App\Http\Controllers\TimeClockController::class, 'index'])->name('time-clock.index');
+    Route::post('my-time/clock-in', [\App\Http\Controllers\TimeClockController::class, 'clockIn'])->name('time-clock.clock-in');
+    Route::post('my-time/{entry}/clock-out', [\App\Http\Controllers\TimeClockController::class, 'clockOut'])->name('time-clock.clock-out');
+
+    // Admin / PM review — review + convert punches to timesheets.
+    Route::middleware('role:admin,project_manager,accountant')->group(function () {
+        Route::get('admin/time-clock', [\App\Http\Controllers\TimeClockController::class, 'adminIndex'])->name('time-clock.admin');
+        Route::post('admin/time-clock/convert', [\App\Http\Controllers\TimeClockController::class, 'convertToTimesheet'])->name('time-clock.convert');
+        Route::post('admin/time-clock/{entry}/void', [\App\Http\Controllers\TimeClockController::class, 'void'])->name('time-clock.void');
     });
 
     // ─── Global Reports ──────────────────────────────────────────

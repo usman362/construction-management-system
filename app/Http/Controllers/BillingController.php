@@ -190,7 +190,11 @@ class BillingController extends Controller
             ->get();
 
         $invoiceAmount = (float) $invoices->sum('amount');
-        $totalAmount = $timesheetAmount + $invoiceAmount;
+        $subtotal = $timesheetAmount + $invoiceAmount;
+
+        // Retainage snapshot from the project default (can be edited on the invoice later).
+        $retainagePercent = (float) ($project->retainage_percent ?? 0);
+        $retainageAmount  = round($subtotal * ($retainagePercent / 100), 2);
 
         $billingInvoice->update([
             'invoice_number' => $validated['invoice_number'],
@@ -199,12 +203,37 @@ class BillingController extends Controller
             'billing_period_end' => $validated['end_date'],
             'labor_amount' => $timesheetAmount,
             'material_amount' => $invoiceAmount,
-            'subtotal' => $totalAmount,
-            'total_amount' => $totalAmount,
+            'subtotal' => $subtotal,
+            'retainage_percent' => $retainagePercent,
+            'retainage_amount' => $retainageAmount,
+            'total_amount' => $subtotal,
             'status' => 'draft',
         ]);
 
         return response()->json(['message' => 'Billing invoice generated successfully']);
+    }
+
+    /**
+     * Mark retainage on this invoice as released (e.g. at substantial completion).
+     */
+    public function releaseRetainage(Request $request, BillingInvoice $billingInvoice): JsonResponse|RedirectResponse
+    {
+        $billingInvoice->update([
+            'retainage_released'      => true,
+            'retainage_released_date' => now()->toDateString(),
+        ]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Retainage marked as released.',
+                'retainage_released_date' => $billingInvoice->retainage_released_date?->format('m/d/Y'),
+            ]);
+        }
+
+        return redirect()
+            ->route('billing.show', $billingInvoice)
+            ->with('success', 'Retainage marked as released.');
     }
 
     public function send(Request $request, BillingInvoice $billingInvoice): JsonResponse|RedirectResponse

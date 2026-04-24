@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BillingInvoice extends Model
 {
+    use Auditable;
+
     protected $table = 'billing_invoices';
 
     protected $fillable = [
@@ -26,6 +29,10 @@ class BillingInvoice extends Model
         'subtotal',
         'tax_rate',
         'tax_amount',
+        'retainage_percent',
+        'retainage_amount',
+        'retainage_released',
+        'retainage_released_date',
         'total_amount',
         'status',
         'sent_date',
@@ -45,6 +52,10 @@ class BillingInvoice extends Model
         'subtotal' => 'decimal:2',
         'tax_rate' => 'decimal:4',
         'tax_amount' => 'decimal:2',
+        'retainage_percent' => 'decimal:2',
+        'retainage_amount' => 'decimal:2',
+        'retainage_released' => 'boolean',
+        'retainage_released_date' => 'date',
         'total_amount' => 'decimal:2',
         'sent_date' => 'date',
         'paid_date' => 'date',
@@ -53,5 +64,13 @@ class BillingInvoice extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * Net billable after retainage withholding — what the owner actually pays this period.
+     */
+    public function getNetBilledAttribute(): float
+    {
+        return (float) $this->total_amount - (float) $this->retainage_amount;
     }
 }

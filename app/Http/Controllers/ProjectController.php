@@ -87,11 +87,15 @@ class ProjectController extends Controller
             'end_date' => 'required|date|after_or_equal:start_date',
             'budget' => 'required|numeric|min:0',
             'contract_value' => 'nullable|numeric|min:0',
+            'retainage_percent' => 'nullable|numeric|min:0|max:99.99',
             'default_per_diem_rate' => 'nullable|numeric|min:0',
             'po_number' => 'nullable|string|max:100',
             'po_date' => 'nullable|date',
             'status' => 'required|in:bidding,awarded,active,on_hold,completed,closed',
             'description' => 'nullable|string',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'geofence_radius_m' => 'nullable|integer|min:10|max:100000',
         ]);
 
         $budget = $validated['budget'];
@@ -229,6 +233,7 @@ class ProjectController extends Controller
             'percentComplete' => $percentComplete,
             'allCostCodes' => \App\Models\CostCode::active()->orderBy('code')->get(['id', 'code', 'name']),
             'allCostTypes' => \App\Models\CostType::active()->orderBy('sort_order')->get(['id', 'code', 'name']),
+            'assignableUsers' => \App\Models\User::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -253,11 +258,15 @@ class ProjectController extends Controller
             'end_date' => 'required|date|after_or_equal:start_date',
             'budget' => 'required|numeric|min:0',
             'contract_value' => 'nullable|numeric|min:0',
+            'retainage_percent' => 'nullable|numeric|min:0|max:99.99',
             'default_per_diem_rate' => 'nullable|numeric|min:0',
             'po_number' => 'nullable|string|max:100',
             'po_date' => 'nullable|date',
             'status' => 'required|in:bidding,awarded,active,on_hold,completed,closed',
             'description' => 'nullable|string',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'geofence_radius_m' => 'nullable|integer|min:10|max:100000',
         ]);
 
         $budget = $validated['budget'];

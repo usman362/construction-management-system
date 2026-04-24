@@ -155,6 +155,8 @@
             <a href="{{ route('projects.manhour-budgets.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Manhour Budgets</a>
             <a href="{{ route('projects.billable-rates.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition text-gray-700 font-medium">Billable Rates</a>
             <a href="{{ route('projects.daily-logs.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Daily Logs</a>
+            <a href="#" @click.prevent="activeTab = 'lien-waivers'" :class="activeTab === 'lien-waivers' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'" class="text-sm px-3 py-1.5 border rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition">Lien Waivers</a>
+            <a href="#" @click.prevent="activeTab = 'rfis'" :class="activeTab === 'rfis' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'" class="text-sm px-3 py-1.5 border rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition">RFIs</a>
         </div>
 
         <!-- Tab Content -->
@@ -521,6 +523,29 @@
 
             <!-- Client Billing Tab -->
             <div x-show="activeTab === 'client-billing'" class="space-y-4">
+                @php
+                    $retainageHeld = method_exists($project, 'getRetainageHeldAttribute') ? $project->retainage_held : 0;
+                    $retainageReleased = method_exists($project, 'getRetainageReleasedAttribute') ? $project->retainage_released : 0;
+                @endphp
+                <!-- Retainage summary strip -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <div class="text-xs font-semibold text-amber-800 uppercase">Retainage %</div>
+                        <div class="text-xl font-bold text-amber-900 mt-0.5">{{ number_format((float)$project->retainage_percent, 2) }}%</div>
+                        <div class="text-xs text-amber-700">Project default</div>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div class="text-xs font-semibold text-blue-800 uppercase">Retainage Held</div>
+                        <div class="text-xl font-bold text-blue-900 mt-0.5">${{ number_format($retainageHeld, 2) }}</div>
+                        <div class="text-xs text-blue-700">Withheld, not yet released</div>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div class="text-xs font-semibold text-green-800 uppercase">Retainage Released</div>
+                        <div class="text-xl font-bold text-green-900 mt-0.5">${{ number_format($retainageReleased, 2) }}</div>
+                        <div class="text-xs text-green-700">Paid out to date</div>
+                    </div>
+                </div>
+
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900">Client Billing</h3>
@@ -573,6 +598,77 @@
                 </div>
             </div>
 
+            <!-- Lien Waivers Tab -->
+            <div x-show="activeTab === 'lien-waivers'" class="space-y-4" x-cloak>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Lien Waivers</h3>
+                        <p class="text-xs text-gray-500">Conditional and unconditional lien waivers from subs and suppliers on this project.</p>
+                    </div>
+                    <button type="button" onclick="openLienWaiverModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                        Add Lien Waiver
+                    </button>
+                </div>
+
+                <div id="lienWaiversStatus" class="hidden rounded-lg p-3 text-sm"></div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 border-b border-gray-200">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Vendor</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">PO / Commitment</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Type</th>
+                                <th class="px-3 py-2 text-right font-semibold text-gray-700">Amount</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Through</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Received</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Status</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lienWaiversBody" class="divide-y divide-gray-200">
+                            <tr><td colspan="8" class="px-3 py-6 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- RFIs Tab -->
+            <div x-show="activeTab === 'rfis'" class="space-y-4" x-cloak>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">RFIs</h3>
+                        <p class="text-xs text-gray-500">Requests for Information — submit, assign, respond, and close.</p>
+                    </div>
+                    <button type="button" onclick="openRfiModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                        New RFI
+                    </button>
+                </div>
+
+                <div id="rfisStatus" class="hidden rounded-lg p-3 text-sm"></div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 border-b border-gray-200">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">RFI #</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Subject</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Priority</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Assignee</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Needed By</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Status</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rfisBody" class="divide-y divide-gray-200">
+                            <tr><td colspan="7" class="px-3 py-6 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Reports Tab -->
             <div x-show="activeTab === 'reports'" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -620,9 +716,10 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Start Date *</label><input type="date" name="start_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">End Date *</label><input type="date" name="end_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Budget *</label><input type="number" step="0.01" name="budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Contract Value</label><input type="number" step="0.01" name="contract_value" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0.00"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Retainage %</label><input type="number" step="0.01" min="0" max="99.99" name="retainage_percent" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0.00"></div>
             </div>
             <div class="grid grid-cols-3 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Client PO #</label><input type="text" name="po_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
@@ -634,10 +731,165 @@
                 </select></div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
+            <div class="pt-3 mt-3 border-t border-gray-100">
+                <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Geofence (Mobile Clock-In)</p>
+                <div class="grid grid-cols-3 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Latitude</label><input type="number" step="0.000001" min="-90" max="90" name="latitude" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. 29.760427"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Longitude</label><input type="number" step="0.000001" min="-180" max="180" name="longitude" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. -95.369804"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Radius (m)</label><input type="number" min="10" max="100000" name="geofence_radius_m" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. 300"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Used to flag clock-ins that happen outside the jobsite. Leave blank to disable.</p>
+            </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('editModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
             <button id="editSaveBtn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Update</button>
+        </div>
+    </div>
+</div>
+
+<!-- Lien Waiver Modal -->
+<div id="lienWaiverModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('lienWaiverModal')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 id="lienWaiverModalTitle" class="text-lg font-bold text-gray-900">Add Lien Waiver</h3>
+            <button onclick="closeModal('lienWaiverModal')" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <form id="lienWaiverForm" class="p-6 space-y-4">
+            @csrf
+            <input type="hidden" name="_lien_waiver_id" id="lwId">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vendor / Sub</label>
+                    <select name="vendor_id" id="lwVendorId" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="">— Select vendor —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Commitment / PO</label>
+                    <select name="commitment_id" id="lwCommitmentId" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="">— None —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                    <select name="type" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="conditional_progress">Conditional — Progress</option>
+                        <option value="unconditional_progress">Unconditional — Progress</option>
+                        <option value="conditional_final">Conditional — Final</option>
+                        <option value="unconditional_final">Unconditional — Final</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+                    <input type="number" step="0.01" min="0" name="amount" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Through Date</label>
+                    <input type="date" name="through_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
+                    <input type="date" name="received_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                <select name="status" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="pending">Pending</option>
+                    <option value="received">Received</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+            </div>
+        </form>
+        <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+            <button onclick="closeModal('lienWaiverModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button id="lwSaveBtn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- RFI Modal -->
+<div id="rfiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('rfiModal')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 id="rfiModalTitle" class="text-lg font-bold text-gray-900">New RFI</h3>
+            <button onclick="closeModal('rfiModal')" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <form id="rfiForm" class="p-6 space-y-4">
+            @csrf
+            <input type="hidden" name="_rfi_id" id="rfiId">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Subject *</label>
+                <input type="text" name="subject" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Question *</label>
+                <textarea name="question" rows="4" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select name="priority" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="drawings">Drawings</option>
+                        <option value="specifications">Specifications</option>
+                        <option value="scope">Scope</option>
+                        <option value="schedule">Schedule</option>
+                        <option value="field_condition">Field Condition</option>
+                        <option value="submittal">Submittal</option>
+                        <option value="other" selected>Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="draft">Draft</option>
+                        <option value="submitted" selected>Submitted</option>
+                        <option value="in_review">In Review</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
+                    <select name="assigned_to" id="rfiAssignee" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="">— Unassigned —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Submitted Date</label>
+                    <input type="date" name="submitted_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="{{ now()->toDateString() }}">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Needed By</label>
+                    <input type="date" name="needed_by" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+            </div>
+        </form>
+        <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+            <button onclick="closeModal('rfiModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button type="button" id="rfiSaveBtn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save</button>
         </div>
     </div>
 </div>
@@ -654,10 +906,14 @@ function editProject() {
         f.querySelector('[name="end_date"]').value = p.end_date ? String(p.end_date).substring(0,10) : '';
         f.querySelector('[name="budget"]').value = p.current_budget != null ? p.current_budget : (p.budget != null ? p.budget : '');
         f.querySelector('[name="contract_value"]').value = p.contract_value || '';
+        f.querySelector('[name="retainage_percent"]').value = p.retainage_percent != null ? p.retainage_percent : '';
         f.querySelector('[name="po_number"]').value = p.po_number || '';
         f.querySelector('[name="po_date"]').value = p.po_date ? String(p.po_date).substring(0,10) : '';
         f.querySelector('[name="status"]').value = p.status || 'active';
         f.querySelector('[name="description"]').value = p.description || '';
+        f.querySelector('[name="latitude"]').value = p.latitude != null ? p.latitude : '';
+        f.querySelector('[name="longitude"]').value = p.longitude != null ? p.longitude : '';
+        f.querySelector('[name="geofence_radius_m"]').value = p.geofence_radius_m != null ? p.geofence_radius_m : '';
 
         var opts = '<option value="">Select Client</option>';
         if (d.clients) {
@@ -672,6 +928,297 @@ function editProject() {
         };
         openModal('editModal');
     });
+}
+
+// ─── Lien Waivers (project-scoped) ─────────────────────────────
+const LW_PROJECT_ID = {{ $project->id }};
+const LW_BASE = window.BASE_URL + '/projects/' + LW_PROJECT_ID + '/lien-waivers';
+const LW_TYPE_LABELS = {
+    'conditional_progress':   'Conditional — Progress',
+    'unconditional_progress': 'Unconditional — Progress',
+    'conditional_final':      'Conditional — Final',
+    'unconditional_final':    'Unconditional — Final',
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadLienWaivers();
+    loadLienWaiverVendorsAndCommitments();
+});
+
+function loadLienWaivers() {
+    fetch(LW_BASE, { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('lienWaiversBody');
+            if (!data.waivers || !data.waivers.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-3 py-6 text-center text-gray-500">No lien waivers recorded yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.waivers.map(w => {
+                const statusClass = {
+                    pending: 'bg-amber-100 text-amber-700',
+                    received: 'bg-green-100 text-green-700',
+                    rejected: 'bg-red-100 text-red-700',
+                }[w.status] || 'bg-gray-100 text-gray-700';
+                const poOrCo = (w.commitment && (w.commitment.commitment_number || w.commitment.po_number)) || '—';
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2">${w.vendor?.name || '—'}</td>
+                        <td class="px-3 py-2 text-xs font-mono text-gray-600">${poOrCo}</td>
+                        <td class="px-3 py-2 text-xs">${LW_TYPE_LABELS[w.type] || w.type}</td>
+                        <td class="px-3 py-2 text-right font-medium">$${Number(w.amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="px-3 py-2 text-gray-700">${w.through_date ? String(w.through_date).substring(0,10) : '—'}</td>
+                        <td class="px-3 py-2 text-gray-700">${w.received_date ? String(w.received_date).substring(0,10) : '—'}</td>
+                        <td class="px-3 py-2 text-center"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass}">${w.status}</span></td>
+                        <td class="px-3 py-2 text-center">
+                            <button type="button" onclick="editLienWaiver(${w.id})" class="text-amber-600 hover:text-amber-800 text-xs mr-2">Edit</button>
+                            <button type="button" onclick="deleteLienWaiver(${w.id})" class="text-red-600 hover:text-red-800 text-xs">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        });
+}
+
+function loadLienWaiverVendorsAndCommitments() {
+    // Data inlined server-side from the project's already-loaded commitments + vendors.
+    @php
+        $lwVendors = $commitments->pluck('vendor')->filter()->unique('id')->map(function ($v) {
+            return ['id' => $v->id, 'name' => $v->name];
+        })->values();
+        $lwCommitments = $commitments->map(function ($c) {
+            return [
+                'id' => $c->id,
+                'commitment_number' => $c->commitment_number,
+                'po_number' => $c->po_number,
+                'amount' => (float) $c->amount,
+            ];
+        })->values();
+    @endphp
+    const vendors = {!! $lwVendors->toJson() !!};
+    const commitments = {!! $lwCommitments->toJson() !!};
+
+    const vSel = document.getElementById('lwVendorId');
+    vendors.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.id; opt.textContent = v.name;
+        vSel.appendChild(opt);
+    });
+    const cSel = document.getElementById('lwCommitmentId');
+    commitments.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = (c.commitment_number || c.po_number || ('#' + c.id)) + ' — $' + Number(c.amount || 0).toLocaleString();
+        cSel.appendChild(opt);
+    });
+}
+
+function openLienWaiverModal() {
+    const f = document.getElementById('lienWaiverForm');
+    f.reset();
+    document.getElementById('lwId').value = '';
+    document.getElementById('lienWaiverModalTitle').textContent = 'Add Lien Waiver';
+    document.getElementById('lwSaveBtn').onclick = saveLienWaiver;
+    openModal('lienWaiverModal');
+}
+
+function editLienWaiver(id) {
+    fetch(LW_BASE + '/' + id, { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(w => {
+            const f = document.getElementById('lienWaiverForm');
+            f.reset();
+            document.getElementById('lwId').value = w.id;
+            f.querySelector('[name="vendor_id"]').value = w.vendor_id || '';
+            f.querySelector('[name="commitment_id"]').value = w.commitment_id || '';
+            f.querySelector('[name="type"]').value = w.type;
+            f.querySelector('[name="amount"]').value = w.amount;
+            f.querySelector('[name="through_date"]').value = w.through_date ? String(w.through_date).substring(0,10) : '';
+            f.querySelector('[name="received_date"]').value = w.received_date ? String(w.received_date).substring(0,10) : '';
+            f.querySelector('[name="status"]').value = w.status;
+            f.querySelector('[name="notes"]').value = w.notes || '';
+            document.getElementById('lienWaiverModalTitle').textContent = 'Edit Lien Waiver';
+            document.getElementById('lwSaveBtn').onclick = saveLienWaiver;
+            openModal('lienWaiverModal');
+        });
+}
+
+function saveLienWaiver() {
+    const id = document.getElementById('lwId').value;
+    const f = document.getElementById('lienWaiverForm');
+    const fd = new FormData(f);
+    const payload = {};
+    fd.forEach((v, k) => { if (k !== '_token' && k !== '_lien_waiver_id') payload[k] = v; });
+
+    const url = id ? (LW_BASE + '/' + id) : LW_BASE;
+    const method = id ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+        },
+        body: JSON.stringify(payload),
+    })
+    .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+    .then(({ ok, body }) => {
+        if (!ok) {
+            showLienWaiverStatus('error', body.message || 'Save failed. Check fields.');
+            return;
+        }
+        closeModal('lienWaiverModal');
+        showLienWaiverStatus('ok', body.message || 'Saved.');
+        loadLienWaivers();
+    });
+}
+
+function deleteLienWaiver(id) {
+    if (!confirm('Delete this lien waiver?')) return;
+    fetch(LW_BASE + '/' + id, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+    }).then(r => {
+        if (r.ok) { showLienWaiverStatus('ok', 'Deleted.'); loadLienWaivers(); }
+        else { showLienWaiverStatus('error', 'Delete failed.'); }
+    });
+}
+
+function showLienWaiverStatus(kind, msg) {
+    const el = document.getElementById('lienWaiversStatus');
+    el.textContent = msg;
+    el.className = 'rounded-lg p-3 text-sm ' + (kind === 'ok' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800');
+    setTimeout(() => el.classList.add('hidden'), 3500);
+    el.classList.remove('hidden');
+}
+
+// ─── RFIs (project-scoped) ─────────────────────────────────────
+const RFI_PROJECT_ID = {{ $project->id }};
+const RFI_BASE = window.BASE_URL + '/projects/' + RFI_PROJECT_ID + '/rfis';
+const RFI_STATUS_LABELS = {
+    draft: 'Draft', submitted: 'Submitted', in_review: 'In Review', answered: 'Answered', closed: 'Closed',
+};
+const RFI_STATUS_CLASS = {
+    draft:     'bg-gray-100 text-gray-700',
+    submitted: 'bg-blue-100 text-blue-700',
+    in_review: 'bg-indigo-100 text-indigo-700',
+    answered:  'bg-green-100 text-green-700',
+    closed:    'bg-slate-200 text-slate-700',
+};
+const RFI_PRIORITY_LABELS = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' };
+const RFI_PRIORITY_CLASS = {
+    low: 'bg-gray-100 text-gray-700',
+    medium: 'bg-blue-100 text-blue-700',
+    high: 'bg-amber-100 text-amber-800',
+    urgent: 'bg-red-100 text-red-800',
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadRfis();
+    populateRfiAssignees();
+});
+
+function populateRfiAssignees() {
+    @php $rfiUsers = ($assignableUsers ?? collect()); @endphp
+    const users = {!! $rfiUsers->toJson() !!};
+    const sel = document.getElementById('rfiAssignee');
+    users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id; opt.textContent = u.name;
+        sel.appendChild(opt);
+    });
+}
+
+function loadRfis() {
+    fetch(RFI_BASE, { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('rfisBody');
+            if (!data.rfis || !data.rfis.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-6 text-center text-gray-500">No RFIs yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.rfis.map(r => {
+                const sClass = RFI_STATUS_CLASS[r.status] || 'bg-gray-100 text-gray-700';
+                const pClass = RFI_PRIORITY_CLASS[r.priority] || 'bg-gray-100';
+                const needed = r.needed_by ? String(r.needed_by).substring(0,10) : '—';
+                const today = new Date().toISOString().substring(0,10);
+                const isOverdue = r.needed_by && needed < today && !['answered','closed'].includes(r.status);
+                const neededDisplay = isOverdue
+                    ? `<span class="text-red-600 font-semibold">${needed} <span class="text-[10px] uppercase ml-1">Overdue</span></span>`
+                    : needed;
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 font-mono text-xs">
+                            <a href="${RFI_BASE}/${r.id}" class="text-blue-600 hover:text-blue-800 font-semibold">${r.rfi_number}</a>
+                        </td>
+                        <td class="px-3 py-2">${(r.subject || '').replace(/</g, '&lt;').substring(0,80)}</td>
+                        <td class="px-3 py-2"><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${pClass}">${RFI_PRIORITY_LABELS[r.priority] || r.priority}</span></td>
+                        <td class="px-3 py-2 text-gray-700">${r.assignee?.name || '—'}</td>
+                        <td class="px-3 py-2">${neededDisplay}</td>
+                        <td class="px-3 py-2 text-center"><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${sClass}">${RFI_STATUS_LABELS[r.status] || r.status}</span></td>
+                        <td class="px-3 py-2 text-center">
+                            <a href="${RFI_BASE}/${r.id}" class="text-blue-600 hover:text-blue-800 text-xs mr-2">Open</a>
+                            <button type="button" onclick="deleteRfi(${r.id})" class="text-red-600 hover:text-red-800 text-xs">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        });
+}
+
+function openRfiModal() {
+    const f = document.getElementById('rfiForm');
+    f.reset();
+    document.getElementById('rfiId').value = '';
+    f.querySelector('[name="submitted_date"]').value = new Date().toISOString().substring(0,10);
+    document.getElementById('rfiModalTitle').textContent = 'New RFI';
+    document.getElementById('rfiSaveBtn').onclick = saveRfi;
+    openModal('rfiModal');
+}
+
+function saveRfi() {
+    const f = document.getElementById('rfiForm');
+    const fd = new FormData(f);
+    const payload = {};
+    fd.forEach((v, k) => { if (k !== '_token' && k !== '_rfi_id') payload[k] = v; });
+
+    fetch(RFI_BASE, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+        },
+        body: JSON.stringify(payload),
+    })
+    .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+    .then(({ ok, body }) => {
+        if (!ok) { showRfisStatus('error', body.message || 'Save failed.'); return; }
+        closeModal('rfiModal');
+        showRfisStatus('ok', body.message || 'RFI created.');
+        loadRfis();
+    });
+}
+
+function deleteRfi(id) {
+    if (!confirm('Delete this RFI?')) return;
+    fetch(RFI_BASE + '/' + id, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+    }).then(r => {
+        if (r.ok) { showRfisStatus('ok', 'Deleted.'); loadRfis(); }
+        else { showRfisStatus('error', 'Delete failed.'); }
+    });
+}
+
+function showRfisStatus(kind, msg) {
+    const el = document.getElementById('rfisStatus');
+    el.textContent = msg;
+    el.className = 'rounded-lg p-3 text-sm ' + (kind === 'ok' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800');
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 3500);
 }
 </script>
 @endpush

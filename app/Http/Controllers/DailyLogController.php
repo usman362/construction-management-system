@@ -63,15 +63,7 @@ class DailyLogController extends Controller
 
     public function store(Request $request, Project $project): JsonResponse
     {
-        $validated = $request->validate([
-            'date' => 'required|date',
-            'weather' => 'required|string|max:255',
-            'temperature' => 'nullable|numeric',
-            'notes' => 'required|string',
-            'visitors' => 'nullable|string',
-            'safety_issues' => 'nullable|string',
-            'delays' => 'nullable|string',
-        ]);
+        $validated = $request->validate($this->rules());
 
         $project->dailyLogs()->create($validated + ['created_by' => auth()->id()]);
         return response()->json(['message' => 'Daily log created successfully']);
@@ -79,7 +71,7 @@ class DailyLogController extends Controller
 
     public function show(Project $project, DailyLog $dailyLog): View
     {
-        $dailyLog->load('creator');
+        $dailyLog->load(['creator', 'photos.uploader']);
 
         return view('daily-logs.show', [
             'project' => $project,
@@ -94,15 +86,7 @@ class DailyLogController extends Controller
 
     public function update(Request $request, Project $project, DailyLog $dailyLog): JsonResponse
     {
-        $validated = $request->validate([
-            'date' => 'required|date',
-            'weather' => 'required|string|max:255',
-            'temperature' => 'nullable|numeric',
-            'notes' => 'required|string',
-            'visitors' => 'nullable|string',
-            'safety_issues' => 'nullable|string',
-            'delays' => 'nullable|string',
-        ]);
+        $validated = $request->validate($this->rules());
 
         $dailyLog->update($validated);
         return response()->json(['message' => 'Daily log updated successfully']);
@@ -112,5 +96,27 @@ class DailyLogController extends Controller
     {
         $dailyLog->delete();
         return response()->json(['message' => 'Daily log deleted successfully']);
+    }
+
+    /**
+     * Shared validation rules — keeps store/update in sync as we add weather + safety fields.
+     */
+    private function rules(): array
+    {
+        return [
+            'date'              => 'required|date',
+            'weather'           => 'required|string|max:255',
+            'temperature'       => 'nullable|numeric',
+            'temperature_high'  => 'nullable|numeric',
+            'temperature_low'   => 'nullable|numeric',
+            'precipitation'     => 'nullable|string|max:100',
+            'wind_speed'        => 'nullable|string|max:50',
+            'notes'             => 'required|string',
+            'visitors'          => 'nullable|string',
+            'safety_issues'     => 'nullable|string',
+            'incidents_count'   => 'nullable|integer|min:0|max:65535',
+            'near_misses_count' => 'nullable|integer|min:0|max:65535',
+            'delays'            => 'nullable|string',
+        ];
     }
 }

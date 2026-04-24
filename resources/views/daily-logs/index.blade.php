@@ -50,11 +50,27 @@
                     <input type="text" id="add_weather" name="weather" required class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="e.g., Sunny, Cloudy">
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-4 gap-4 mb-4">
                 <div>
-                    <label for="add_temperature" class="block text-sm font-medium text-gray-700 mb-1">Temperature (°F)</label>
+                    <label for="add_temperature" class="block text-sm font-medium text-gray-700 mb-1">Temp (°F)</label>
                     <input type="number" id="add_temperature" name="temperature" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                 </div>
+                <div>
+                    <label for="add_temperature_high" class="block text-sm font-medium text-gray-700 mb-1">High (°F)</label>
+                    <input type="number" id="add_temperature_high" name="temperature_high" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label for="add_temperature_low" class="block text-sm font-medium text-gray-700 mb-1">Low (°F)</label>
+                    <input type="number" id="add_temperature_low" name="temperature_low" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label for="add_wind_speed" class="block text-sm font-medium text-gray-700 mb-1">Wind</label>
+                    <input type="text" id="add_wind_speed" name="wind_speed" placeholder="e.g., 10 mph NW" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                </div>
+            </div>
+            <div class="mb-4">
+                <label for="add_precipitation" class="block text-sm font-medium text-gray-700 mb-1">Precipitation</label>
+                <input type="text" id="add_precipitation" name="precipitation" placeholder="e.g., 0.5 in rain morning" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
             <div class="mb-4">
                 <label for="add_notes" class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -64,8 +80,21 @@
                 <label for="add_visitors" class="block text-sm font-medium text-gray-700 mb-1">Visitors</label>
                 <input type="text" id="add_visitors" name="visitors" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
+            <div class="mb-2 pt-2 border-t border-gray-200">
+                <h3 class="text-sm font-semibold text-gray-800 mb-2">Safety</h3>
+                <div class="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <label for="add_incidents_count" class="block text-sm font-medium text-gray-700 mb-1">Incidents</label>
+                        <input type="number" id="add_incidents_count" name="incidents_count" min="0" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label for="add_near_misses_count" class="block text-sm font-medium text-gray-700 mb-1">Near Misses</label>
+                        <input type="number" id="add_near_misses_count" name="near_misses_count" min="0" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+            </div>
             <div class="mb-4">
-                <label for="add_safety_issues" class="block text-sm font-medium text-gray-700 mb-1">Safety Issues</label>
+                <label for="add_safety_issues" class="block text-sm font-medium text-gray-700 mb-1">Safety Notes / Issues</label>
                 <textarea id="add_safety_issues" name="safety_issues" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
             </div>
             <div class="mb-6">
@@ -101,11 +130,27 @@
                     <input type="text" id="edit_weather" name="weather" required class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="e.g., Sunny, Cloudy">
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-4 gap-4 mb-4">
                 <div>
-                    <label for="edit_temperature" class="block text-sm font-medium text-gray-700 mb-1">Temperature (°F)</label>
+                    <label for="edit_temperature" class="block text-sm font-medium text-gray-700 mb-1">Temp (°F)</label>
                     <input type="number" id="edit_temperature" name="temperature" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                 </div>
+                <div>
+                    <label for="edit_temperature_high" class="block text-sm font-medium text-gray-700 mb-1">High (°F)</label>
+                    <input type="number" id="edit_temperature_high" name="temperature_high" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label for="edit_temperature_low" class="block text-sm font-medium text-gray-700 mb-1">Low (°F)</label>
+                    <input type="number" id="edit_temperature_low" name="temperature_low" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label for="edit_wind_speed" class="block text-sm font-medium text-gray-700 mb-1">Wind</label>
+                    <input type="text" id="edit_wind_speed" name="wind_speed" placeholder="e.g., 10 mph NW" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                </div>
+            </div>
+            <div class="mb-4">
+                <label for="edit_precipitation" class="block text-sm font-medium text-gray-700 mb-1">Precipitation</label>
+                <input type="text" id="edit_precipitation" name="precipitation" placeholder="e.g., 0.5 in rain morning" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
             <div class="mb-4">
                 <label for="edit_notes" class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -115,8 +160,21 @@
                 <label for="edit_visitors" class="block text-sm font-medium text-gray-700 mb-1">Visitors</label>
                 <input type="text" id="edit_visitors" name="visitors" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
+            <div class="mb-2 pt-2 border-t border-gray-200">
+                <h3 class="text-sm font-semibold text-gray-800 mb-2">Safety</h3>
+                <div class="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <label for="edit_incidents_count" class="block text-sm font-medium text-gray-700 mb-1">Incidents</label>
+                        <input type="number" id="edit_incidents_count" name="incidents_count" min="0" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label for="edit_near_misses_count" class="block text-sm font-medium text-gray-700 mb-1">Near Misses</label>
+                        <input type="number" id="edit_near_misses_count" name="near_misses_count" min="0" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+            </div>
             <div class="mb-4">
-                <label for="edit_safety_issues" class="block text-sm font-medium text-gray-700 mb-1">Safety Issues</label>
+                <label for="edit_safety_issues" class="block text-sm font-medium text-gray-700 mb-1">Safety Notes / Issues</label>
                 <textarea id="edit_safety_issues" name="safety_issues" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
             </div>
             <div class="mb-6">
@@ -191,8 +249,14 @@ function editDailyLog(id) {
         document.getElementById('edit_date').value = d.date ? String(d.date).substring(0, 10) : '';
         document.getElementById('edit_weather').value = d.weather || '';
         document.getElementById('edit_temperature').value = d.temperature || '';
+        document.getElementById('edit_temperature_high').value = d.temperature_high || '';
+        document.getElementById('edit_temperature_low').value = d.temperature_low || '';
+        document.getElementById('edit_precipitation').value = d.precipitation || '';
+        document.getElementById('edit_wind_speed').value = d.wind_speed || '';
         document.getElementById('edit_notes').value = d.notes || '';
         document.getElementById('edit_visitors').value = d.visitors || '';
+        document.getElementById('edit_incidents_count').value = d.incidents_count ?? 0;
+        document.getElementById('edit_near_misses_count').value = d.near_misses_count ?? 0;
         document.getElementById('edit_safety_issues').value = d.safety_issues || '';
         document.getElementById('edit_delays').value = d.delays || '';
 

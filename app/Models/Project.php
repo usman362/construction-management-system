@@ -29,9 +29,13 @@ class Project extends Model
         'current_budget',
         'estimate',
         'contract_value',
+        'retainage_percent',
         'default_per_diem_rate',
         'po_number',
         'po_date',
+        'latitude',
+        'longitude',
+        'geofence_radius_m',
     ];
 
     protected $casts = [
@@ -43,7 +47,11 @@ class Project extends Model
         'current_budget' => 'decimal:2',
         'estimate' => 'decimal:2',
         'contract_value' => 'decimal:2',
+        'retainage_percent' => 'decimal:2',
         'default_per_diem_rate' => 'decimal:2',
+        'latitude' => 'decimal:6',
+        'longitude' => 'decimal:6',
+        'geofence_radius_m' => 'integer',
     ];
 
     /** @var list<string> */
@@ -136,9 +144,81 @@ class Project extends Model
         return $this->hasMany(BillingInvoice::class);
     }
 
+    public function lienWaivers(): HasMany
+    {
+        return $this->hasMany(LienWaiver::class);
+    }
+
+    public function rfis(): HasMany
+    {
+        return $this->hasMany(Rfi::class);
+    }
+
+    public function timeClockEntries(): HasMany
+    {
+        return $this->hasMany(TimeClockEntry::class);
+    }
+
+    /**
+     * Haversine distance, in meters, from this project's geofence center
+     * to an arbitrary (lat, lng) pair. Returns null when the project has
+     * no center configured.
+     */
+    public function distanceToMeters(?float $lat, ?float $lng): ?int
+    {
+        if ($this->latitude === null || $this->longitude === null || $lat === null || $lng === null) {
+            return null;
+        }
+
+        $earthRadius = 6371000; // meters
+        $dLat = deg2rad($lat - (float) $this->latitude);
+        $dLng = deg2rad($lng - (float) $this->longitude);
+        $a = sin($dLat / 2) ** 2
+           + cos(deg2rad((float) $this->latitude)) * cos(deg2rad($lat)) * sin($dLng / 2) ** 2;
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return (int) round($earthRadius * $c);
+    }
+
+    /**
+     * True when the given coordinates fall within the project's geofence.
+     * Null = indeterminate (no geofence configured or no coords provided).
+     */
+    public function isWithinGeofence(?float $lat, ?float $lng): ?bool
+    {
+        if ($this->geofence_radius_m === null) {
+            return null;
+        }
+        $distance = $this->distanceToMeters($lat, $lng);
+        if ($distance === null) {
+            return null;
+        }
+        return $distance <= (int) $this->geofence_radius_m;
+    }
+
     public function dailyLogs(): HasMany
     {
         return $this->hasMany(DailyLog::class);
+    }
+
+    /**
+     * Total retainage withheld across all non-voided billing invoices and still un-released.
+     */
+    public function getRetainageHeldAttribute(): float
+    {
+        return (float) $this->billingInvoices()
+            ->where('retainage_released', false)
+            ->sum('retainage_amount');
+    }
+
+    /**
+     * Total retainage that has been formally released back to the owner/contractor.
+     */
+    public function getRetainageReleasedAttribute(): float
+    {
+        return (float) $this->billingInvoices()
+            ->where('retainage_released', true)
+            ->sum('retainage_amount');
     }
 
     public function payrollEntries(): HasMany
