@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Project;
-use App\Models\Employee;
-use App\Models\Timesheet;
+use App\Models\BillingInvoice;
 use App\Models\ChangeOrder;
+use App\Models\Employee;
 use App\Models\EmployeeCertification;
+use App\Models\Invoice;
+use App\Models\Project;
+use App\Models\Rfi;
+use App\Models\TimeClockEntry;
+use App\Models\Timesheet;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -93,8 +97,42 @@ class DashboardController extends Controller
         }
 
         $totalEmployees    = Employee::where('status', 'active')->count();
-        $pendingTimesheets = Timesheet::where('status', 'pending')->count();
+        // 'submitted' is the timesheet workflow's "needs approval" state
+        // (status enum: draft, submitted, approved, rejected). The label on
+        // the dashboard tile still reads "Pending T-Sheets" because that's the
+        // user-facing wording.
+        $pendingTimesheets = Timesheet::where('status', 'submitted')->count();
         $openChangeOrders  = ChangeOrder::where('status', 'pending')->count();
+
+        // ─── Phase 7C: Live operations widgets ─────────────────────
+        // These four metrics power the new "What's happening right now" tile
+        // strip on the dashboard. Everything is a single COUNT or SUM so the
+        // dashboard load stays under one DB roundtrip per metric.
+        $clockedInNow      = TimeClockEntry::where('status', 'open')->count();
+        $clockedInList     = TimeClockEntry::with(['employee:id,first_name,last_name', 'project:id,project_number'])
+            ->where('status', 'open')
+            ->orderBy('clock_in_at')
+            ->get();
+        $pendingInvoices   = Invoice::where('status', 'pending')->count();
+        $openRfisCount     = Rfi::whereIn('status', ['submitted', 'in_review'])->count();
+
+        // Combined "Pending Approvals" tile — one number the admin can scan.
+        $pendingApprovalsTotal = $pendingTimesheets + $openChangeOrders + $pendingInvoices;
+
+        // Cash flow snapshot — billed vs. collected this calendar month.
+        // Billed = sum of billing_invoices issued this month.
+        // Collected = sum of billing_invoices marked paid this month.
+        $monthStart = now()->startOfMonth();
+        $billedThisMonth    = (float) BillingInvoice::where('invoice_date', '>=', $monthStart)->sum('total_amount');
+        $collectedThisMonth = (float) BillingInvoice::where('paid_date', '>=', $monthStart)
+            ->whereNotNull('paid_date')
+            ->sum('total_amount');
+
+        // Overdue RFIs — submitted/in_review with a `needed_by` date in the past.
+        $overdueRfisCount = Rfi::whereIn('status', ['submitted', 'in_review'])
+            ->whereNotNull('needed_by')
+            ->whereDate('needed_by', '<', now()->toDateString())
+            ->count();
 
         // ── Certification expiry tracking ──
         // Bucket upcoming/past expirations so the PM can act on them each morning.
@@ -126,20 +164,29 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'stats' => [
-                'activeProjects'    => $activeProjectsCount,
-                'totalEmployees'    => $totalEmployees,
-                'pendingTimesheets' => $pendingTimesheets,
-                'openChangeOrders'  => $openChangeOrders,
-                'overBudget'        => $overBudgetCount,
-                'nearBudget'        => $nearBudgetCount,
-                'expiredCerts'      => $expiredCerts->count(),
-                'expiring30Certs'   => $expiring30Certs->count(),
-                'expiring60Certs'   => $expiring60Certs->count(),
-                'expiring90Certs'   => $expiring90Certs->count(),
+                'activeProjects'        => $activeProjectsCount,
+                'totalEmployees'        => $totalEmployees,
+                'pendingTimesheets'     => $pendingTimesheets,
+                'openChangeOrders'      => $openChangeOrders,
+                'overBudget'            => $overBudgetCount,
+                'nearBudget'            => $nearBudgetCount,
+                'expiredCerts'          => $expiredCerts->count(),
+                'expiring30Certs'       => $expiring30Certs->count(),
+                'expiring60Certs'       => $expiring60Certs->count(),
+                'expiring90Certs'       => $expiring90Certs->count(),
+                // Phase 7C live widgets
+                'clockedInNow'          => $clockedInNow,
+                'pendingInvoices'       => $pendingInvoices,
+                'openRfis'              => $openRfisCount,
+                'overdueRfis'           => $overdueRfisCount,
+                'pendingApprovalsTotal' => $pendingApprovalsTotal,
+                'billedThisMonth'       => $billedThisMonth,
+                'collectedThisMonth'    => $collectedThisMonth,
             ],
             'recentProjects' => $activeProjects,
             'allProjects'    => $allProjects,
             'certWatchList'  => $certWatchList,
+            'clockedInList'  => $clockedInList,
         ]);
     }
 }

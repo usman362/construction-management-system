@@ -14,6 +14,82 @@
          Tile set redesigned in Phase 1 to surface risk signals at a glance:
          over-budget projects, near-budget projects, expiring certs.
          ═══════════════════════════════════════════════════════════════════ --}}
+    {{-- ═══════════════════════════════════════════════════════════════════
+         PHASE 7C — LIVE OPS STRIP
+         Right-now reality at a glance. Independent of the longer-term KPI
+         tiles below — this is "what's happening today" not "what's the trend."
+         ═══════════════════════════════════════════════════════════════════ --}}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {{-- Clocked in right now --}}
+        <a href="{{ route('time-clock.admin') }}" class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border-l-4 {{ ($stats['clockedInNow'] ?? 0) > 0 ? 'border-emerald-500' : 'border-gray-300' }} block">
+            <div class="flex items-center justify-between">
+                <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Clocked In Now</p>
+                @if(($stats['clockedInNow'] ?? 0) > 0)
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                @endif
+            </div>
+            <p class="text-3xl font-bold {{ ($stats['clockedInNow'] ?? 0) > 0 ? 'text-emerald-600' : 'text-gray-900' }} mt-2">{{ $stats['clockedInNow'] ?? 0 }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">On the job right now</p>
+        </a>
+
+        {{-- Pending approvals (combined) --}}
+        <div class="bg-white rounded-lg shadow p-4 border-l-4 {{ ($stats['pendingApprovalsTotal'] ?? 0) > 0 ? 'border-amber-500' : 'border-gray-300' }}">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Pending Approvals</p>
+            <p class="text-3xl font-bold {{ ($stats['pendingApprovalsTotal'] ?? 0) > 0 ? 'text-amber-600' : 'text-gray-900' }} mt-2">{{ $stats['pendingApprovalsTotal'] ?? 0 }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">
+                {{ $stats['pendingTimesheets'] ?? 0 }} TS · {{ $stats['openChangeOrders'] ?? 0 }} CO · {{ $stats['pendingInvoices'] ?? 0 }} Inv
+            </p>
+        </div>
+
+        {{-- Billed this month --}}
+        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Billed This Month</p>
+            <p class="text-2xl font-bold text-gray-900 mt-2">${{ number_format($stats['billedThisMonth'] ?? 0, 0) }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">{{ now()->format('F Y') }} invoices issued</p>
+        </div>
+
+        {{-- Collected this month --}}
+        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+            <p class="text-gray-600 text-xs font-medium uppercase tracking-wide">Collected This Month</p>
+            <p class="text-2xl font-bold text-green-700 mt-2">${{ number_format($stats['collectedThisMonth'] ?? 0, 0) }}</p>
+            @php
+                $billed = (float) ($stats['billedThisMonth'] ?? 0);
+                $collected = (float) ($stats['collectedThisMonth'] ?? 0);
+                $pct = $billed > 0 ? min(100, round(($collected / $billed) * 100)) : 0;
+            @endphp
+            <p class="text-[11px] text-gray-500 mt-1">{{ $pct }}% of billed</p>
+        </div>
+    </div>
+
+    {{-- ── Live: Currently clocked-in workers (only render when count > 0) ── --}}
+    @if(($stats['clockedInNow'] ?? 0) > 0)
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-emerald-900 flex items-center gap-2">
+                    <span class="flex h-2 w-2"><span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                    On the clock right now
+                </h3>
+                <a href="{{ route('time-clock.admin') }}" class="text-xs text-emerald-700 hover:underline">Review all &rarr;</a>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                @foreach($clockedInList ?? [] as $entry)
+                    <div class="bg-white border border-emerald-200 rounded-md px-3 py-1.5 text-xs">
+                        <span class="font-semibold text-gray-900">
+                            {{ $entry->employee?->first_name ?? '—' }} {{ $entry->employee?->last_name ?? '' }}
+                        </span>
+                        <span class="text-gray-500"> · {{ $entry->project?->project_number ?? '—' }}</span>
+                        <span class="text-emerald-600 ml-1" title="Since {{ $entry->clock_in_at->format('g:i A') }}">
+                            {{ $entry->clock_in_at->diffForHumans(null, true) }}
+                        </span>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <!-- Active Projects -->
         <a href="{{ route('projects.index') }}" class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border-l-4 border-blue-600 block">

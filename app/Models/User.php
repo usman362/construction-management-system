@@ -104,6 +104,23 @@ class User extends Authenticatable
     }
 
     /**
+     * Fetch active users in any of the given roles, with a non-empty email.
+     *
+     * Used by notification dispatchers (TimesheetController, RfiController,
+     * etc.) to fan out emails to the right approvers without duplicating the
+     * "active + has email" filter at every call site.
+     */
+    public static function notifiableForRoles(array $roles): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::query()
+            ->whereIn('role', $roles)
+            ->where('is_active', true)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->get();
+    }
+
+    /**
      * Check if user can access a given section.
      */
     public function canAccess(string $section): bool
