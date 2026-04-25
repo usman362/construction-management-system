@@ -322,21 +322,67 @@ class ImportController extends Controller
 
     // ─── Project Billable Rates (Billable Crafts) ─────────────────────────
 
+    // Columns are paired ST/OT to mirror the manual entry form, where every
+    // markup row shows a Straight-Time and Overtime cell side-by-side. Burden
+    // and tax %s often differ between ST and OT (e.g. WC modifiers, blended
+    // overhead), so OT cannot just be derived from ST × 1.5 — accountants
+    // need to set them independently.
     private const BILLABLE_RATE_COLUMNS = [
-        'craft_name', 'employee_number', 'base_hourly_rate',
-        'payroll_tax_rate', 'burden_rate', 'insurance_rate',
-        'job_expenses_rate', 'consumables_rate', 'overhead_rate', 'profit_rate',
-        'effective_date', 'notes',
+        'craft_name',
+        'employee_number',
+        'base_hourly_rate',
+        'base_ot_hourly_rate',
+        'payroll_tax_rate',
+        'payroll_tax_ot_rate',
+        'burden_rate',
+        'burden_ot_rate',
+        'insurance_rate',
+        'insurance_ot_rate',
+        'job_expenses_rate',
+        'job_expenses_ot_rate',
+        'consumables_rate',
+        'consumables_ot_rate',
+        'overhead_rate',
+        'overhead_ot_rate',
+        'profit_rate',
+        'profit_ot_rate',
+        'effective_date',
+        'notes',
     ];
 
     public function billableRateTemplate(Project $project): StreamedResponse
     {
+        // Sample rows mirror the form's most common pattern: base OT = base × 1.5,
+        // most markup %s identical between ST and OT, but payroll tax/insurance
+        // can differ — left as-is in the example so accountants see the shape.
         return $this->streamCsv(
             "project_{$project->id}_billable_rates_template.csv",
             self::BILLABLE_RATE_COLUMNS,
             [
-                ['Crane Operator', '', '32.50', '0.0765', '0.45', '0.0325', '0.05', '0.02', '0.12', '0.10', '2026-01-01', 'Base crane op rate'],
-                ['Laborer', '', '22.00', '0.0765', '0.35', '0.0325', '0.05', '0.02', '0.12', '0.10', '2026-01-01', ''],
+                [
+                    'Crane Operator', '',
+                    '32.50', '48.75',           // base ST / OT
+                    '0.0765', '0.0765',         // payroll tax ST / OT
+                    '0.45',   '0.45',           // burden ST / OT
+                    '0.0325', '0.0325',         // insurance ST / OT
+                    '0.05',   '0.05',           // job expenses ST / OT
+                    '0.02',   '0.02',           // consumables ST / OT
+                    '0.12',   '0.12',           // overhead ST / OT
+                    '0.10',   '0.10',           // profit ST / OT
+                    '2026-01-01', 'Base crane op rate',
+                ],
+                [
+                    'Laborer', '',
+                    '22.00', '33.00',
+                    '0.0765', '0.0765',
+                    '0.35',   '0.35',
+                    '0.0325', '0.0325',
+                    '0.05',   '0.05',
+                    '0.02',   '0.02',
+                    '0.12',   '0.12',
+                    '0.10',   '0.10',
+                    '2026-01-01', '',
+                ],
             ]
         );
     }
@@ -386,16 +432,36 @@ class ImportController extends Controller
                         'effective_date' => $effectiveDate,
                     ];
 
+                    // Persist every column the manual form supports. OT-rate columns
+                    // are optional in the CSV — when blank, we leave them at the
+                    // model default (0) rather than copying from the ST value, so
+                    // an empty cell never silently misstates an OT rate.
                     $values = [
-                        'base_hourly_rate'  => $this->toDecimal($data['base_hourly_rate'] ?? 0),
-                        'payroll_tax_rate'  => $this->toDecimal($data['payroll_tax_rate'] ?? 0, 4),
-                        'burden_rate'       => $this->toDecimal($data['burden_rate'] ?? 0, 4),
-                        'insurance_rate'    => $this->toDecimal($data['insurance_rate'] ?? 0, 4),
-                        'job_expenses_rate' => $this->toDecimal($data['job_expenses_rate'] ?? 0, 4),
-                        'consumables_rate'  => $this->toDecimal($data['consumables_rate'] ?? 0, 4),
-                        'overhead_rate'     => $this->toDecimal($data['overhead_rate'] ?? 0, 4),
-                        'profit_rate'       => $this->toDecimal($data['profit_rate'] ?? 0, 4),
-                        'notes'             => $this->blankToNull($data['notes'] ?? null),
+                        'base_hourly_rate'      => $this->toDecimal($data['base_hourly_rate'] ?? 0),
+                        'base_ot_hourly_rate'   => $this->toDecimal($data['base_ot_hourly_rate'] ?? 0, 4),
+
+                        'payroll_tax_rate'      => $this->toDecimal($data['payroll_tax_rate'] ?? 0, 4),
+                        'payroll_tax_ot_rate'   => $this->toDecimal($data['payroll_tax_ot_rate'] ?? 0, 4),
+
+                        'burden_rate'           => $this->toDecimal($data['burden_rate'] ?? 0, 4),
+                        'burden_ot_rate'        => $this->toDecimal($data['burden_ot_rate'] ?? 0, 4),
+
+                        'insurance_rate'        => $this->toDecimal($data['insurance_rate'] ?? 0, 4),
+                        'insurance_ot_rate'     => $this->toDecimal($data['insurance_ot_rate'] ?? 0, 4),
+
+                        'job_expenses_rate'     => $this->toDecimal($data['job_expenses_rate'] ?? 0, 4),
+                        'job_expenses_ot_rate'  => $this->toDecimal($data['job_expenses_ot_rate'] ?? 0, 4),
+
+                        'consumables_rate'      => $this->toDecimal($data['consumables_rate'] ?? 0, 4),
+                        'consumables_ot_rate'   => $this->toDecimal($data['consumables_ot_rate'] ?? 0, 4),
+
+                        'overhead_rate'         => $this->toDecimal($data['overhead_rate'] ?? 0, 4),
+                        'overhead_ot_rate'      => $this->toDecimal($data['overhead_ot_rate'] ?? 0, 4),
+
+                        'profit_rate'           => $this->toDecimal($data['profit_rate'] ?? 0, 4),
+                        'profit_ot_rate'        => $this->toDecimal($data['profit_ot_rate'] ?? 0, 4),
+
+                        'notes'                 => $this->blankToNull($data['notes'] ?? null),
                     ];
 
                     $existing = ProjectBillableRate::where($attributes)->first();
