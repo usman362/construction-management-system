@@ -126,7 +126,7 @@
                                 @endif
                             </td>
                             <td data-sort-value="{{ (float) ($project->dashboard_estimate ?? $project->estimate ?? 0) }}" class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->dashboard_estimate ?? $project->estimate ?? 0, 2) }}</td>
-                            <td data-sort-value="{{ (float) ($project->budget ?? 0) }}" class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->budget ?? 0, 2) }}</td>
+                            <td data-sort-value="{{ (float) ($project->dashboard_budget ?? $project->budget ?? 0) }}" class="px-4 py-4 whitespace-nowrap font-medium text-right">${{ number_format($project->dashboard_budget ?? $project->budget ?? 0, 2) }}</td>
                             <td data-sort-value="{{ (float) ($project->committed_percentage ?? 0) }}" class="px-4 py-4 whitespace-nowrap">
                                 <div class="flex items-center space-x-2">
                                     <div class="w-16 bg-gray-200 rounded-full h-2">

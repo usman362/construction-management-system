@@ -14,33 +14,67 @@ class DashboardController extends Controller
     public function index(): View
     {
         // ── Active projects (non-closed/completed) ──
-        // Eager-load `estimates` so we can fall back to the sum of approved
-        // estimate records when the project's direct `estimate` column is
-        // empty. Clients often build estimates through the Estimates module
-        // rather than typing a single number into the project form, so the
-        // dashboard should pick up either source.
+        // Eager-load `estimates` AND `budgetLines` so we can fall back to those
+        // when the project's direct columns are empty. Clients enter project
+        // values in three different places depending on workflow:
+        //   - The `estimate` / `current_budget` columns on the project form
+        //   - Line items in the Estimates module (estimates → total_amount)
+        //   - Line items in the Budget tab (budget_lines → budget_amount /
+        //     revised_amount)
+        // The dashboard should surface a value if ANY of these sources have one.
         $activeProjects = Project::whereNotIn('status', ['closed', 'completed'])
-            ->with(['client', 'commitments', 'invoices', 'estimates'])
+            ->with(['client', 'commitments', 'invoices', 'estimates', 'budgetLines'])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Compute a single `dashboard_estimate` value per project:
-        //   1. Direct `estimate` column if > 0
-        //   2. Otherwise, sum of approved Estimate records
-        //   3. Otherwise, `contract_value` (last-resort fallback)
+        // Compute display values for the dashboard table.
+        //
+        // dashboard_estimate fallback order:
+        //   1. `projects.estimate` column (manually typed)
+        //   2. Sum of approved Estimate records
+        //   3. Sum of any Estimate records (drafts etc.)
+        //   4. Sum of budget_lines.revised_amount (when client uses Budget tab
+        //      as their estimate source)
+        //   5. `contract_value` (last-resort fallback)
+        //
+        // dashboard_budget fallback order:
+        //   1. `projects.current_budget` column (manually typed)
+        //   2. Sum of budget_lines.revised_amount (or budget_amount if revised
+        //      not set) — this is how most clients actually enter budgets
+        //
+        // Without the budget_lines fallback, projects like BM-5400 (which has
+        // $462k in budget lines but no value typed into the project form) show
+        // $0 on the dashboard despite having real data.
         foreach ($activeProjects as $p) {
+            // Reusable budget-lines total (revised_amount preferred, falls back
+            // to budget_amount per line).
+            $budgetLineTotal = (float) $p->budgetLines->sum(function ($line) {
+                return (float) ($line->revised_amount ?? $line->budget_amount ?? 0);
+            });
+
+            // ── Estimate ─────────────────────────────────────────────
             $direct = (float) ($p->estimate ?? 0);
             if ($direct > 0) {
                 $p->dashboard_estimate = $direct;
-                continue;
+            } else {
+                $approvedSum = (float) $p->estimates->where('status', 'approved')->sum('total_amount');
+                if ($approvedSum > 0) {
+                    $p->dashboard_estimate = $approvedSum;
+                } else {
+                    $anySum = (float) $p->estimates->sum('total_amount');
+                    if ($anySum > 0) {
+                        $p->dashboard_estimate = $anySum;
+                    } elseif ($budgetLineTotal > 0) {
+                        $p->dashboard_estimate = $budgetLineTotal;
+                    } else {
+                        $p->dashboard_estimate = (float) ($p->contract_value ?? 0);
+                    }
+                }
             }
-            $approvedSum = (float) $p->estimates->where('status', 'approved')->sum('total_amount');
-            if ($approvedSum > 0) {
-                $p->dashboard_estimate = $approvedSum;
-                continue;
-            }
-            $anySum = (float) $p->estimates->sum('total_amount');
-            $p->dashboard_estimate = $anySum > 0 ? $anySum : (float) ($p->contract_value ?? 0);
+
+            // ── Budget ───────────────────────────────────────────────
+            $directBudget = (float) ($p->current_budget ?? 0);
+            $p->dashboard_budget = $directBudget > 0 ? $directBudget : $budgetLineTotal;
         }
 
         $activeProjectsCount = $activeProjects->count();
