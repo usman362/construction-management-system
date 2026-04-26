@@ -32,6 +32,9 @@ class Estimate extends Model
         // Phase 1
         'client_id',
         'estimate_type',
+        // Phase 2 — link to a specific Change Order ("smaller estimating
+        // module for change orders inside the project")
+        'change_order_id',
         'total_cost',
         'total_price',
         'margin_percent',
@@ -75,6 +78,11 @@ class Estimate extends Model
     public function convertedToProject(): BelongsTo
     {
         return $this->belongsTo(Project::class, 'converted_to_project_id');
+    }
+
+    public function changeOrder(): BelongsTo
+    {
+        return $this->belongsTo(ChangeOrder::class);
     }
 
     /**

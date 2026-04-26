@@ -141,6 +141,8 @@ Route::middleware('auth')->group(function () {
             Route::post('change-orders/{changeOrder}/approve', [ChangeOrderController::class, 'approve'])->name('change-orders.approve');
             // Phase 7F — e-signature capture
             Route::post('change-orders/{changeOrder}/sign', [ChangeOrderController::class, 'sign'])->name('change-orders.sign');
+            // Brenda 04.25.2026 — "smaller estimate module" tied to a CO.
+            Route::post('change-orders/{changeOrder}/build-estimate', [ChangeOrderController::class, 'buildEstimate'])->name('change-orders.build-estimate');
             Route::get('change-orders/{changeOrder}/pdf', [ChangeOrderController::class, 'downloadPdf'])->name('change-orders.pdf');
             Route::post('change-orders/{changeOrder}/items', [ChangeOrderController::class, 'addItem'])->name('change-orders.add-item');
             Route::post('change-orders/{changeOrder}/labor', [ChangeOrderController::class, 'addLabor'])->name('change-orders.add-labor');
@@ -370,6 +372,17 @@ Route::middleware('auth')->group(function () {
     // ─── RFIs — Admin, PM, Field User ────────────────────────────
     Route::middleware('role:admin,project_manager,field_user')->group(function () {
         Route::get('rfis', [\App\Http\Controllers\RfiController::class, 'index'])->name('rfis.index');
+    });
+
+    // ─── Top-level Estimates Portfolio (Brenda 04.25.2026) ───────
+    // Distinct from project-scoped estimates (which are change-order-focused).
+    // This is the company-wide "all bids" view. Standalone bids without a
+    // project_id can be created here — a Project gets auto-spawned on accept.
+    Route::middleware('role:admin,project_manager,accountant')->group(function () {
+        Route::get('estimates', [\App\Http\Controllers\EstimatePortfolioController::class, 'index'])->name('estimates.portfolio');
+        Route::post('estimates', [\App\Http\Controllers\EstimatePortfolioController::class, 'store'])->name('estimates.portfolio.store');
+        Route::get('estimates/{estimate}', [\App\Http\Controllers\EstimatePortfolioController::class, 'show'])->name('estimates.portfolio.show');
+        Route::post('estimates/{estimate}/spawn-project', [\App\Http\Controllers\EstimatePortfolioController::class, 'spawnProject'])->name('estimates.portfolio.spawn-project');
     });
 
     // ─── Mobile Time Clock — everyone who can touch a timesheet ───

@@ -200,6 +200,50 @@
         </div>
     </div>
 
+    {{-- ── CO Estimate (the "smaller estimating module") ──
+         Brenda 04.25.2026: each CO can have its own line-itemized estimate
+         (labor / material / equipment with markups) so the price quoted to
+         the owner is fully traceable to costs. --}}
+    @php
+        $coEstimate = \App\Models\Estimate::where('change_order_id', $changeOrder->id)->first();
+    @endphp
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="flex items-center justify-between mb-2">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">CO Pricing Estimate</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Itemize labor, materials, equipment, and markups for this change order so the price you charge the owner is fully traceable.</p>
+            </div>
+            @if($coEstimate)
+                <a href="{{ route('projects.estimates.show', [$project, $coEstimate]) }}"
+                   class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                    Open Estimate &rarr;
+                </a>
+            @else
+                <button type="button" onclick="buildCoEstimate()"
+                        class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    Build Estimate
+                </button>
+            @endif
+        </div>
+        @if($coEstimate)
+            <div class="mt-3 grid grid-cols-3 gap-4 text-sm">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-bold">Cost</p>
+                    <p class="font-bold text-gray-900">${{ number_format((float) $coEstimate->total_cost, 2) }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-bold">Price</p>
+                    <p class="font-bold text-blue-700">${{ number_format((float) $coEstimate->total_price, 2) }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-bold">Margin</p>
+                    <p class="font-bold text-emerald-700">{{ number_format(((float) $coEstimate->margin_percent) * 100, 1) }}%</p>
+                </div>
+            </div>
+        @endif
+    </div>
+
     <!-- Action Buttons -->
     @if (in_array($changeOrder->status, ['pending', 'draft', 'submitted']))
         <div class="bg-white rounded-lg shadow p-6">
@@ -217,6 +261,35 @@
             </div>
         </div>
     @endif
+
+    @push('scripts')
+    <script>
+    function buildCoEstimate() {
+        Swal.fire({
+            title: 'Build estimate for this CO?',
+            text: 'Creates a draft estimate scoped to this change order. You can add labor, material, equipment, sub, and other lines, with per-line markups.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#7c3aed',
+            confirmButtonText: 'Create',
+        }).then(r => {
+            if (!r.isConfirmed) return;
+            fetch('{{ route("projects.change-orders.build-estimate", [$project, $changeOrder]) }}', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                },
+            })
+            .then(r => r.json())
+            .then(b => {
+                if (!b.success) { Swal.fire({ icon: 'error', title: b.message }); return; }
+                location.href = b.url;
+            });
+        });
+    }
+    </script>
+    @endpush
 
     {{-- Phase 7F — E-signature capture. The partial swaps between a draw-and-save
          canvas (unsigned) and a static "Signed by X on Y" panel (signed). --}}

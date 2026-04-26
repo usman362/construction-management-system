@@ -233,6 +233,52 @@ class ChangeOrderController extends Controller
     }
 
     /**
+     * Brenda 04.25.2026 — "the smaller estimating module for change orders
+     * inside the project."
+     *
+     * Spawns (or reuses) an Estimate row scoped to this Change Order so the
+     * CO has its own line-itemized cost build-up. Auto-fills client_id from
+     * the project, stamps estimate_type='change_order', and links via
+     * change_order_id. Caller redirects to the project-scoped estimate show
+     * page where the full builder UI takes over.
+     */
+    public function buildEstimate(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
+    {
+        // Reuse if one already exists for this CO — avoids duplicate rows
+        // when the user clicks the button twice.
+        $existing = \App\Models\Estimate::where('change_order_id', $changeOrder->id)->first();
+        if ($existing) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Existing estimate opened.',
+                'url'     => route('projects.estimates.show', [$project->id, $existing->id]),
+            ]);
+        }
+
+        // Auto-number CO estimates as CO-{co_number}-EST so the lineage is
+        // obvious in the portfolio.
+        $estNumber = 'CO-' . ($changeOrder->co_number ?? $changeOrder->id) . '-EST';
+
+        $estimate = \App\Models\Estimate::create([
+            'project_id'      => $project->id,
+            'client_id'       => $project->client_id,
+            'change_order_id' => $changeOrder->id,
+            'estimate_number' => $estNumber,
+            'name'            => 'Pricing for CO #' . ($changeOrder->co_number ?? $changeOrder->id) . ' — ' . ($changeOrder->title ?? ''),
+            'description'     => $changeOrder->description,
+            'estimate_type'   => 'change_order',
+            'status'          => 'draft',
+            'created_by'      => auth()->id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'CO estimate created.',
+            'url'     => route('projects.estimates.show', [$project->id, $estimate->id]),
+        ]);
+    }
+
+    /**
      * Phase 7F — Capture an e-signature on a change order.
      * Stored inline as a Base64 PNG data URL (`signature` longText) plus a
      * typed legal name and timestamp. The currently logged-in user is also
