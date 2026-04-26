@@ -237,6 +237,74 @@
          Pulls every cert with an expiry_date, buckets by urgency, and shows
          the 20 most urgent so the PM/admin can renew before they lapse.
          ═══════════════════════════════════════════════════════════════════ --}}
+    {{-- ═══════════════════════════════════════════════════════════════════
+         CASH FLOW FORECAST — 12-week rolling widget
+         Sums expected receivables (sent + unpaid billing invoices, by due
+         date) against expected payables (vendor invoices not yet paid, by
+         due date) into 12 weekly buckets. Past-due rolls into "Week 1".
+         ═══════════════════════════════════════════════════════════════════ --}}
+    @if(!empty($cashFlowWeeks))
+        @php
+            $maxBar = max(1, max(
+                collect($cashFlowWeeks)->max('inflow') ?: 0,
+                collect($cashFlowWeeks)->max('outflow') ?: 0,
+            ));
+            $cashFlowTotalIn  = collect($cashFlowWeeks)->sum('inflow');
+            $cashFlowTotalOut = collect($cashFlowWeeks)->sum('outflow');
+            $cashFlowNet      = $cashFlowTotalIn - $cashFlowTotalOut;
+        @endphp
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">12-Week Cash Flow Forecast</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Expected receivables vs. payables, by due date. Past-due rolls into this week.</p>
+                </div>
+                <div class="text-right text-xs">
+                    <div>In: <span class="font-bold text-emerald-700">${{ number_format($cashFlowTotalIn, 0) }}</span></div>
+                    <div>Out: <span class="font-bold text-rose-700">${{ number_format($cashFlowTotalOut, 0) }}</span></div>
+                    <div>Net: <span class="font-bold {{ $cashFlowNet >= 0 ? 'text-blue-700' : 'text-red-600' }}">${{ number_format($cashFlowNet, 0) }}</span></div>
+                </div>
+            </div>
+            <div class="px-6 py-4 overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="border-b border-gray-100">
+                            <th class="px-2 py-1 text-left font-semibold text-gray-500 uppercase">Week</th>
+                            <th class="px-2 py-1 text-left font-semibold text-gray-500 uppercase">Range</th>
+                            <th class="px-2 py-1 text-right font-semibold text-emerald-700 uppercase">In</th>
+                            <th class="px-2 py-1 text-right font-semibold text-rose-700 uppercase">Out</th>
+                            <th class="px-2 py-1 text-right font-semibold text-blue-700 uppercase">Net</th>
+                            <th class="px-2 py-1 text-right font-semibold text-gray-500 uppercase">Cumulative</th>
+                            <th class="px-2 py-1 text-left font-semibold text-gray-500 uppercase w-1/3">Visual</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($cashFlowWeeks as $w)
+                            @php
+                                $inPct  = $w->inflow > 0  ? round(($w->inflow  / $maxBar) * 100, 1) : 0;
+                                $outPct = $w->outflow > 0 ? round(($w->outflow / $maxBar) * 100, 1) : 0;
+                            @endphp
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-2 py-1.5 font-mono text-gray-700">W{{ $w->index }}</td>
+                                <td class="px-2 py-1.5 text-gray-500">{{ $w->start->format('M j') }} – {{ $w->end->format('M j') }}</td>
+                                <td class="px-2 py-1.5 text-right text-emerald-700">${{ number_format($w->inflow, 0) }}</td>
+                                <td class="px-2 py-1.5 text-right text-rose-700">${{ number_format($w->outflow, 0) }}</td>
+                                <td class="px-2 py-1.5 text-right font-semibold {{ $w->net >= 0 ? 'text-blue-700' : 'text-red-600' }}">{{ $w->net >= 0 ? '+' : '' }}${{ number_format($w->net, 0) }}</td>
+                                <td class="px-2 py-1.5 text-right text-gray-700">${{ number_format($w->cumulative, 0) }}</td>
+                                <td class="px-2 py-1.5">
+                                    <div class="flex items-center gap-1 h-3">
+                                        <div class="bg-emerald-400 rounded-sm h-full" style="width: {{ $inPct }}%; max-width: 50%;" title="${{ number_format($w->inflow, 0) }} in"></div>
+                                        <div class="bg-rose-400 rounded-sm h-full" style="width: {{ $outPct }}%; max-width: 50%;" title="${{ number_format($w->outflow, 0) }} out"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     <div id="certifications-watch" class="bg-white rounded-lg shadow mb-8">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
             <div class="flex items-center gap-3">

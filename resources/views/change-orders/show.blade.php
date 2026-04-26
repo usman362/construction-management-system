@@ -217,5 +217,15 @@
             </div>
         </div>
     @endif
+
+    {{-- Phase 7F — E-signature capture. The partial swaps between a draw-and-save
+         canvas (unsigned) and a static "Signed by X on Y" panel (signed). --}}
+    <div class="mt-6">
+        @include('partials.signature-pad', [
+            'document'  => $changeOrder,
+            'submitUrl' => route('projects.change-orders.sign', [$project, $changeOrder]),
+            'docLabel'  => 'Change Order #' . ($changeOrder->co_number ?? $changeOrder->id),
+        ])
+    </div>
 </div>
 @endsection

@@ -94,6 +94,30 @@ class ReportController extends Controller
             $buckets[$k]['committed_labor'] += (float) $t->total_cost;
         }
 
+        // Per diem dollars — route under their OWN cost type (PER DIEM, code 07
+        // by default) instead of the labor cost type the rest of the allocation
+        // sits under. This is what lets the cost tracker see per diem as a
+        // separate line in the cost report rather than being absorbed into
+        // Direct Labor.
+        $perDiemAllocations = \App\Models\TimesheetCostAllocation::query()
+            ->whereHas('timesheet', function ($q) use ($project) {
+                $q->where('project_id', $project->id)->where('status', '!=', 'rejected');
+            })
+            ->where('per_diem_amount', '>', 0)
+            ->with(['costCode', 'perDiemCostType', 'costType'])
+            ->get();
+
+        foreach ($perDiemAllocations as $alloc) {
+            // Prefer the explicit per-diem cost type; fall back to the labor
+            // cost type for legacy rows that haven't been re-saved since the
+            // backfill (rare, but keeps reports from dropping dollars).
+            $ctId     = $alloc->per_diem_cost_type_id ?? $alloc->cost_type_id;
+            $costType = $alloc->perDiemCostType ?? $alloc->costType ?? ($ctId ? $costTypesById->get($ctId) : null);
+            $k        = $keyFor($alloc->cost_code_id, $ctId);
+            $buckets[$k] ??= $makeBucket($alloc->cost_code_id, $ctId, $alloc->costCode, $costType);
+            $buckets[$k]['committed_labor'] += (float) $alloc->per_diem_amount;
+        }
+
         // Vendor invoices — infer cost_type_id from commitment, then cost code default.
         foreach ($invoices as $inv) {
             $ctId = $inv->commitment?->cost_type_id ?? $inv->costCode?->cost_type_id;

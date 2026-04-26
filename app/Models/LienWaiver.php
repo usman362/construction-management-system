@@ -23,12 +23,18 @@ class LienWaiver extends Model
         'status',
         'notes',
         'created_by',
+        // Phase 7F: e-signature capture
+        'signature',
+        'signature_name',
+        'signed_at',
+        'signed_by',
     ];
 
     protected $casts = [
         'amount'        => 'decimal:2',
         'through_date'  => 'date',
         'received_date' => 'date',
+        'signed_at'     => 'datetime',
     ];
 
     /**

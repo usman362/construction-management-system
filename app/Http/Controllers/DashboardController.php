@@ -134,6 +134,13 @@ class DashboardController extends Controller
             ->whereDate('needed_by', '<', now()->toDateString())
             ->count();
 
+        // ─── Cash Flow Forecast (12-week rolling) ─────────────────
+        // Bucket expected receivables (sent + unpaid billing invoices, by due_date)
+        // and expected payables (pending vendor invoices + draft/issued POs delivery
+        // dates) into 12 weekly buckets starting THIS week. Net per week tells the
+        // owner whether next month is cash-positive or whether they need a draw.
+        $cashFlowWeeks = $this->buildCashFlowForecast();
+
         // ── Certification expiry tracking ──
         // Bucket upcoming/past expirations so the PM can act on them each morning.
         $now      = now()->startOfDay();
@@ -187,6 +194,82 @@ class DashboardController extends Controller
             'allProjects'    => $allProjects,
             'certWatchList'  => $certWatchList,
             'clockedInList'  => $clockedInList,
+            'cashFlowWeeks'  => $cashFlowWeeks,
         ]);
+    }
+
+    /**
+     * Build a 12-week rolling cash flow forecast.
+     *
+     * - Receivables: billing invoices that are sent/approved but not paid yet,
+     *   bucketed by due_date.
+     * - Payables: vendor invoices in pending/approved status (not paid),
+     *   bucketed by due_date.
+     *
+     * Anything past-due rolls into "Week 1" (this week) so the owner sees the
+     * urgency.
+     */
+    private function buildCashFlowForecast(): array
+    {
+        $weeks = [];
+        $weekStart = now()->startOfWeek();
+        for ($i = 0; $i < 12; $i++) {
+            $weeks[] = (object) [
+                'index' => $i + 1,
+                'start' => $weekStart->copy()->addWeeks($i),
+                'end'   => $weekStart->copy()->addWeeks($i + 1)->subDay(),
+                'inflow' => 0.0,
+                'outflow' => 0.0,
+            ];
+        }
+        $horizonEnd = $weeks[11]->end;
+
+        // Receivables — billing invoices not yet paid
+        $receivables = BillingInvoice::query()
+            ->whereNotIn('status', ['draft', 'voided', 'paid'])
+            ->whereNotNull('due_date')
+            ->where('due_date', '<=', $horizonEnd)
+            ->get(['id', 'due_date', 'total_amount']);
+
+        foreach ($receivables as $r) {
+            $idx = $this->bucketIndex($r->due_date, $weeks);
+            if ($idx !== null) $weeks[$idx]->inflow += (float) $r->total_amount;
+        }
+
+        // Payables — vendor invoices not yet paid
+        $payables = \App\Models\Invoice::query()
+            ->whereIn('status', ['pending', 'approved'])
+            ->whereNotNull('due_date')
+            ->where('due_date', '<=', $horizonEnd)
+            ->get(['id', 'due_date', 'amount']);
+
+        foreach ($payables as $p) {
+            $idx = $this->bucketIndex($p->due_date, $weeks);
+            if ($idx !== null) $weeks[$idx]->outflow += (float) $p->amount;
+        }
+
+        // Compute net + running balance
+        $running = 0.0;
+        foreach ($weeks as $w) {
+            $w->net = $w->inflow - $w->outflow;
+            $running += $w->net;
+            $w->cumulative = $running;
+        }
+
+        return $weeks;
+    }
+
+    /**
+     * Map an arbitrary date to the matching 12-week bucket index.
+     * Past-due dates collapse into bucket 0 (this week).
+     */
+    private function bucketIndex($date, array $weeks): ?int
+    {
+        $d = \Carbon\Carbon::parse($date);
+        if ($d->lt($weeks[0]->start)) return 0;   // overdue → this week
+        foreach ($weeks as $i => $w) {
+            if ($d->between($w->start, $w->end)) return $i;
+        }
+        return null;
     }
 }

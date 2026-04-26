@@ -53,10 +53,98 @@
     <div class="flex h-screen">
         @include('partials.sidebar')
         <div class="flex-1 flex flex-col overflow-hidden">
-            <header class="bg-white border-b border-gray-200 h-14 flex items-center justify-end px-6 flex-shrink-0">
+            <header class="bg-white border-b border-gray-200 h-14 flex items-center justify-between px-6 flex-shrink-0 gap-4">
+                {{-- ─── Phase 7D: Global Search ──────────────────────────
+                     Alpine-powered top-nav search. Hits /search (max 5 hits per
+                     entity type) and renders grouped results in a dropdown.
+                     Cmd/Ctrl+K from anywhere in the app focuses this input. --}}
+                <div
+                    class="flex-1 max-w-xl relative"
+                    x-data="globalSearch()"
+                    @keydown.window.prevent.meta.k="focusSearch()"
+                    @keydown.window.prevent.ctrl.k="focusSearch()"
+                >
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input
+                            type="text"
+                            x-ref="searchInput"
+                            x-model="query"
+                            @input.debounce.250ms="runSearch()"
+                            @focus="open = true"
+                            @keydown.escape="closeAndBlur()"
+                            @keydown.arrow-down.prevent="moveCursor(1)"
+                            @keydown.arrow-up.prevent="moveCursor(-1)"
+                            @keydown.enter.prevent="openHighlighted()"
+                            placeholder="Search projects, employees, POs, RFIs, invoices…"
+                            class="w-full pl-9 pr-12 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
+                        >
+                        <kbd class="absolute right-3 top-1/2 -translate-y-1/2 hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-white border border-gray-200 rounded pointer-events-none">
+                            <span x-text="isMac ? '⌘' : 'Ctrl'"></span>K
+                        </kbd>
+                    </div>
+
+                    {{-- Dropdown --}}
+                    <div
+                        x-show="open && query.length >= 2"
+                        x-transition.opacity.duration.100ms
+                        @click.away="open = false"
+                        class="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl max-h-[70vh] overflow-y-auto z-50"
+                        style="display:none;"
+                    >
+                        {{-- Loading --}}
+                        <template x-if="loading">
+                            <div class="px-4 py-6 text-center text-sm text-gray-400">
+                                <svg class="inline-block animate-spin w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4zm2 5.3A7.96 7.96 0 014 12H0c0 3 1.1 5.8 3 7.9l3-2.6z"></path></svg>
+                                Searching…
+                            </div>
+                        </template>
+
+                        {{-- Empty --}}
+                        <template x-if="!loading && results.count === 0">
+                            <div class="px-4 py-6 text-center">
+                                <p class="text-sm text-gray-500">No matches for <span class="font-mono text-gray-700" x-text="'&quot;' + query + '&quot;'"></span></p>
+                                <p class="text-xs text-gray-400 mt-1">Try a project number, person's name, or invoice number.</p>
+                            </div>
+                        </template>
+
+                        {{-- Results --}}
+                        <template x-if="!loading && results.count > 0">
+                            <div class="py-1">
+                                <template x-for="(group, gi) in results.groups" :key="gi">
+                                    <div>
+                                        <div class="px-3 py-1.5 bg-gray-50 border-b border-gray-100 sticky top-0">
+                                            <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500" x-text="group.label"></span>
+                                            <span class="text-[10px] text-gray-400 ml-1" x-text="'(' + group.items.length + ')'"></span>
+                                        </div>
+                                        <template x-for="(item, ii) in group.items" :key="ii">
+                                            <a
+                                                :href="item.url"
+                                                @mouseenter="setCursor(gi, ii)"
+                                                :class="isHighlighted(gi, ii) ? 'bg-blue-50' : ''"
+                                                class="block px-3 py-2 hover:bg-blue-50 transition border-b border-gray-50 last:border-0"
+                                            >
+                                                <div class="text-sm font-medium text-gray-900" x-text="item.title"></div>
+                                                <div class="text-xs text-gray-500 mt-0.5" x-text="item.subtitle"></div>
+                                            </a>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <div class="px-3 py-1.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400 flex items-center justify-between">
+                            <span>↑↓ navigate · Enter open · Esc close</span>
+                            <span x-text="results.count + ' result' + (results.count === 1 ? '' : 's')"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex items-center gap-4">
-                    <span class="text-xs text-gray-400">{{ now()->format('D, M j, Y') }}</span>
-                    <div class="h-5 w-px bg-gray-200"></div>
+                    <span class="text-xs text-gray-400 hidden lg:inline">{{ now()->format('D, M j, Y') }}</span>
+                    <div class="h-5 w-px bg-gray-200 hidden lg:block"></div>
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" class="flex items-center gap-2 hover:opacity-80 transition focus:outline-none">
                             <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
@@ -93,6 +181,81 @@
     </div>
 
     <script>
+    // ─── Global Search Alpine component (Phase 7D) ─────────────────
+    // Lives at the top so it's defined before Alpine evaluates templates.
+    function globalSearch() {
+        return {
+            query: '',
+            open: false,
+            loading: false,
+            results: { count: 0, groups: [] },
+            cursorGroup: 0,
+            cursorItem: 0,
+            isMac: navigator.platform.toUpperCase().includes('MAC'),
+
+            focusSearch() {
+                this.$refs.searchInput.focus();
+                this.$refs.searchInput.select();
+            },
+
+            closeAndBlur() {
+                this.open = false;
+                this.$refs.searchInput.blur();
+            },
+
+            async runSearch() {
+                if (this.query.trim().length < 2) {
+                    this.results = { count: 0, groups: [] };
+                    return;
+                }
+                this.loading = true;
+                this.open = true;
+                try {
+                    const url = window.BASE_URL + '/search?q=' + encodeURIComponent(this.query);
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const data = await res.json();
+                    this.results = { count: data.count || 0, groups: data.groups || [] };
+                    this.cursorGroup = 0;
+                    this.cursorItem = 0;
+                } catch (e) {
+                    this.results = { count: 0, groups: [] };
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Keyboard nav across grouped results (skip group headers).
+            moveCursor(delta) {
+                if (this.results.count === 0) return;
+                let g = this.cursorGroup, i = this.cursorItem;
+                if (delta > 0) {
+                    i++;
+                    if (i >= this.results.groups[g].items.length) { g++; i = 0; }
+                    if (g >= this.results.groups.length) { g = 0; i = 0; }
+                } else {
+                    i--;
+                    if (i < 0) {
+                        g--;
+                        if (g < 0) g = this.results.groups.length - 1;
+                        i = this.results.groups[g].items.length - 1;
+                    }
+                }
+                this.cursorGroup = g;
+                this.cursorItem = i;
+            },
+
+            setCursor(g, i) { this.cursorGroup = g; this.cursorItem = i; },
+            isHighlighted(g, i) { return this.cursorGroup === g && this.cursorItem === i; },
+
+            openHighlighted() {
+                if (this.results.count === 0) return;
+                const item = this.results.groups[this.cursorGroup]?.items?.[this.cursorItem];
+                if (item) window.location.href = item.url;
+            },
+        };
+    }
+
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
     const Toast = Swal.mixin({ toast:true, position:'top-end', showConfirmButton:false, timer:3000, timerProgressBar:true,

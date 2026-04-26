@@ -50,6 +50,32 @@ Route::middleware('auth')->group(function () {
     // Dashboard — everyone
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+    // ─── Global Search — Phase 7D ────────────────────────────────
+    // Single endpoint that searches across projects, employees, POs, invoices,
+    // RFIs, change orders, vendors, clients, and cost codes. Used by the
+    // top-nav search dropdown. Available to anyone authenticated; results are
+    // filtered to data the user already has access to via existing role
+    // middleware on each detail page.
+    Route::get('search', [\App\Http\Controllers\SearchController::class, 'search'])
+        ->name('search');
+
+    // ─── Excel Exports — Phase 7E ────────────────────────────────
+    // One endpoint per list page; each honors the same filters as the source
+    // index (status, project_id, date_from/to, etc.) via query string. Adding
+    // a new export = controller method + a route here + a button on the list
+    // view. Role middleware is applied separately further down so each export
+    // matches the access rules of its list page.
+    Route::prefix('exports')->name('exports.')->group(function () {
+        Route::get('projects',        [\App\Http\Controllers\ExportController::class, 'projects'])->name('projects');
+        Route::get('employees',       [\App\Http\Controllers\ExportController::class, 'employees'])->name('employees');
+        Route::get('vendors',         [\App\Http\Controllers\ExportController::class, 'vendors'])->name('vendors');
+        Route::get('timesheets',      [\App\Http\Controllers\ExportController::class, 'timesheets'])->name('timesheets');
+        Route::get('invoices',        [\App\Http\Controllers\ExportController::class, 'invoices'])->name('invoices');
+        Route::get('purchase-orders', [\App\Http\Controllers\ExportController::class, 'purchaseOrders'])->name('purchase-orders');
+        Route::get('change-orders',   [\App\Http\Controllers\ExportController::class, 'changeOrders'])->name('change-orders');
+        Route::get('rfis',            [\App\Http\Controllers\ExportController::class, 'rfis'])->name('rfis');
+    });
+
     // Profile — every logged-in user
     Route::get('profile', [ProfileController::class, 'index'])->name('profile');
     Route::put('profile', [ProfileController::class, 'updateProfile'])->name('profile.update');
@@ -113,6 +139,8 @@ Route::middleware('auth')->group(function () {
         Route::middleware('role:admin,project_manager,accountant')->group(function () {
             Route::resource('change-orders', ChangeOrderController::class);
             Route::post('change-orders/{changeOrder}/approve', [ChangeOrderController::class, 'approve'])->name('change-orders.approve');
+            // Phase 7F — e-signature capture
+            Route::post('change-orders/{changeOrder}/sign', [ChangeOrderController::class, 'sign'])->name('change-orders.sign');
             Route::get('change-orders/{changeOrder}/pdf', [ChangeOrderController::class, 'downloadPdf'])->name('change-orders.pdf');
             Route::post('change-orders/{changeOrder}/items', [ChangeOrderController::class, 'addItem'])->name('change-orders.add-item');
             Route::post('change-orders/{changeOrder}/labor', [ChangeOrderController::class, 'addLabor'])->name('change-orders.add-labor');
@@ -124,6 +152,15 @@ Route::middleware('auth')->group(function () {
             Route::post('estimates/{estimate}/lines', [EstimateController::class, 'addLine'])->name('estimates.add-line');
             Route::put('estimates/lines/{estimateLine}', [EstimateController::class, 'updateLine'])->name('estimates.update-line');
             Route::delete('estimates/lines/{estimateLine}', [EstimateController::class, 'removeLine'])->name('estimates.remove-line');
+            // Estimating Phase 1 — section CRUD
+            Route::post('estimates/{estimate}/sections', [EstimateController::class, 'storeSection'])->name('estimates.sections.store');
+            Route::put('estimates/{estimate}/sections/{section}', [EstimateController::class, 'updateSection'])->name('estimates.sections.update');
+            Route::delete('estimates/{estimate}/sections/{section}', [EstimateController::class, 'destroySection'])->name('estimates.sections.destroy');
+            // Estimating Phase 2 + 3 — workflow + PDF
+            Route::post('estimates/{estimate}/convert', [EstimateController::class, 'convertToProject'])->name('estimates.convert');
+            Route::post('estimates/{estimate}/mark-sent', [EstimateController::class, 'markSent'])->name('estimates.mark-sent');
+            Route::post('estimates/{estimate}/response', [EstimateController::class, 'recordResponse'])->name('estimates.response');
+            Route::get('estimates/{estimate}/pdf', [EstimateController::class, 'downloadPdf'])->name('estimates.pdf');
             Route::get('estimates/{estimate}/lines/import/template', [ImportController::class, 'estimateLineTemplate'])->name('estimates.lines.import.template');
             Route::post('estimates/{estimate}/lines/import', [ImportController::class, 'estimateLineImport'])->name('estimates.lines.import');
         });
@@ -140,6 +177,8 @@ Route::middleware('auth')->group(function () {
             Route::get('lien-waivers/{lienWaiver}', [\App\Http\Controllers\LienWaiverController::class, 'show'])->name('lien-waivers.show');
             Route::put('lien-waivers/{lienWaiver}', [\App\Http\Controllers\LienWaiverController::class, 'update'])->name('lien-waivers.update');
             Route::delete('lien-waivers/{lienWaiver}', [\App\Http\Controllers\LienWaiverController::class, 'destroy'])->name('lien-waivers.destroy');
+            // Phase 7F — e-signature capture
+            Route::post('lien-waivers/{lienWaiver}/sign', [\App\Http\Controllers\LienWaiverController::class, 'sign'])->name('lien-waivers.sign');
         });
 
         // RFIs (project-scoped) — Admin, PM, Field (field users can submit + view)
@@ -231,6 +270,11 @@ Route::middleware('auth')->group(function () {
         // uses the bound model AFTER these fixed URIs resolve.
         Route::get('timesheets/print-batch', [TimesheetController::class, 'printBatch'])->name('timesheets.print-batch');
         Route::get('timesheets/{timesheet}/print', [TimesheetController::class, 'print'])->name('timesheets.print');
+        // Bulk approve/reject — must come BEFORE the resource so "bulk-approve"
+        // isn't matched as a {timesheet} parameter on the (PUT/PATCH/DELETE)
+        // resource routes. Brenda asked for these 04.25.2026.
+        Route::post('timesheets/bulk-approve', [TimesheetController::class, 'bulkApprove'])->name('timesheets.bulk-approve');
+        Route::post('timesheets/bulk-reject',  [TimesheetController::class, 'bulkReject'])->name('timesheets.bulk-reject');
         Route::resource('timesheets', TimesheetController::class);
         Route::post('timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])->name('timesheets.approve');
         Route::post('timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])->name('timesheets.reject');
@@ -346,5 +390,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
         Route::get('reports/timesheets', [ReportController::class, 'timesheetReport'])->name('reports.timesheets');
         Route::get('reports/timesheets/pdf', [ReportController::class, 'timesheetReportPdf'])->name('reports.timesheets.pdf');
+        // Phase 7+ — Work-in-Progress (WIP) report (banks/bonding requirement)
+        Route::get('reports/wip', [\App\Http\Controllers\WipReportController::class, 'index'])->name('reports.wip');
     });
 });

@@ -242,22 +242,14 @@ class TimeClockController extends Controller
             ], 422);
         }
 
-        // DB-level unique on timesheets is (employee_id, project_id, date), so
-        // we group by those three. If a supervisor assigned DIFFERENT cost
-        // codes to punches for the same worker/project/day, reject — they
-        // need to fix the codes before conversion (or split over two days).
-        $groups = $entries->groupBy(fn ($e) => $e->employee_id . '|' . $e->project_id . '|' . $e->clock_in_at->toDateString());
-
-        foreach ($groups as $key => $group) {
-            $codes = $group->pluck('cost_code_id')->unique();
-            if ($codes->count() > 1) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Punches on the same day for the same worker/project must share one cost code before converting. Fix punches: '
-                        . $group->pluck('id')->implode(', '),
-                ], 422);
-            }
-        }
+        // 2026-04-25: timesheets unique relaxed to (emp, project, date, cost_code).
+        // We now group by all four — punches with the SAME cost code on the
+        // same day roll into one timesheet, punches with DIFFERENT cost codes
+        // on the same day produce separate timesheets (the worker split hours
+        // across phase codes, which is normal in construction).
+        $groups = $entries->groupBy(fn ($e) =>
+            $e->employee_id . '|' . $e->project_id . '|' . $e->clock_in_at->toDateString() . '|' . $e->cost_code_id
+        );
 
         $created = 0;
         DB::transaction(function () use ($groups, &$created) {
@@ -267,14 +259,18 @@ class TimeClockController extends Controller
                 $regular    = min(8, $totalHours);
                 $overtime   = max(0, $totalHours - 8);
 
+                // 2026-04-25: timesheets unique was relaxed to include
+                // cost_code_id so a worker can split hours across phase codes
+                // on the same day. Match on the full 4-tuple so the upsert
+                // creates a separate row per cost code instead of clobbering.
                 $timesheet = Timesheet::updateOrCreate(
                     [
-                        'employee_id' => $first->employee_id,
-                        'project_id'  => $first->project_id,
-                        'date'        => $first->clock_in_at->toDateString(),
+                        'employee_id'  => $first->employee_id,
+                        'project_id'   => $first->project_id,
+                        'date'         => $first->clock_in_at->toDateString(),
+                        'cost_code_id' => $first->cost_code_id,
                     ],
                     [
-                        'cost_code_id'   => $first->cost_code_id,
                         'regular_hours'  => $regular,
                         'overtime_hours' => $overtime,
                         'total_hours'    => $totalHours,

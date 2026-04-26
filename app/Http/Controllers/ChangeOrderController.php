@@ -232,6 +232,39 @@ class ChangeOrderController extends Controller
         return response()->json(['message' => 'Labor added to change order']);
     }
 
+    /**
+     * Phase 7F — Capture an e-signature on a change order.
+     * Stored inline as a Base64 PNG data URL (`signature` longText) plus a
+     * typed legal name and timestamp. The currently logged-in user is also
+     * recorded as the audit-trail signer.
+     */
+    public function sign(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
+    {
+        $data = $request->validate([
+            // ~30KB hard ceiling — typical signature PNG is 4-15KB. Anything
+            // larger is almost certainly garbage from a misuse of the endpoint.
+            'signature'      => ['required', 'string', 'max:200000', 'starts_with:data:image/'],
+            'signature_name' => ['required', 'string', 'max:150'],
+        ]);
+
+        // Soft sanity check — make sure this CO actually belongs to the project
+        // in the URL (Laravel's implicit binding doesn't enforce the chain).
+        abort_unless($changeOrder->project_id === $project->id, 404);
+
+        $changeOrder->update([
+            'signature'      => $data['signature'],
+            'signature_name' => $data['signature_name'],
+            'signed_at'      => now(),
+            'signed_by'      => auth()->id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signature saved.',
+            'signed_at' => $changeOrder->signed_at->format('M j, Y g:i A'),
+        ]);
+    }
+
     public function approve(Request $request, Project $project, ChangeOrder $changeOrder): JsonResponse
     {
         // Idempotency: don't double-credit project budget if already approved

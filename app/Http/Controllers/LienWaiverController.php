@@ -116,4 +116,31 @@ class LienWaiverController extends Controller
 
         return response()->json($lienWaiver->load(['vendor', 'commitment', 'documents.uploader']));
     }
+
+    /**
+     * Phase 7F — Capture an e-signature on a lien waiver. Same shape as
+     * ChangeOrderController::sign() so the partial works on both.
+     */
+    public function sign(Request $request, Project $project, LienWaiver $lienWaiver): JsonResponse
+    {
+        $data = $request->validate([
+            'signature'      => ['required', 'string', 'max:200000', 'starts_with:data:image/'],
+            'signature_name' => ['required', 'string', 'max:150'],
+        ]);
+
+        abort_unless($lienWaiver->project_id === $project->id, 404);
+
+        $lienWaiver->update([
+            'signature'      => $data['signature'],
+            'signature_name' => $data['signature_name'],
+            'signed_at'      => now(),
+            'signed_by'      => auth()->id(),
+        ]);
+
+        return response()->json([
+            'success'   => true,
+            'message'   => 'Signature saved.',
+            'signed_at' => $lienWaiver->signed_at->format('M j, Y g:i A'),
+        ]);
+    }
 }

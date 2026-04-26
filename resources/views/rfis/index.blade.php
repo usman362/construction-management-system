@@ -24,6 +24,16 @@
             <h1 class="text-2xl font-bold text-gray-900">RFIs</h1>
             <p class="text-sm text-gray-500 mt-1">Portfolio-wide register of Requests for Information across all projects.</p>
         </div>
+        <div class="flex items-center gap-2">
+            {{-- Forwards the same filters the user has applied (status, priority, etc.)
+                 so the Excel export matches what's on screen. --}}
+            <a href="{{ route('exports.rfis') }}{{ request()->getQueryString() ? '?' . request()->getQueryString() : '' }}"
+               class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm border border-emerald-200 transition"
+               title="Download RFIs (current filters applied) as Excel">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                Export
+            </a>
+        </div>
     </div>
 
     <!-- Filters -->

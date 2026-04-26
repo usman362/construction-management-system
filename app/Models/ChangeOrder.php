@@ -29,6 +29,11 @@ class ChangeOrder extends Model
         'new_completion_date',
         'approved_by',
         'approved_date',
+        // Phase 7F: e-signature capture
+        'signature',
+        'signature_name',
+        'signed_at',
+        'signed_by',
     ];
 
     protected $casts = [
@@ -36,6 +41,7 @@ class ChangeOrder extends Model
         'amount' => 'decimal:2',
         'new_completion_date' => 'date',
         'approved_date' => 'date',
+        'signed_at' => 'datetime',
     ];
 
     public function documents(): MorphMany

@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Models\ChangeOrder;
+use App\Models\EstimateLine;
 use App\Models\Invoice;
 use App\Models\Rfi;
 use App\Models\Timesheet;
 use App\Observers\ChangeOrderObserver;
+use App\Observers\EstimateLineObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\RfiObserver;
 use App\Observers\TimesheetObserver;
@@ -36,5 +38,8 @@ class AppServiceProvider extends ServiceProvider
         Rfi::observe(RfiObserver::class);
         ChangeOrder::observe(ChangeOrderObserver::class);
         Invoice::observe(InvoiceObserver::class);
+
+        // Estimating Phase 1: auto-roll-up line → section → estimate totals.
+        EstimateLine::observe(EstimateLineObserver::class);
     }
 }

@@ -237,18 +237,24 @@
         <p>This Change Order becomes part of the contract when signed by all parties listed below. Work shall not proceed until this Change Order has been approved and signed by the Owner.</p>
     </div>
 
-    {{-- Signature Section --}}
+    {{-- Signature Section
+         When the change order has been e-signed in BuildTrack, drop the captured
+         signature image onto the Owner / Client signature line and pre-fill the
+         printed name + date. Blank lines stay for hand-signing the printed copy. --}}
     <table class="signature-section" cellspacing="0">
         <tr>
             <td class="sig-block">
+                @if(!empty($changeOrder->signature))
+                    <img src="{{ $changeOrder->signature }}" alt="Owner Signature" style="max-height:55px; display:block; margin-bottom:4px;">
+                @endif
                 <div class="sig-line"></div>
                 <div class="sig-label">Owner / Client Signature</div>
                 <div class="sig-date">
-                    <div class="sig-line"></div>
+                    <div class="sig-line">{{ $changeOrder->signature_name ?? '' }}</div>
                     <div class="sig-label">Printed Name</div>
                 </div>
                 <div class="sig-date">
-                    <div class="sig-line"></div>
+                    <div class="sig-line">{{ optional($changeOrder->signed_at)->format('M j, Y') ?? '' }}</div>
                     <div class="sig-label">Date</div>
                 </div>
             </td>

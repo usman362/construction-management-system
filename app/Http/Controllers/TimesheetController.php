@@ -459,7 +459,9 @@ class TimesheetController extends Controller
 
     /**
      * Keep a single allocation row in sync so payroll and reports can resolve cost code by hours.
-     * Auto-fills per_diem_amount from the project's default_per_diem_rate if set.
+     * Auto-fills per_diem_amount from the project's default_per_diem_rate if set,
+     * and tags any per diem with the dedicated PER DIEM cost type (code 07) so
+     * reports don't lump it in with labor.
      */
     private function syncTimesheetCostAllocation(Timesheet $timesheet): void
     {
@@ -471,10 +473,23 @@ class TimesheetController extends Controller
                 // Apply per diem only for days the employee actually worked (total_hours > 0)
                 $perDiem = $timesheet->total_hours > 0 ? (float) $rate : 0;
             }
+
+            // Resolve the dedicated per-diem cost type once per request. Looked
+            // up by code (not a hard-coded id) so it works on any seeded
+            // environment. Cached statically to avoid a DB hit per timesheet
+            // during bulk-create.
+            static $perDiemCostTypeId = null;
+            if ($perDiemCostTypeId === null && $perDiem > 0) {
+                $perDiemCostTypeId = \App\Models\CostType::where('code', '07')->value('id');
+            }
+
             TimesheetCostAllocation::create([
                 'timesheet_id' => $timesheet->id,
                 'cost_code_id' => $timesheet->cost_code_id,
                 'cost_type_id' => $timesheet->cost_type_id,
+                // Only tag per_diem_cost_type_id when there is actual per diem
+                // on this row — keeps it NULL for hours-only allocations.
+                'per_diem_cost_type_id' => $perDiem > 0 ? $perDiemCostTypeId : null,
                 'hours' => $timesheet->total_hours,
                 'cost' => $timesheet->total_cost,
                 'per_diem_amount' => $perDiem,
@@ -514,6 +529,73 @@ class TimesheetController extends Controller
         return redirect()
             ->route('timesheets.show', $timesheet)
             ->with('success', 'Timesheet approved.');
+    }
+
+    /**
+     * Bulk approve / reject — operates on an array of timesheet IDs in one
+     * shot. Requested by Brenda 04.25.2026: "we might need a bulk approval
+     * for timesheets."
+     *
+     * Wrapped in a single transaction so partial-failure leaves the data
+     * untouched. Only acts on timesheets whose status is currently
+     * 'submitted' so re-running with already-approved IDs is a no-op.
+     */
+    public function bulkApprove(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:timesheets,id',
+        ]);
+
+        $count = 0;
+        \DB::transaction(function () use ($data, &$count) {
+            $count = Timesheet::whereIn('id', $data['ids'])
+                ->where('status', 'submitted')
+                ->update([
+                    'status'      => 'approved',
+                    'approved_by' => auth()->id(),
+                    'approved_at' => now(),
+                ]);
+        });
+
+        $skipped = count($data['ids']) - $count;
+        $msg = "{$count} timesheet(s) approved." . ($skipped > 0
+            ? " {$skipped} skipped (not in 'submitted' status)." : '');
+
+        return response()->json(['success' => true, 'message' => $msg, 'approved' => $count, 'skipped' => $skipped]);
+    }
+
+    public function bulkReject(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids'              => 'required|array|min:1',
+            'ids.*'            => 'integer|exists:timesheets,id',
+            'rejection_reason' => 'nullable|string|max:2000',
+        ]);
+
+        $reason = $data['rejection_reason'] ?? null;
+        $count  = 0;
+
+        \DB::transaction(function () use ($data, $reason, &$count) {
+            $rows = Timesheet::whereIn('id', $data['ids'])
+                ->where('status', 'submitted')
+                ->get();
+
+            foreach ($rows as $ts) {
+                $notes = $ts->notes;
+                if ($reason) {
+                    $notes = trim(($notes ? $notes . "\n\n" : '') . 'Rejection: ' . $reason);
+                }
+                $ts->update(['status' => 'rejected', 'notes' => $notes]);
+                $count++;
+            }
+        });
+
+        $skipped = count($data['ids']) - $count;
+        $msg = "{$count} timesheet(s) rejected." . ($skipped > 0
+            ? " {$skipped} skipped (not in 'submitted' status)." : '');
+
+        return response()->json(['success' => true, 'message' => $msg, 'rejected' => $count, 'skipped' => $skipped]);
     }
 
     public function reject(Request $request, Timesheet $timesheet): JsonResponse|RedirectResponse

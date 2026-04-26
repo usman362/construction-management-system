@@ -7,6 +7,10 @@
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Timesheets</h1>
     <div class="flex items-center gap-3">
+        <a href="{{ route('exports.timesheets') }}" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm border border-emerald-200 transition" title="Download all timesheets as Excel">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+            Export
+        </a>
         <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
             Add Timesheet
@@ -89,9 +93,32 @@
     </div>
 </div>
 
+{{-- Bulk action bar — appears the moment any row is checked. Brenda asked
+     for bulk approve 04.25.2026. Approve/Reject only act on rows whose
+     status is currently 'submitted'; rows in other statuses get skipped
+     server-side with a count returned in the response. --}}
+<div id="bulkActionBar" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+    <div class="text-sm text-blue-900">
+        <strong id="bulkSelectedCount">0</strong> timesheet(s) selected
+        <span class="text-xs text-blue-700">— only "Submitted" rows will be acted on; others are skipped</span>
+    </div>
+    <div class="flex gap-2">
+        <button type="button" onclick="bulkApproveSelected()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            ✓ Approve Selected
+        </button>
+        <button type="button" onclick="bulkRejectSelected()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            ✗ Reject Selected
+        </button>
+        <button type="button" onclick="clearBulkSelection()" class="bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-lg border border-gray-200">
+            Clear
+        </button>
+    </div>
+</div>
+
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">
         <thead><tr>
+            <th width="30"><input type="checkbox" id="bulkSelectAll" onclick="toggleAllBulk(this)" title="Select all on this page"></th>
             <th>Date</th><th>Employee</th><th>Project</th><th>Phase code</th><th>Crew</th><th>Regular</th><th>OT</th><th>DT</th><th>Total</th><th>Cost</th><th>Status</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
@@ -234,6 +261,15 @@
 var table = $('#dataTable').DataTable({
     ajax: '{{ route("timesheets.index") }}',
     columns: [
+        // Bulk-select checkbox column. Re-rendered on every redraw because
+        // server-side DataTables wipe the DOM each page change.
+        {data:'id', orderable:false, searchable:false, className:'text-center',
+         render: function(id, type, row) {
+            const status = row.status;
+            const dis = (status === 'submitted') ? '' : 'disabled title="Only Submitted timesheets can be bulk-acted on"';
+            return '<input type="checkbox" class="ts-bulk-check" value="'+id+'" '+dis+' onchange="refreshBulkSelection()">';
+         }
+        },
         {data:'date', render: function(d) {
             if (!d) return '—';
             // Server sends Y-m-d string. Parse manually to avoid JS timezone shift
@@ -260,6 +296,87 @@ var table = $('#dataTable').DataTable({
         }}
     ]
 });
+
+// ─── Bulk approve/reject ──────────────────────────────────────────
+const bulkSelectedIds = new Set();
+
+function refreshBulkSelection() {
+    bulkSelectedIds.clear();
+    document.querySelectorAll('.ts-bulk-check:checked').forEach(cb => bulkSelectedIds.add(parseInt(cb.value)));
+    document.getElementById('bulkSelectedCount').textContent = bulkSelectedIds.size;
+    document.getElementById('bulkActionBar').classList.toggle('hidden', bulkSelectedIds.size === 0);
+}
+
+function toggleAllBulk(master) {
+    document.querySelectorAll('.ts-bulk-check:not([disabled])').forEach(cb => cb.checked = master.checked);
+    refreshBulkSelection();
+}
+
+function clearBulkSelection() {
+    document.querySelectorAll('.ts-bulk-check:checked').forEach(cb => cb.checked = false);
+    document.getElementById('bulkSelectAll').checked = false;
+    refreshBulkSelection();
+}
+
+function bulkApproveSelected() {
+    if (bulkSelectedIds.size === 0) return;
+    Swal.fire({
+        title: 'Approve ' + bulkSelectedIds.size + ' timesheet(s)?',
+        text: 'Only rows still in "Submitted" status will be approved; others are skipped.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#16a34a',
+        confirmButtonText: 'Approve all',
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '{{ route("timesheets.bulk-approve") }}',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ ids: Array.from(bulkSelectedIds) }),
+            success: function (res) {
+                Toast.fire({ icon: 'success', title: res.message });
+                clearBulkSelection();
+                table.ajax.reload(null, false);
+            },
+            error: function (xhr) {
+                Toast.fire({ icon: 'error', title: xhr.responseJSON?.message || 'Bulk approve failed' });
+            },
+        });
+    });
+}
+
+function bulkRejectSelected() {
+    if (bulkSelectedIds.size === 0) return;
+    Swal.fire({
+        title: 'Reject ' + bulkSelectedIds.size + ' timesheet(s)?',
+        input: 'textarea',
+        inputLabel: 'Optional reason (added to notes on each rejected timesheet)',
+        inputPlaceholder: 'e.g. Hours don\'t match crew sign-in sheet',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        confirmButtonText: 'Reject all',
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '{{ route("timesheets.bulk-reject") }}',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ ids: Array.from(bulkSelectedIds), rejection_reason: r.value || null }),
+            success: function (res) {
+                Toast.fire({ icon: 'success', title: res.message });
+                clearBulkSelection();
+                table.ajax.reload(null, false);
+            },
+            error: function (xhr) {
+                Toast.fire({ icon: 'error', title: xhr.responseJSON?.message || 'Bulk reject failed' });
+            },
+        });
+    });
+}
+
+// Reset master checkbox + selection state on every DataTable redraw (page change, filter, etc.)
+table.on('draw', () => { document.getElementById('bulkSelectAll').checked = false; });
 
 function openCreateModal(){
     document.getElementById('createForm').reset();
