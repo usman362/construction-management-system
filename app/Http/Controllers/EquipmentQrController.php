@@ -56,8 +56,9 @@ class EquipmentQrController extends Controller
         $equipment = Equipment::where('qr_token', $token)->firstOrFail();
 
         $data = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'notes'      => 'nullable|string|max:500',
+            'project_id'           => 'required|exists:projects,id',
+            'expected_return_date' => 'nullable|date|after_or_equal:today',
+            'notes'                => 'nullable|string|max:500',
         ]);
 
         if ($equipment->currentAssignment) {
@@ -70,10 +71,11 @@ class EquipmentQrController extends Controller
         }
 
         $assignment = EquipmentAssignment::create([
-            'equipment_id'  => $equipment->id,
-            'project_id'    => $data['project_id'],
-            'assigned_date' => now()->toDateString(),
-            'daily_cost'    => $equipment->daily_rate,
+            'equipment_id'         => $equipment->id,
+            'project_id'           => $data['project_id'],
+            'assigned_date'        => now()->toDateString(),
+            'expected_return_date' => $data['expected_return_date'] ?? null,
+            'daily_cost'           => $equipment->daily_rate,
         ]);
         $equipment->update(['status' => 'in_use']);
 

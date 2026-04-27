@@ -159,14 +159,19 @@ class EquipmentController extends Controller
     public function assign(Request $request, Equipment $equipment): JsonResponse
     {
         $validated = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'assigned_date' => 'required|date',
+            'project_id'           => 'required|exists:projects,id',
+            'assigned_date'        => 'required|date',
+            // Brenda 04.28.2026: track when this rental is due back
+            // (powers the calendar Gantt + email alerts).
+            'expected_return_date' => 'nullable|date|after_or_equal:assigned_date',
         ]);
 
         EquipmentAssignment::create([
-            'equipment_id' => $equipment->id,
-            'project_id' => $validated['project_id'],
-            'assigned_date' => $validated['assigned_date'],
+            'equipment_id'         => $equipment->id,
+            'project_id'           => $validated['project_id'],
+            'assigned_date'        => $validated['assigned_date'],
+            'expected_return_date' => $validated['expected_return_date'] ?? null,
+            'daily_cost'           => $equipment->daily_rate,
         ]);
 
         $equipment->update(['status' => 'in_use']);

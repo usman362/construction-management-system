@@ -121,6 +121,130 @@ class TimeClockController extends Controller
     }
 
     /**
+     * Crew bulk clock-in (Brenda 04.28.2026).
+     *
+     * Foreman taps "Clock In Crew" on the My Crew Today dashboard. We pull
+     * every active member of the crew (CrewMember.removed_date IS NULL),
+     * skip anyone who already has an open punch (so the action is
+     * idempotent — fine to tap twice), and create a TimeClockEntry per
+     * worker stamped with the foreman's GPS coords.
+     *
+     * The foreman is recorded as the user_id on each entry (since they're
+     * the actor initiating the action), but employee_id is each crew member
+     * — that's what payroll consumes.
+     */
+    public function crewClockIn(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'crew_id'    => 'required|exists:crews,id',
+            'lat'        => 'nullable|numeric|between:-90,90',
+            'lng'        => 'nullable|numeric|between:-180,180',
+            'accuracy_m' => 'nullable|integer|min:0|max:65535',
+        ]);
+
+        $crew = \App\Models\Crew::with([
+                'project',
+                'members' => fn ($q) => $q->whereNull('removed_date')->with('employee'),
+            ])
+            ->findOrFail($data['crew_id']);
+
+        if (!$crew->project_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Crew has no project assigned. Set the project before clocking in.',
+            ], 422);
+        }
+
+        $foreman = $request->user();
+        $lat = isset($data['lat']) ? (float) $data['lat'] : null;
+        $lng = isset($data['lng']) ? (float) $data['lng'] : null;
+        $distance = $crew->project->distanceToMeters($lat, $lng);
+        $within   = $crew->project->isWithinGeofence($lat, $lng);
+
+        $clocked = 0;
+        $skipped = 0;
+        \DB::transaction(function () use ($crew, $foreman, $lat, $lng, $data, $distance, $within, &$clocked, &$skipped) {
+            foreach ($crew->members as $member) {
+                if (!$member->employee) { $skipped++; continue; }
+
+                // Skip workers who already have an open punch — idempotent.
+                $hasOpen = TimeClockEntry::where('employee_id', $member->employee_id)
+                    ->where('status', 'open')->exists();
+                if ($hasOpen) { $skipped++; continue; }
+
+                TimeClockEntry::create([
+                    'user_id'             => $foreman->id,   // who initiated
+                    'employee_id'         => $member->employee_id,
+                    'project_id'          => $crew->project_id,
+                    'cost_code_id'        => null,           // supervisor assigns at review time
+                    'clock_in_at'         => now(),
+                    'clock_in_lat'        => $lat,
+                    'clock_in_lng'        => $lng,
+                    'clock_in_accuracy_m' => $data['accuracy_m'] ?? null,
+                    'within_geofence'     => $within,
+                    'distance_m'          => $distance,
+                    'notes'               => 'Crew clocked-in by ' . $foreman->name . ' on ' . $crew->name,
+                    'status'              => 'open',
+                ]);
+                $clocked++;
+            }
+        });
+
+        $msg = "Clocked in {$clocked} worker(s)";
+        if ($skipped > 0) $msg .= " ({$skipped} skipped — already on the clock or no employee record)";
+        $msg .= '.';
+
+        return response()->json([
+            'success'         => true,
+            'message'         => $msg,
+            'clocked_in'      => $clocked,
+            'skipped'         => $skipped,
+            'within_geofence' => $within,
+        ]);
+    }
+
+    /**
+     * Crew bulk clock-out — closes every open punch for this crew's members.
+     */
+    public function crewClockOut(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'crew_id'    => 'required|exists:crews,id',
+            'lat'        => 'nullable|numeric|between:-90,90',
+            'lng'        => 'nullable|numeric|between:-180,180',
+            'accuracy_m' => 'nullable|integer|min:0|max:65535',
+        ]);
+
+        $crew = \App\Models\Crew::with([
+                'members' => fn ($q) => $q->whereNull('removed_date'),
+            ])->findOrFail($data['crew_id']);
+
+        $employeeIds = $crew->members->pluck('employee_id')->filter()->unique();
+
+        $openEntries = TimeClockEntry::whereIn('employee_id', $employeeIds)
+            ->where('status', 'open')
+            ->get();
+
+        $closed = 0;
+        \DB::transaction(function () use ($openEntries, $data, &$closed) {
+            foreach ($openEntries as $entry) {
+                $entry->closeOut(
+                    isset($data['lat']) ? (float) $data['lat'] : null,
+                    isset($data['lng']) ? (float) $data['lng'] : null,
+                    $data['accuracy_m'] ?? null,
+                );
+                $closed++;
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Clocked out {$closed} worker(s).",
+            'closed'  => $closed,
+        ]);
+    }
+
+    /**
      * Close the given open entry. Stamps clock-out GPS + computes hours.
      */
     public function clockOut(Request $request, TimeClockEntry $entry): JsonResponse

@@ -67,6 +67,18 @@
                     <option value="{{ $p->id }}">{{ $p->project_number }} — {{ $p->name }}</option>
                 @endforeach
             </select>
+
+            {{-- Brenda 04.28.2026: expected return date powers the rental
+                 calendar Gantt + the email expiry alert before the off-rent
+                 date hits. Especially important for 3rd-party rented
+                 equipment where overdue = extra rental fees. --}}
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Expected Return</label>
+                <input type="date" id="expectedReturn" min="{{ now()->toDateString() }}"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-3 text-base">
+                <p class="text-[11px] text-gray-500 mt-1">When the rental is due back. We'll email you ahead of time so it doesn't go past the off-rent date.</p>
+            </div>
+
             <textarea id="scanNotes" rows="2" placeholder="Notes (optional)"
                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
             <button type="button" onclick="checkOutEquipment()"
@@ -100,14 +112,15 @@ function showScanStatus(kind, msg) {
 }
 
 async function checkOutEquipment() {
-    const projectId = document.getElementById('projectId').value;
-    const notes = document.getElementById('scanNotes').value || null;
+    const projectId      = document.getElementById('projectId').value;
+    const expectedReturn = document.getElementById('expectedReturn').value || null;
+    const notes          = document.getElementById('scanNotes').value || null;
     if (!projectId) { showScanStatus('error', 'Pick a project first.'); return; }
 
     const r = await fetch(QR_OUT_URL, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
-        body: JSON.stringify({ project_id: projectId, notes }),
+        body: JSON.stringify({ project_id: projectId, expected_return_date: expectedReturn, notes }),
     });
     const body = await r.json();
     if (!r.ok) { showScanStatus('error', body.message || 'Check-out failed.'); return; }

@@ -81,10 +81,23 @@
 
             {{-- Action buttons --}}
             <div class="px-5 py-3 grid grid-cols-2 gap-2 border-b border-gray-100">
-                <a href="{{ route('time-clock.index') }}"
-                   class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-3 rounded-lg text-center">
-                    Clock In/Out
-                </a>
+                {{-- Brenda 04.28.2026: foreman clocks the WHOLE crew in or out
+                     in one tap. Color-codes based on whether anyone in the crew
+                     already has an open punch (= "Clock Out" mode). --}}
+                @php $anyOnClock = $crew->live_punches->isNotEmpty(); @endphp
+                @if($anyOnClock)
+                    <button type="button"
+                            onclick="crewClockOut({{ $crew->id }}, this)"
+                            class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold py-3 rounded-lg">
+                        Clock Out Crew ({{ $crew->live_punches->count() }})
+                    </button>
+                @else
+                    <button type="button"
+                            onclick="crewClockIn({{ $crew->id }}, this)"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-3 rounded-lg">
+                        Clock In Crew ({{ $crew->members->count() }})
+                    </button>
+                @endif
                 @if($crew->daily_log_today)
                     <a href="{{ route('projects.daily-logs.show', [$crew->project, $crew->daily_log_today->id]) }}"
                        class="bg-green-100 text-green-800 text-sm font-semibold py-3 rounded-lg text-center border border-green-200">
@@ -171,6 +184,66 @@
 </div>
 
 @push('scripts')
+<script>
+// ─── Crew bulk clock-in / clock-out (Brenda 04.28.2026) ──────────
+// Foreman taps a button to clock the entire crew at once. We grab the
+// foreman's GPS first so each TimeClockEntry has the same coords (the
+// whole crew is together). Buttons are disabled during the request so
+// double-tap doesn't double-clock — and the backend is idempotent
+// anyway (skips workers who already have open punches).
+
+async function withGps() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve({lat: null, lng: null, accuracy: null});
+        navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                accuracy: Math.round(pos.coords.accuracy || 0),
+            }),
+            () => resolve({lat: null, lng: null, accuracy: null}),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+        );
+    });
+}
+
+async function crewClock(url, crewId, btn, btnLabelOnSuccess) {
+    btn.disabled = true;
+    const origLabel = btn.textContent;
+    btn.textContent = 'Locating…';
+    const gps = await withGps();
+    btn.textContent = 'Saving…';
+
+    try {
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+            },
+            body: JSON.stringify({ crew_id: crewId, lat: gps.lat, lng: gps.lng, accuracy_m: gps.accuracy }),
+        });
+        const body = await r.json();
+        if (!r.ok || !body.success) {
+            Toast.fire({icon:'error', title: body.message || 'Could not clock crew'});
+            btn.disabled = false; btn.textContent = origLabel;
+            return;
+        }
+        Toast.fire({icon:'success', title: body.message});
+        // Stash so the toast survives the reload (same pattern as submitForm).
+        try { localStorage.setItem('flash_toast', JSON.stringify({icon:'success', title: body.message})); } catch (e) {}
+        setTimeout(() => location.reload(), 600);
+    } catch (e) {
+        Toast.fire({icon:'error', title: e.message});
+        btn.disabled = false; btn.textContent = origLabel;
+    }
+}
+
+function crewClockIn(crewId, btn)  { crewClock('{{ route("time-clock.crew-in") }}',  crewId, btn); }
+function crewClockOut(crewId, btn) { crewClock('{{ route("time-clock.crew-out") }}', crewId, btn); }
+</script>
+
 @if($weatherApiKey)
 <script>
 // ─── Fetch today's weather for each crew with project lat/lng ─────

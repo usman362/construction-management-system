@@ -229,11 +229,18 @@
                 @endif
                 @if(Auth::user()->canAccess('equipment'))
                 <a href="{{ route('equipment.index') }}"
-                   class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('equipment.*') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                   class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('equipment.index') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17l-5.384 3.408 1.382-5.964L2.3 8.222l6.092-.527L11.42 2.25l3.028 5.445 6.092.527-4.918 4.392 1.382 5.964z"/>
                     </svg>
                     <span>Equipment</span>
+                </a>
+                <a href="{{ route('equipment.rental-calendar') }}"
+                   class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 {{ request()->routeIs('equipment.rental-calendar') ? 'bg-blue-600 text-white font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+                    </svg>
+                    <span>Rental Calendar</span>
                 </a>
                 @endif
                 @if(Auth::user()->canAccess('materials'))

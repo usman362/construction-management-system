@@ -31,6 +31,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ->timezone(config('app.timezone'))
             ->withoutOverlapping()
             ->onOneServer();
+
+        // Equipment rental off-rent alerts (Brenda 04.28.2026) — daily 7:30am
+        // weekdays. Catches anything coming due in the next 7 days plus
+        // anything already overdue.
+        $schedule->command('equipment:rental-expiry-alerts')
+            ->weekdays()
+            ->at('07:30')
+            ->timezone(config('app.timezone'))
+            ->withoutOverlapping()
+            ->onOneServer();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([

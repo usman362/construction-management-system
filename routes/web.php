@@ -351,6 +351,10 @@ Route::middleware('auth')->group(function () {
         Route::post('equipment/scan/{token}/check-in', [\App\Http\Controllers\EquipmentQrController::class, 'checkIn'])->name('equipment.scan.check-in');
         Route::get('equipment/{equipment}/qr-sticker', [\App\Http\Controllers\EquipmentQrController::class, 'printSticker'])->name('equipment.qr-sticker');
 
+        // Brenda 04.28.2026 — Gantt rental calendar (registered before resource
+        // so /equipment/rental-calendar isn't matched as {equipment}).
+        Route::get('equipment/rental-calendar', [\App\Http\Controllers\RentalCalendarController::class, 'index'])->name('equipment.rental-calendar');
+
         Route::resource('equipment', EquipmentController::class);
         Route::post('equipment/{equipment}/assign', [EquipmentController::class, 'assign'])->name('equipment.assign');
         Route::delete('equipment/assignments/{equipmentAssignment}', [EquipmentController::class, 'unassign'])->name('equipment.unassign');
@@ -429,6 +433,9 @@ Route::middleware('auth')->group(function () {
     Route::get('my-time', [\App\Http\Controllers\TimeClockController::class, 'index'])->name('time-clock.index');
     Route::post('my-time/clock-in', [\App\Http\Controllers\TimeClockController::class, 'clockIn'])->name('time-clock.clock-in');
     Route::post('my-time/{entry}/clock-out', [\App\Http\Controllers\TimeClockController::class, 'clockOut'])->name('time-clock.clock-out');
+    // Crew bulk clock — foreman clocks the entire crew in/out at once
+    Route::post('crew-clock/in',  [\App\Http\Controllers\TimeClockController::class, 'crewClockIn'])->name('time-clock.crew-in');
+    Route::post('crew-clock/out', [\App\Http\Controllers\TimeClockController::class, 'crewClockOut'])->name('time-clock.crew-out');
 
     // Admin / PM review — review + convert punches to timesheets.
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
