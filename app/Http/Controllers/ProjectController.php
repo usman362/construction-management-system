@@ -77,35 +77,68 @@ class ProjectController extends Controller
         return view('projects.create', ['clients' => $clients]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse
     {
+        // 2026-04-28 — Brenda's create-page bug:
+        //   The dedicated /projects/create form sends `original_budget` (not
+        //   `budget`), plus address/city/state/zip/substantial_completion_date/
+        //   estimate fields the old validation rules didn't cover. Validation
+        //   silently failed and the page just bounced back with no visible
+        //   error. We now accept BOTH input shapes:
+        //     - modal flow: posts `budget` (legacy from /projects index modal)
+        //     - dedicated page flow: posts `original_budget` + extras
+        //
+        //   Whichever the user sent, we coerce into the canonical
+        //   `original_budget` / `current_budget` columns at save time.
         $validated = $request->validate([
             'project_number' => 'required|unique:projects|string|max:50',
-            'name' => 'required|string|max:255',
-            'client_id' => 'required|exists:clients,id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'budget' => 'required|numeric|min:0',
-            'contract_value' => 'nullable|numeric|min:0',
-            'retainage_percent' => 'nullable|numeric|min:0|max:99.99',
+            'name'           => 'required|string|max:255',
+            'client_id'      => 'required|exists:clients,id',
+            'start_date'     => 'required|date',
+            'end_date'       => 'required|date|after_or_equal:start_date',
+            'substantial_completion_date' => 'nullable|date',
+
+            // Either field name is OK; at least one with a value is required.
+            'budget'          => 'nullable|numeric|min:0',
+            'original_budget' => 'nullable|numeric|min:0',
+
+            'estimate'              => 'nullable|numeric|min:0',
+            'contract_value'        => 'nullable|numeric|min:0',
+            'retainage_percent'     => 'nullable|numeric|min:0|max:99.99',
             'default_per_diem_rate' => 'nullable|numeric|min:0',
+
             'po_number' => 'nullable|string|max:100',
-            'po_date' => 'nullable|date',
+            'po_date'   => 'nullable|date',
+
             'status' => 'required|in:bidding,awarded,active,on_hold,completed,closed',
             'description' => 'nullable|string',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
+
+            // Project address (dedicated create page sends these)
+            'address' => 'nullable|string|max:255',
+            'city'    => 'nullable|string|max:120',
+            'state'   => 'nullable|string|max:50',
+            'zip'     => 'nullable|string|max:20',
+
+            // Geofence center (modal sends these on edit)
+            'latitude'          => 'nullable|numeric|between:-90,90',
+            'longitude'         => 'nullable|numeric|between:-180,180',
             'geofence_radius_m' => 'nullable|integer|min:10|max:100000',
         ]);
 
-        $budget = $validated['budget'];
-        unset($validated['budget']);
+        // Resolve which budget field was sent. The dedicated form uses
+        // `original_budget`; the modal uses `budget`. Default to 0 if neither
+        // was provided so the project still saves (a project at bidding stage
+        // legitimately has no budget yet).
+        $budget = (float) ($validated['original_budget'] ?? $validated['budget'] ?? 0);
+        unset($validated['budget'], $validated['original_budget']);
 
         $project = Project::create(array_merge($validated, [
             'original_budget' => $budget,
-            'current_budget' => $budget,
+            'current_budget'  => $budget,
         ]));
 
+        // Dedicated create page submits as a regular HTML form (no AJAX).
+        // Send them to the project show page with a success flash.
         if (!$request->ajax() && !$request->wantsJson()) {
             return redirect()->route('projects.show', $project)
                 ->with('success', 'Project created successfully.');
@@ -248,33 +281,61 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function update(Request $request, Project $project): JsonResponse
+    public function update(Request $request, Project $project): JsonResponse|\Illuminate\Http\RedirectResponse
     {
+        // Mirrors store() — accepts both `budget` (modal) and `original_budget`
+        // (dedicated edit page) plus the address/extras. See store() for the
+        // bug context (Brenda 04.28.2026).
         $validated = $request->validate([
             'project_number' => "required|unique:projects,project_number,{$project->id}|string|max:50",
-            'name' => 'required|string|max:255',
-            'client_id' => 'required|exists:clients,id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'budget' => 'required|numeric|min:0',
-            'contract_value' => 'nullable|numeric|min:0',
-            'retainage_percent' => 'nullable|numeric|min:0|max:99.99',
+            'name'           => 'required|string|max:255',
+            'client_id'      => 'required|exists:clients,id',
+            'start_date'     => 'required|date',
+            'end_date'       => 'required|date|after_or_equal:start_date',
+            'substantial_completion_date' => 'nullable|date',
+
+            'budget'          => 'nullable|numeric|min:0',
+            'original_budget' => 'nullable|numeric|min:0',
+
+            'estimate'              => 'nullable|numeric|min:0',
+            'contract_value'        => 'nullable|numeric|min:0',
+            'retainage_percent'     => 'nullable|numeric|min:0|max:99.99',
             'default_per_diem_rate' => 'nullable|numeric|min:0',
+
             'po_number' => 'nullable|string|max:100',
-            'po_date' => 'nullable|date',
-            'status' => 'required|in:bidding,awarded,active,on_hold,completed,closed',
+            'po_date'   => 'nullable|date',
+
+            'status'      => 'required|in:bidding,awarded,active,on_hold,completed,closed',
             'description' => 'nullable|string',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
+
+            'address' => 'nullable|string|max:255',
+            'city'    => 'nullable|string|max:120',
+            'state'   => 'nullable|string|max:50',
+            'zip'     => 'nullable|string|max:20',
+
+            'latitude'          => 'nullable|numeric|between:-90,90',
+            'longitude'         => 'nullable|numeric|between:-180,180',
             'geofence_radius_m' => 'nullable|integer|min:10|max:100000',
         ]);
 
-        $budget = $validated['budget'];
-        unset($validated['budget']);
+        // Resolve which budget field was sent (or keep current if neither).
+        $budget = $validated['original_budget'] ?? $validated['budget'] ?? null;
+        unset($validated['budget'], $validated['original_budget']);
 
-        $project->update(array_merge($validated, [
-            'current_budget' => $budget,
-        ]));
+        $updates = $validated;
+        if ($budget !== null) {
+            // Edit page treats the input as the project's CURRENT budget; the
+            // original budget stays whatever it was at create time.
+            $updates['current_budget'] = (float) $budget;
+        }
+
+        $project->update($updates);
+
+        // Dedicated edit page submits as a regular HTML form (no AJAX).
+        if (!$request->ajax() && !$request->wantsJson()) {
+            return redirect()->route('projects.show', $project)
+                ->with('success', 'Project updated successfully.');
+        }
 
         return response()->json([
             'success' => true,
