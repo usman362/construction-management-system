@@ -141,28 +141,48 @@ class MaterialController extends Controller
     public function recordUsage(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'material_id' => 'required|exists:materials,id',
-            'project_id' => 'required|exists:projects,id',
-            'quantity' => 'required|numeric|min:0',
-            'usage_date' => 'required|date',
-            'unit_cost' => 'nullable|numeric|min:0',
-            'description' => 'nullable|string',
+            'material_id'  => 'required|exists:materials,id',
+            'project_id'   => 'required|exists:projects,id',
+            'cost_code_id' => 'nullable|exists:cost_codes,id',
+            'quantity'     => 'required|numeric|min:0',
+            'usage_date'   => 'required|date',
+            'unit_cost'    => 'nullable|numeric|min:0',
+            'description'  => 'nullable|string',
         ]);
 
-        $material = Material::findOrFail($validated['material_id']);
-        $unitCost = (float) ($validated['unit_cost'] ?? $material->unit_cost);
+        $material  = Material::findOrFail($validated['material_id']);
+        $unitCost  = (float) ($validated['unit_cost'] ?? $material->unit_cost);
         $totalCost = (float) $validated['quantity'] * $unitCost;
 
-        MaterialUsage::create([
-            'project_id' => $validated['project_id'],
-            'material_id' => $validated['material_id'],
-            'date' => $validated['usage_date'],
-            'description' => $validated['description'] ?? null,
-            'quantity' => $validated['quantity'],
-            'unit_cost' => $unitCost,
-            'total_cost' => $totalCost,
+        $usage = MaterialUsage::create([
+            'project_id'   => $validated['project_id'],
+            'material_id'  => $validated['material_id'],
+            'cost_code_id' => $validated['cost_code_id'] ?? null,
+            'date'         => $validated['usage_date'],
+            'description'  => $validated['description'] ?? null,
+            'quantity'     => $validated['quantity'],
+            'unit_cost'    => $unitCost,
+            'total_cost'   => $totalCost,
         ]);
 
-        return response()->json(['message' => 'Material usage recorded successfully']);
+        return response()->json([
+            'message'    => 'Material usage recorded.',
+            'total_cost' => $totalCost,
+            'usage_id'   => $usage->id,
+        ]);
+    }
+
+    /**
+     * Mobile-first material quick-log — designed for foremen to one-tap log
+     * material consumption from the jobsite. Uses the same `recordUsage`
+     * endpoint to persist; this just renders the form.
+     */
+    public function mobileQuickLog(\App\Models\Project $project): \Illuminate\View\View
+    {
+        return view('materials.mobile-quick-log', [
+            'project'   => $project,
+            'materials' => Material::orderBy('name')->get(['id', 'name', 'unit_of_measure', 'unit_cost', 'category']),
+            'costCodes' => \App\Models\CostCode::active()->orderBy('code')->get(['id', 'code', 'name']),
+        ]);
     }
 }

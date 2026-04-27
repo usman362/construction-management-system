@@ -214,7 +214,15 @@ Route::middleware('auth')->group(function () {
 
         // Daily Logs — Admin, PM, Field
         Route::middleware('role:admin,project_manager,field')->group(function () {
+            // Mobile-first daily log creator — registered BEFORE the resource
+            // so /daily-logs/mobile-create isn't matched as {dailyLog}.
+            Route::get('daily-logs/mobile-create', [DailyLogController::class, 'mobileCreate'])->name('daily-logs.mobile-create');
             Route::resource('daily-logs', DailyLogController::class);
+        });
+
+        // Field & Mobile Pack — Photo Gallery (aggregates docs across the project)
+        Route::middleware('role:admin,project_manager,field,accountant')->group(function () {
+            Route::get('photos', [\App\Http\Controllers\ProjectPhotoGalleryController::class, 'index'])->name('photos.index');
         });
 
         // Project Reports — Admin, PM, Accountant
@@ -336,6 +344,13 @@ Route::middleware('auth')->group(function () {
 
     // Equipment — Admin, PM, Field
     Route::middleware('role:admin,project_manager,field')->group(function () {
+        // QR scan + sticker print — registered BEFORE the resource so
+        // /equipment/scan/{token} doesn't get matched as {equipment}.
+        Route::get('equipment/scan/{token}',           [\App\Http\Controllers\EquipmentQrController::class, 'scan'])->name('equipment.scan');
+        Route::post('equipment/scan/{token}/check-out',[\App\Http\Controllers\EquipmentQrController::class, 'checkOut'])->name('equipment.scan.check-out');
+        Route::post('equipment/scan/{token}/check-in', [\App\Http\Controllers\EquipmentQrController::class, 'checkIn'])->name('equipment.scan.check-in');
+        Route::get('equipment/{equipment}/qr-sticker', [\App\Http\Controllers\EquipmentQrController::class, 'printSticker'])->name('equipment.qr-sticker');
+
         Route::resource('equipment', EquipmentController::class);
         Route::post('equipment/{equipment}/assign', [EquipmentController::class, 'assign'])->name('equipment.assign');
         Route::delete('equipment/assignments/{equipmentAssignment}', [EquipmentController::class, 'unassign'])->name('equipment.unassign');
@@ -345,6 +360,26 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,project_manager,field')->group(function () {
         Route::resource('materials', MaterialController::class);
         Route::post('materials/usage', [MaterialController::class, 'recordUsage'])->name('materials.record-usage');
+        // Mobile quick-log (project-scoped) — registered outside the resource
+        // so /projects/{project}/materials/quick-log doesn't collide.
+        Route::get('projects/{project}/materials/quick-log', [MaterialController::class, 'mobileQuickLog'])->name('projects.materials.quick-log');
+    });
+
+    // ─── Tool Tracker (Field Pack) ───────────────────────────────
+    Route::middleware('role:admin,project_manager,field')->group(function () {
+        Route::get('tools',                       [\App\Http\Controllers\ToolController::class, 'index'])->name('tools.index');
+        Route::post('tools',                      [\App\Http\Controllers\ToolController::class, 'store'])->name('tools.store');
+        Route::put('tools/{tool}',                [\App\Http\Controllers\ToolController::class, 'update'])->name('tools.update');
+        Route::delete('tools/{tool}',             [\App\Http\Controllers\ToolController::class, 'destroy'])->name('tools.destroy');
+        Route::post('tools/{tool}/issue',         [\App\Http\Controllers\ToolController::class, 'issue'])->name('tools.issue');
+        Route::post('tools/{tool}/return',        [\App\Http\Controllers\ToolController::class, 'return_'])->name('tools.return');
+    });
+
+    // ─── Fuel Logs (Field Pack) ──────────────────────────────────
+    Route::middleware('role:admin,project_manager,field,accountant')->group(function () {
+        Route::get('fuel-logs',              [\App\Http\Controllers\FuelLogController::class, 'index'])->name('fuel-logs.index');
+        Route::post('fuel-logs',             [\App\Http\Controllers\FuelLogController::class, 'store'])->name('fuel-logs.store');
+        Route::delete('fuel-logs/{fuelLog}', [\App\Http\Controllers\FuelLogController::class, 'destroy'])->name('fuel-logs.destroy');
     });
 
     // ─── Billing — Admin, Accountant ─────────────────────────────
@@ -384,6 +419,10 @@ Route::middleware('auth')->group(function () {
         Route::get('estimates/{estimate}', [\App\Http\Controllers\EstimatePortfolioController::class, 'show'])->name('estimates.portfolio.show');
         Route::post('estimates/{estimate}/spawn-project', [\App\Http\Controllers\EstimatePortfolioController::class, 'spawnProject'])->name('estimates.portfolio.spawn-project');
     });
+
+    // ─── Foreman Dashboard — "My Crew Today" ─────────────────────
+    // Foreman gets their own crews; admin/PM see all crews.
+    Route::get('foreman', [\App\Http\Controllers\ForemanDashboardController::class, 'index'])->name('foreman.dashboard');
 
     // ─── Mobile Time Clock — everyone who can touch a timesheet ───
     // "My Time" is open to anyone logged in; they can only see their own punches.

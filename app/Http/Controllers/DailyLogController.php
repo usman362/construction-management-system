@@ -65,8 +65,21 @@ class DailyLogController extends Controller
     {
         $validated = $request->validate($this->rules());
 
-        $project->dailyLogs()->create($validated + ['created_by' => auth()->id()]);
-        return response()->json(['message' => 'Daily log created successfully']);
+        $log = $project->dailyLogs()->create($validated + ['created_by' => auth()->id()]);
+        return response()->json([
+            'message' => 'Daily log created successfully',
+            'id'      => $log->id,
+        ]);
+    }
+
+    /**
+     * Mobile-first daily log entry — same store endpoint, but a phone-friendly
+     * form with camera capture, GPS-driven weather auto-fill, and voice notes.
+     * See resources/views/daily-logs/mobile-create.blade.php.
+     */
+    public function mobileCreate(Project $project): View
+    {
+        return view('daily-logs.mobile-create', ['project' => $project]);
     }
 
     public function show(Project $project, DailyLog $dailyLog): View
