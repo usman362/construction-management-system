@@ -197,6 +197,27 @@
                         </div>
                     </div>
 
+                    {{-- ── Integrations ──
+                         OpenWeatherMap key powers two features:
+                           1. "Auto-fill weather from GPS" on the mobile daily log
+                           2. Live weather strip on the Foreman "My Crew Today" dashboard
+                         Get a free key at openweathermap.org/api (1000 calls/day free). --}}
+                    <div class="border-t border-gray-100 pt-4 mt-2">
+                        <p class="text-[10px] text-gray-500 uppercase font-semibold mb-3 tracking-wider">Integrations</p>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">OpenWeatherMap API Key</label>
+                        <input type="text" name="weather_api_key"
+                               value="{{ $settings['weather_api_key'] ?? '' }}"
+                               placeholder="Paste your API key here (32 hex chars)"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <p class="text-[11px] text-gray-500 mt-1">
+                            Used by: <em>mobile daily log auto-weather button</em>, <em>Foreman dashboard live weather</em>.
+                            Free tier at <a href="https://openweathermap.org/api" target="_blank" class="text-blue-600 hover:underline">openweathermap.org/api</a> — 1000 calls/day.
+                        </p>
+                        @if(!empty($settings['weather_api_key']))
+                            <p class="text-[11px] text-emerald-700 mt-1">✓ Key currently saved (last 4 chars: <span class="font-mono">…{{ substr($settings['weather_api_key'], -4) }}</span>)</p>
+                        @endif
+                    </div>
+
                     <!-- Live Preview -->
                     <div class="bg-gray-900 rounded-xl p-4 mt-2">
                         <p class="text-[10px] text-gray-500 uppercase font-semibold mb-3 tracking-wider">Sidebar Preview</p>

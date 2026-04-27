@@ -21,6 +21,8 @@ class ProfileController extends Controller
                 'company_logo' => Setting::get('company_logo'),
                 'favicon' => Setting::get('favicon'),
                 'primary_color' => Setting::get('primary_color', '#2563eb'),
+                // Integrations — optional 3rd-party API keys
+                'weather_api_key' => Setting::get('weather_api_key', ''),
             ],
         ]);
     }
@@ -72,18 +74,24 @@ class ProfileController extends Controller
     public function updateSettings(Request $request): JsonResponse
     {
         $request->validate([
-            'company_name' => 'required|string|max:255',
+            'company_name'    => 'required|string|max:255',
             'company_tagline' => 'nullable|string|max:255',
-            'primary_color' => 'nullable|string|max:7',
-            'company_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
-            'favicon' => 'nullable|image|mimes:png,ico,jpg,jpeg,svg|max:1024',
-            'remove_logo' => 'nullable|boolean',
-            'remove_favicon' => 'nullable|boolean',
+            'primary_color'   => 'nullable|string|max:7',
+            'company_logo'    => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'favicon'         => 'nullable|image|mimes:png,ico,jpg,jpeg,svg|max:1024',
+            'remove_logo'     => 'nullable|boolean',
+            'remove_favicon'  => 'nullable|boolean',
+            // OpenWeatherMap API key — used by mobile daily log auto-weather
+            // and the foreman dashboard live weather strip. 32 hex chars but
+            // we just check max length so other providers' keys are accepted
+            // if the user later swaps providers.
+            'weather_api_key' => 'nullable|string|max:80',
         ]);
 
         Setting::set('company_name', $request->input('company_name'));
         Setting::set('company_tagline', $request->input('company_tagline', ''));
         Setting::set('primary_color', $request->input('primary_color', '#2563eb'));
+        Setting::set('weather_api_key', trim((string) $request->input('weather_api_key', '')));
 
         if ($request->input('remove_logo')) {
             $oldLogo = Setting::get('company_logo');
