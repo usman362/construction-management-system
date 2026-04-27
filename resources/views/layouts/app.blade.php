@@ -298,15 +298,27 @@
         $.ajax({
             url: url, type: method, data: data,
             success: function(res) {
-                Toast.fire({icon:'success', title:res.message||'Saved!'});
+                const message = res.message || 'Saved!';
                 closeModal(modalId);
                 if (table && table.ajax) {
+                    // DataTables flow: ajax-reload the table, show the toast inline.
+                    Toast.fire({icon:'success', title:message});
                     table.ajax.reload(null, false);
+                    form.reset();
                 } else if (!table) {
+                    // Full-page reload flow (e.g. dashboard quick-add modals): the
+                    // toast won't survive the reload because Toast.fire renders
+                    // into the current DOM. Stash it in localStorage so the layout
+                    // shows it on the next page load.
+                    try {
+                        localStorage.setItem('flash_toast', JSON.stringify({icon:'success', title:message}));
+                    } catch (e) { /* private mode / quota — fall through, toast is lost but save succeeded */ }
                     window.location.reload();
                     return;
+                } else {
+                    Toast.fire({icon:'success', title:message});
+                    form.reset();
                 }
-                form.reset();
             },
             error: function(xhr) {
                 let errors = xhr.responseJSON?.errors;
@@ -319,6 +331,20 @@
             }
         });
     }
+
+    // Read any flash-toast that survived a page reload (set by submitForm
+    // before window.location.reload(), since the prior Toast.fire would be
+    // discarded along with the page).
+    (function () {
+        try {
+            const stash = localStorage.getItem('flash_toast');
+            if (stash) {
+                localStorage.removeItem('flash_toast');
+                const payload = JSON.parse(stash);
+                Toast.fire(payload);
+            }
+        } catch (e) { /* ignore */ }
+    })();
 
     function loadEdit(url, formId, modalId, fields) {
         $.get(url, function(data) {

@@ -49,7 +49,23 @@
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Month</label><input type="number" step="0.01" name="monthly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0.00"></div>
                 </div>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="">Select...</option><option value="available">Available</option><option value="in_use">In Use</option><option value="maintenance">Maintenance</option><option value="retired">Retired</option></select></div>
+            {{-- 2026-04-28: vendor + description fields merged in from the deleted equipment/create.blade.php --}}
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="">Select...</option><option value="available">Available</option><option value="in_use">In Use</option><option value="maintenance">Maintenance</option><option value="retired">Retired</option></select></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+                    <select name="vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">— None —</option>
+                        @foreach($vendors as $v)
+                            <option value="{{ $v->id }}">{{ $v->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea>
+            </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -100,6 +116,8 @@ var table = $('#dataTable').DataTable({
 
 function openCreateModal(){ document.getElementById('createForm').reset(); openModal('createModal'); }
 
+@include('partials.auto-open-create-modal')
+
 function editEquipment(id){
     $.get('{{ url('/equipment') }}/'+id+'/edit', function(d){
         let f=document.getElementById('editForm');
@@ -112,6 +130,9 @@ function editEquipment(id){
         f.querySelector('[name="weekly_rate"]').value=d.weekly_rate != null ? d.weekly_rate : '';
         f.querySelector('[name="monthly_rate"]').value=d.monthly_rate != null ? d.monthly_rate : '';
         f.querySelector('[name="status"]').value=d.status;
+        // 2026-04-28: populate the merged vendor + description fields
+        if(f.querySelector('[name="vendor_id"]'))   f.querySelector('[name="vendor_id"]').value=d.vendor_id || '';
+        if(f.querySelector('[name="description"]')) f.querySelector('[name="description"]').value=d.description || '';
         document.getElementById('editSaveBtn').onclick=function(){ submitForm('editForm','{{ url('/equipment') }}/'+d.id,'PUT',table,'editModal'); };
         openModal('editModal');
     });

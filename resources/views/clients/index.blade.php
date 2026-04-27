@@ -143,6 +143,8 @@ var table = $('#dataTable').DataTable({
 
 function openCreateModal(){ document.getElementById('createForm').reset(); openModal('createModal'); }
 
+@include('partials.auto-open-create-modal')
+
 function editClient(id){
     $.get('{{ url('/clients') }}/'+id+'/edit', function(d){
         let f=document.getElementById('editForm');

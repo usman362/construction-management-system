@@ -71,10 +71,17 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function create(): View
+    /**
+     * 2026-04-28 — Project creation is handled by the modal on the projects
+     * index page (cleaner UX, single source of truth, no field-shape drift
+     * between two forms — see the bug Brenda hit). The dedicated /projects/create
+     * page was retired; this redirect keeps any old bookmarks/links working
+     * by sending the user to the index with `?new=1`, which auto-opens the
+     * "Add Project" modal.
+     */
+    public function create(): \Illuminate\Http\RedirectResponse
     {
-        $clients = Client::orderBy('name')->get();
-        return view('projects.create', ['clients' => $clients]);
+        return redirect()->route('projects.index', ['new' => 1]);
     }
 
     public function store(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse

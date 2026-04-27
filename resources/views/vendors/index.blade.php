@@ -101,6 +101,12 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" name="phone" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Address</label><input type="text" name="address" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            {{-- 2026-04-28: city/state/zip merged into modal from the now-deleted vendors/create.blade.php --}}
+            <div class="grid grid-cols-3 gap-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">City</label><input type="text" name="city" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">State</label><input type="text" name="state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">ZIP</label><input type="text" name="zip" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty</label><input type="text" name="specialty" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="flex items-center gap-2"><input type="checkbox" name="is_preferred" value="1" class="rounded border-gray-300"><span class="text-sm font-medium text-gray-700">Preferred</span></label></div>
@@ -154,6 +160,8 @@ var table = $('#dataTable').DataTable({
 
 function openCreateModal(){ document.getElementById('createForm').reset(); openModal('createModal'); }
 
+@include('partials.auto-open-create-modal')
+
 function editVendor(id){
     $.get('{{ url('/vendors') }}/'+id+'/edit', function(d){
         let f=document.getElementById('editForm');
@@ -164,6 +172,10 @@ function editVendor(id){
         f.querySelector('[name="email"]').value=d.email||'';
         f.querySelector('[name="phone"]').value=d.phone||'';
         f.querySelector('[name="address"]').value=d.address||'';
+        // 2026-04-28: populate the merged city/state/zip fields
+        if(f.querySelector('[name="city"]'))  f.querySelector('[name="city"]').value=d.city||'';
+        if(f.querySelector('[name="state"]')) f.querySelector('[name="state"]').value=d.state||'';
+        if(f.querySelector('[name="zip"]'))   f.querySelector('[name="zip"]').value=d.zip||'';
         f.querySelector('[name="specialty"]').value=d.specialty||'';
         f.querySelector('#edit_is_preferred').checked=!!d.is_preferred;
         f.querySelector('#edit_is_active').checked=!!d.is_active;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BillingInvoice;
 use App\Models\ChangeOrder;
+use App\Models\CostCode;
 use App\Models\Employee;
 use App\Models\EmployeeCertification;
 use App\Models\Invoice;
@@ -195,6 +196,13 @@ class DashboardController extends Controller
             'certWatchList'  => $certWatchList,
             'clockedInList'  => $clockedInList,
             'cashFlowWeeks'  => $cashFlowWeeks,
+            // Quick-action modal data — Brenda 04.28.2026 wanted the dashboard
+            // "New X" buttons to open modals in-place instead of redirecting.
+            // Each partial modal needs the dropdown data inline.
+            'allEmployees'   => Employee::where('status', 'active')
+                ->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'employee_number']),
+            'allClients'     => \App\Models\Client::orderBy('name')->get(['id', 'name']),
+            'allCostCodes'   => CostCode::active()->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
 

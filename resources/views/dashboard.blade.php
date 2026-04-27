@@ -394,50 +394,65 @@
         </div>
     </div>
 
-    <!-- Quick Action Buttons -->
+    {{-- Quick Action Buttons — Brenda 04.28.2026: open modals on the dashboard
+         itself, no redirects. Each button opens the matching reusable partial
+         modal included below. --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <a href="{{ route('projects.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
+        <button type="button" onclick="openCreateModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             <span>New Project</span>
-        </a>
-        <a href="{{ route('timesheets.bulk-create') }}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
+        </button>
+        <button type="button" onclick="openModal('quickTimesheetModal')" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             <span>New Timesheet</span>
-        </a>
-        <button onclick="document.getElementById('coProjectModal').classList.remove('hidden')" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
+        </button>
+        <button type="button" onclick="openModal('quickCoModal')" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 text-center flex items-center justify-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             <span>New Change Order</span>
         </button>
     </div>
 
-    <!-- Project Picker Modal for Change Orders -->
-    <div id="coProjectModal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5)" onclick="if(event.target===this)this.classList.add('hidden')">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">Select Project for Change Order</h3>
-            <select id="coProjectSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white mb-4">
-                <option value="">Choose a project...</option>
-                @foreach($allProjects ?? [] as $proj)
-                    <option value="{{ $proj->id }}">{{ $proj->name }} ({{ $proj->project_number }})</option>
-                @endforeach
-            </select>
-            <div class="flex gap-3 justify-end">
-                <button onclick="document.getElementById('coProjectModal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button onclick="goToChangeOrders()" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">Go to Change Orders</button>
-            </div>
-        </div>
-    </div>
+    {{-- Reusable modal partials. Each is self-contained and posts to its
+         entity's standard store endpoint. Modals share the same `submitForm`
+         helper from layouts/app.blade.php so behavior matches every other
+         modal in the app. --}}
+    @include('partials.projects.create-modal')
+    @include('partials.timesheets.quick-create-modal', [
+        'employees' => $allEmployees,
+        'projects'  => $allProjects,
+        'costCodes' => $allCostCodes,
+    ])
+    @include('partials.change-orders.quick-create-modal')
 
     <script>
-    function goToChangeOrders() {
-        var projectId = document.getElementById('coProjectSelect').value;
-        if (!projectId) { alert('Please select a project first.'); return; }
-        window.location.href = window.BASE_URL+'/projects/' + projectId + '/change-orders';
+    // ─── Project modal helpers ─────────────────────────────────────
+    // Pre-fill the client dropdown when the Project modal opens — the
+    // partial's <select name="client_id"> is empty by default so it can be
+    // reused on any page without coupling to a specific data source.
+    function loadClients(callback) {
+        const sel = document.querySelector('#createModal select[name="client_id"]');
+        if (!sel) { callback && callback(); return; }
+        // Cache the options across opens so we don't re-fetch every click.
+        if (sel.options.length > 1) { callback && callback(); return; }
+        sel.innerHTML = '<option value="">Loading…</option>';
+        const clients = @json($allClients ?? []);
+        sel.innerHTML = '<option value="">Select client</option>'
+            + clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        callback && callback();
+    }
+    function openCreateModal() {
+        document.getElementById('createForm').reset();
+        loadClients(() => openModal('createModal'));
+    }
+
+    // ─── CO modal: dynamic POST URL based on selected project ──────
+    // The change-orders endpoint is project-scoped so the URL has to be built
+    // at submit time from whichever project the user picked in the modal.
+    function saveQuickCo() {
+        const projectId = document.getElementById('quickCoProjectId').value;
+        if (!projectId) { Toast.fire({icon: 'error', title: 'Pick a project first.'}); return; }
+        const url = window.BASE_URL + '/projects/' + projectId + '/change-orders';
+        submitForm('quickCoForm', url, 'POST', null, 'quickCoModal');
     }
 
     // ─── Dashboard Projects table: client-side sort ────────────────────

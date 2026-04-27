@@ -12,9 +12,12 @@ use Illuminate\View\View;
 
 class MaterialController extends Controller
 {
-    public function create(): View
+    /**
+     * 2026-04-28 — Modal-only flow. See Projects/Clients cleanup notes.
+     */
+    public function create(): \Illuminate\Http\RedirectResponse
     {
-        return view('materials.create');
+        return redirect()->route('materials.index', ['new' => 1]);
     }
 
     public function index(Request $request)

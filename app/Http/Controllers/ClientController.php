@@ -9,9 +9,16 @@ use Illuminate\View\View;
 
 class ClientController extends Controller
 {
-    public function create(): View
+    /**
+     * 2026-04-28 — Modal-only flow (matches Projects cleanup). The dedicated
+     * /clients/create page was retired to eliminate the field-shape drift
+     * that caused silent save failures. This redirect keeps old bookmarks
+     * working by sending the user to the index with `?new=1`, which auto-
+     * opens the Add Client modal.
+     */
+    public function create(): \Illuminate\Http\RedirectResponse
     {
-        return view('clients.create');
+        return redirect()->route('clients.index', ['new' => 1]);
     }
 
     public function index(Request $request)

@@ -10,9 +10,14 @@ use Illuminate\View\View;
 
 class VendorController extends Controller
 {
-    public function create(): View
+    /**
+     * 2026-04-28 — Modal-only flow. The dedicated /vendors/create page was
+     * retired (its city/state/zip fields were merged into the index modal).
+     * This redirect keeps old links/bookmarks working.
+     */
+    public function create(): \Illuminate\Http\RedirectResponse
     {
-        return view('vendors.create');
+        return redirect()->route('vendors.index', ['new' => 1]);
     }
 
     public function index(Request $request)

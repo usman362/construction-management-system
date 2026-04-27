@@ -12,9 +12,14 @@ use Illuminate\View\View;
 
 class EquipmentController extends Controller
 {
-    public function create(): View
+    /**
+     * 2026-04-28 — Modal-only flow. /equipment/create redirects to the index
+     * with the modal auto-opened. The dedicated page was retired and its
+     * description + vendor_id fields were merged into the modal.
+     */
+    public function create(): \Illuminate\Http\RedirectResponse
     {
-        return view('equipment.create');
+        return redirect()->route('equipment.index', ['new' => 1]);
     }
 
     public function index(Request $request)
@@ -22,7 +27,11 @@ class EquipmentController extends Controller
         if ($request->ajax()) {
             return $this->dataTable($request);
         }
-        return view('equipment.index');
+        // Pass vendors so the create + edit modals can offer the vendor dropdown
+        // (was a field on the dedicated /equipment/create page).
+        return view('equipment.index', [
+            'vendors' => \App\Models\Vendor::orderBy('name')->get(['id', 'name']),
+        ]);
     }
 
     private function dataTable(Request $request): JsonResponse
@@ -102,15 +111,18 @@ class EquipmentController extends Controller
         return view('equipment.show', ['equipment' => $equipment]);
     }
 
-    public function edit(Request $request, Equipment $equipment): JsonResponse|View
+    public function edit(Request $request, Equipment $equipment): JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $equipment->load('vendor');
 
+        // Modal calls this via AJAX to populate the edit form.
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json($equipment);
         }
 
-        return view('equipment.edit', ['equipment' => $equipment]);
+        // Browser hit on /equipment/{id}/edit (rare — old bookmark) → send
+        // them to the index where the modal lives.
+        return redirect()->route('equipment.index');
     }
 
     public function update(Request $request, Equipment $equipment): JsonResponse|RedirectResponse

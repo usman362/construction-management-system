@@ -91,6 +91,8 @@ var table = $('#dataTable').DataTable({
 
 function openCreateModal(){ document.getElementById('createForm').reset(); openModal('createModal'); }
 
+@include('partials.auto-open-create-modal')
+
 function editMaterial(id){
     $.get('{{ url('/materials') }}/'+id+'/edit', function(d){
         let f=document.getElementById('editForm');
