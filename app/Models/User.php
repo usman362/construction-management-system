@@ -16,14 +16,22 @@ class User extends Authenticatable
     // ─── Role Constants ─────────────────────────────────────────
     const ROLE_ADMIN = 'admin';
     const ROLE_PROJECT_MANAGER = 'project_manager';
+    // 2026-04-28 (Brenda): Site Manager is the on-site authority who can
+    // approve timesheets alongside the Admin. Distinct from Project Manager
+    // (office-based PM) because BAK's structure has site supervisors who
+    // sign off labor without owning the project P&L.
+    const ROLE_SITE_MANAGER = 'site_manager';
     const ROLE_ACCOUNTANT = 'accountant';
     const ROLE_FIELD = 'field';
+    const ROLE_FOREMAN = 'foreman';
     const ROLE_VIEWER = 'viewer';
 
     const ROLES = [
         self::ROLE_ADMIN => 'Admin',
         self::ROLE_PROJECT_MANAGER => 'Project Manager',
+        self::ROLE_SITE_MANAGER => 'Site Manager',
         self::ROLE_ACCOUNTANT => 'Accountant',
+        self::ROLE_FOREMAN => 'Foreman',
         self::ROLE_FIELD => 'Field Staff',
         self::ROLE_VIEWER => 'Viewer',
     ];
@@ -77,9 +85,31 @@ class User extends Authenticatable
         return $this->role === self::ROLE_PROJECT_MANAGER;
     }
 
+    public function isSiteManager(): bool
+    {
+        return $this->role === self::ROLE_SITE_MANAGER;
+    }
+
+    public function isForeman(): bool
+    {
+        return $this->role === self::ROLE_FOREMAN;
+    }
+
     public function isAccountant(): bool
     {
         return $this->role === self::ROLE_ACCOUNTANT;
+    }
+
+    /**
+     * Can this user approve / reject timesheets?
+     *
+     * Brenda's policy (04.28.2026): only the Admin (her) and Site Managers
+     * sign off on labor. PMs/accountants/field staff can submit and view but
+     * cannot approve. Foremen submit on behalf of their crew.
+     */
+    public function canApproveTimesheets(): bool
+    {
+        return $this->hasRole([self::ROLE_ADMIN, self::ROLE_SITE_MANAGER]);
     }
 
     public function isField(): bool

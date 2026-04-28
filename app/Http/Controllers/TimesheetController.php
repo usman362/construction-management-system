@@ -300,6 +300,10 @@ class TimesheetController extends Controller
             'date_from'   => 'nullable|date',
             'date_to'     => 'nullable|date',
             'mode'        => 'nullable|in:html,pdf',
+            // 2026-04-28 (Brenda): "weekly" = one page per employee per
+            // Mon–Sun week, full 7-day grid. Default 'daily' keeps the
+            // legacy one-page-per-timesheet output.
+            'layout'      => 'nullable|in:daily,weekly',
         ]);
 
         $query = Timesheet::with([
@@ -322,7 +326,22 @@ class TimesheetController extends Controller
 
         abort_if($timesheets->isEmpty(), 404, 'No timesheets match the selected filters.');
 
-        $heading = 'Timesheet Batch — ';
+        $layout = $request->query('layout', 'daily');
+
+        // Safety guard: weekly layout against the entire history is meaningless
+        // and will OOM on a busy DB. Require at least one filter (date range,
+        // employee, project, or crew) before letting the report run.
+        if ($layout === 'weekly'
+            && ! $request->filled('date_from')
+            && ! $request->filled('date_to')
+            && ! $request->filled('employee_id')
+            && ! $request->filled('project_id')
+            && ! $request->filled('crew_id')
+        ) {
+            abort(422, 'Weekly summary requires at least one filter (date range, employee, project, or crew).');
+        }
+
+        $heading = ($layout === 'weekly' ? 'Weekly Timesheet Summary — ' : 'Timesheet Batch — ');
         if ($request->filled('date_from') || $request->filled('date_to')) {
             $heading .= ($request->date_from ?: '…') . ' to ' . ($request->date_to ?: '…');
         } else {
@@ -341,13 +360,94 @@ class TimesheetController extends Controller
             'filters'      => $request->only(['employee_id','project_id','crew_id','status','date_from','date_to']),
         ];
 
-        if ($request->query('mode') === 'pdf') {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('timesheets.print', $data)
-                ->setPaper('letter', 'portrait');
-            return $pdf->download('timesheets-batch-' . now()->format('Y-m-d-His') . '.pdf');
+        // Weekly layout — bucket timesheets by employee_id + ISO week (Mon–Sun),
+        // then build one printable page per (employee, week) pair with Mon–Sun
+        // columns and per-day ST/OT/PR cells. Brenda's payroll/billing flow
+        // reviews a whole week at a glance per worker.
+        if ($layout === 'weekly') {
+            $data['weeks'] = $this->groupTimesheetsByEmployeeWeek($timesheets);
+            $view = 'timesheets.print-weekly';
+            $filename = 'timesheets-weekly-' . now()->format('Y-m-d-His') . '.pdf';
+        } else {
+            $view = 'timesheets.print';
+            $filename = 'timesheets-batch-' . now()->format('Y-m-d-His') . '.pdf';
         }
 
-        return view('timesheets.print', $data);
+        if ($request->query('mode') === 'pdf') {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, $data)
+                ->setPaper('letter', $layout === 'weekly' ? 'landscape' : 'portrait');
+            return $pdf->download($filename);
+        }
+
+        return view($view, $data);
+    }
+
+    /**
+     * Bucket a flat collection of timesheets into one entry per
+     * (employee_id, ISO week-start). Each bucket carries a 7-element
+     * `days` array (Mon=0 … Sun=6) of timesheet collections plus
+     * pre-totaled ST/OT/PR/total/cost numbers used by the weekly print.
+     *
+     * Returns a list (sortable, indexed) so the blade can foreach over
+     * it and emit one printable page per element.
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Timesheet> $timesheets
+     * @return \Illuminate\Support\Collection<int, array{
+     *     employee: \App\Models\Employee,
+     *     week_start: \Carbon\CarbonImmutable,
+     *     week_end: \Carbon\CarbonImmutable,
+     *     days: array<int, \Illuminate\Support\Collection>,
+     *     totals: array{regular: float, overtime: float, double_time: float, total: float, cost: float, billable: float}
+     * }>
+     */
+    protected function groupTimesheetsByEmployeeWeek(\Illuminate\Support\Collection $timesheets): \Illuminate\Support\Collection
+    {
+        $buckets = [];
+
+        foreach ($timesheets as $ts) {
+            $date = \Carbon\CarbonImmutable::parse($ts->date);
+            // ISO week starts Monday — matches the rest of the system's
+            // weekly-OT calculation (App\Services\OvertimeCalculator).
+            $weekStart = $date->startOfWeek(\Carbon\CarbonImmutable::MONDAY);
+            $weekEnd   = $weekStart->addDays(6);
+            $key = $ts->employee_id . '|' . $weekStart->format('Y-m-d');
+            // Mon = 0, Sun = 6
+            $dow = (int) $date->dayOfWeekIso - 1;
+
+            if (! isset($buckets[$key])) {
+                $buckets[$key] = [
+                    'employee'   => $ts->employee,
+                    'week_start' => $weekStart,
+                    'week_end'   => $weekEnd,
+                    'days'       => array_fill(0, 7, collect()),
+                    'totals'     => [
+                        'regular'     => 0.0,
+                        'overtime'    => 0.0,
+                        'double_time' => 0.0,
+                        'total'       => 0.0,
+                        'cost'        => 0.0,
+                        'billable'    => 0.0,
+                    ],
+                ];
+            }
+
+            $buckets[$key]['days'][$dow]->push($ts);
+            $buckets[$key]['totals']['regular']     += (float) $ts->regular_hours;
+            $buckets[$key]['totals']['overtime']    += (float) $ts->overtime_hours;
+            $buckets[$key]['totals']['double_time'] += (float) $ts->double_time_hours;
+            $buckets[$key]['totals']['total']       += (float) $ts->total_hours;
+            $buckets[$key]['totals']['cost']        += (float) $ts->total_cost;
+            $buckets[$key]['totals']['billable']    += (float) $ts->billable_amount;
+        }
+
+        // Sort: employee name, then week_start
+        return collect($buckets)
+            ->sortBy(function ($b) {
+                $emp = $b['employee'];
+                $name = $emp ? trim(($emp->last_name ?? '') . ' ' . ($emp->first_name ?? '')) : 'zzz';
+                return $name . '|' . $b['week_start']->format('Y-m-d');
+            })
+            ->values();
     }
 
     /**
@@ -515,6 +615,12 @@ class TimesheetController extends Controller
 
     public function approve(Request $request, Timesheet $timesheet): JsonResponse|RedirectResponse
     {
+        // 2026-04-28 (Brenda): Only the Admin (her) and Site Managers may
+        // approve timesheets. Foremen submit on behalf of crew but cannot
+        // sign off on their own labor.
+        abort_unless(auth()->user()?->canApproveTimesheets(), 403,
+            'Only an Admin or Site Manager may approve timesheets.');
+
         $timesheet->update([
             'status' => 'approved',
             'approved_by' => auth()->id(),
@@ -548,6 +654,9 @@ class TimesheetController extends Controller
      */
     public function bulkApprove(Request $request): JsonResponse
     {
+        abort_unless(auth()->user()?->canApproveTimesheets(), 403,
+            'Only an Admin or Site Manager may approve timesheets.');
+
         $data = $request->validate([
             'ids'   => 'required|array|min:1',
             'ids.*' => 'integer|exists:timesheets,id',
@@ -573,6 +682,9 @@ class TimesheetController extends Controller
 
     public function bulkReject(Request $request): JsonResponse
     {
+        abort_unless(auth()->user()?->canApproveTimesheets(), 403,
+            'Only an Admin or Site Manager may reject timesheets.');
+
         $data = $request->validate([
             'ids'              => 'required|array|min:1',
             'ids.*'            => 'integer|exists:timesheets,id',
@@ -606,6 +718,9 @@ class TimesheetController extends Controller
 
     public function reject(Request $request, Timesheet $timesheet): JsonResponse|RedirectResponse
     {
+        abort_unless(auth()->user()?->canApproveTimesheets(), 403,
+            'Only an Admin or Site Manager may reject timesheets.');
+
         $request->validate([
             'rejection_reason' => 'nullable|string|max:2000',
         ]);

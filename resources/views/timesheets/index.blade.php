@@ -84,6 +84,30 @@
                     <option value="approved">Approved</option>
                 </select>
             </div>
+
+            {{-- 2026-04-28 (Brenda): Layout toggle — "weekly" prints one
+                 landscape page per employee per Mon–Sun week, with all
+                 7 days laid out in columns and weekly totals. The default
+                 "daily" keeps the original one-page-per-timesheet output. --}}
+            <div class="border-t border-gray-100 pt-4">
+                <label class="block text-xs font-semibold text-gray-700 mb-2">Print Layout</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex items-start gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="layout" value="daily" class="mt-1" checked>
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Per Timesheet (Daily)</div>
+                            <div class="text-xs text-gray-500">One page per timesheet entry. Best for daily client sign-off and field filing.</div>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="layout" value="weekly" class="mt-1">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Weekly Summary (Per Employee)</div>
+                            <div class="text-xs text-gray-500">One landscape page per employee per Mon–Sun week. All 7 days side-by-side with weekly totals — best for billing & payroll review.</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('batchPrintModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -96,7 +120,11 @@
 {{-- Bulk action bar — appears the moment any row is checked. Brenda asked
      for bulk approve 04.25.2026. Approve/Reject only act on rows whose
      status is currently 'submitted'; rows in other statuses get skipped
-     server-side with a count returned in the response. --}}
+     server-side with a count returned in the response.
+
+     2026-04-28 — only Admin + Site Manager can approve/reject (Brenda's
+     policy). Other roles still see the table + filters but no bulk bar. --}}
+@if (auth()->user()?->canApproveTimesheets())
 <div id="bulkActionBar" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center justify-between flex-wrap gap-2">
     <div class="text-sm text-blue-900">
         <strong id="bulkSelectedCount">0</strong> timesheet(s) selected
@@ -114,6 +142,7 @@
         </button>
     </div>
 </div>
+@endif
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table id="dataTable" class="w-full">

@@ -142,28 +142,26 @@
         @endif
     </div>
 
-    <!-- Action Buttons -->
-    @if (in_array($timesheet->status, ['draft', 'submitted']))
+    {{-- Action Buttons — only Admins and Site Managers may approve/reject
+         per Brenda's policy (04.28.2026). Foremen + PMs see the timesheet
+         but can't sign off on it. --}}
+    @if (in_array($timesheet->status, ['draft', 'submitted']) && auth()->user()?->canApproveTimesheets())
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold mb-4">Actions</h3>
             <div class="flex gap-4">
-                @if ($timesheet->status === 'submitted' || $timesheet->status === 'draft')
-                    <form method="POST" action="{{ route('timesheets.approve', $timesheet) }}" style="display:inline;">
-                        @csrf
-                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
-                            Approve
-                        </button>
-                    </form>
-                @endif
+                <form method="POST" action="{{ route('timesheets.approve', $timesheet) }}" style="display:inline;">
+                    @csrf
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
+                        Approve
+                    </button>
+                </form>
 
-                @if ($timesheet->status === 'submitted' || $timesheet->status === 'draft')
-                    <form method="POST" action="{{ route('timesheets.reject', $timesheet) }}" style="display:inline;">
-                        @csrf
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
-                            Reject
-                        </button>
-                    </form>
-                @endif
+                <form method="POST" action="{{ route('timesheets.reject', $timesheet) }}" style="display:inline;">
+                    @csrf
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
+                        Reject
+                    </button>
+                </form>
             </div>
         </div>
     @endif
