@@ -37,6 +37,8 @@ class Timesheet extends Model
         'billable_amount',
         'is_billable',
         'rate_type',
+        // 2026-04-28: Earnings category — HE/HO/VA per Brenda's payroll codes.
+        'earnings_category',
         'project_billable_rate_id',
         'status',
         'approved_by',

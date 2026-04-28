@@ -2,418 +2,596 @@
 
 @section('title', 'Bulk Timesheet Entry')
 
+{{--
+    2026-04-28: Brenda asked for the bulk entry page to look like her legacy
+    Foundation Software / ComputerEase payroll batch-entry screen — dense
+    keyboard-driven form, "Save Record" running list at the bottom, classic
+    Win95 yellow-input aesthetic so her data-entry clerks feel at home.
+
+    Confirmed scope from Brenda (04.28.2026):
+      - Same data fields as the existing single + bulk timesheet (no new fields)
+      - Use Employee # (not SSN) as the keyed identifier
+      - Earnings Category: HE = Hourly Earnings, HO = Holiday, VA = Vacation
+      - No subjob field needed at this point
+
+    Implementation choice: each "Save Record" click hits the existing single
+    `timesheets.store` endpoint with `force_overtime: true` so the manually
+    keyed ST/OT/PR are preserved verbatim (no weekly 40-hr re-split). All
+    observers, cost calc, and audit logging stay intact — no new bulkStore
+    endpoint needed for this flow.
+--}}
+
+@push('styles')
+<style>
+    .legacy-frame { background: #ece9d8; border: 2px solid #4b5563; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; box-shadow: 2px 2px 0 #000; }
+    .legacy-titlebar { background: linear-gradient(to right, #1e3a8a, #1e40af 50%, #3b82f6); color: #fff; padding: 6px 10px; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+    .legacy-titlebar .ctrls { display: flex; gap: 4px; }
+    .legacy-titlebar .ctrls span { display: inline-block; width: 18px; height: 16px; background: #d1d5db; border: 1px solid #6b7280; text-align: center; line-height: 14px; font-size: 11px; color: #1f2937; }
+    .legacy-headerstrip { background: #1e3a8a; color: #fff; padding: 6px 10px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 12px; }
+    .legacy-headerstrip label { color: #cbd5e1; margin-right: 4px; font-weight: 600; }
+    .legacy-headerstrip input[type=date], .legacy-headerstrip input[type=text] { background: #fffbeb; border: 1px inset #94a3b8; padding: 2px 4px; font-size: 12px; }
+    .legacy-body { padding: 10px; display: grid; grid-template-columns: 1fr 220px; gap: 10px; }
+    .legacy-fieldgrid { display: grid; grid-template-columns: 140px 1fr 140px 1fr; gap: 6px 10px; align-items: center; background: #ece9d8; padding: 8px; border: 1px solid #b8b3a0; }
+    .legacy-fieldgrid label { font-size: 12px; font-weight: 600; color: #1f2937; text-align: right; }
+    .legacy-fieldgrid input, .legacy-fieldgrid select { background: #fffbeb; border: 1px inset #94a3b8; padding: 3px 5px; font-size: 12px; width: 100%; font-family: 'Consolas', 'Courier New', monospace; }
+    .legacy-fieldgrid input:focus, .legacy-fieldgrid select:focus { outline: 2px solid #2563eb; background: #fef9c3; }
+    .legacy-rail { display: flex; flex-direction: column; gap: 6px; }
+    .legacy-btn { background: linear-gradient(to bottom, #f3f4f6, #d1d5db); border: 1px solid #6b7280; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 1px 1px 0 #000; text-align: center; color: #1f2937; }
+    .legacy-btn:hover:not(:disabled) { background: linear-gradient(to bottom, #fef9c3, #fde047); }
+    .legacy-btn:active:not(:disabled) { box-shadow: inset 1px 1px 0 #000; }
+    .legacy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .legacy-btn-primary { background: linear-gradient(to bottom, #3b82f6, #1d4ed8); color: #fff; border-color: #1e3a8a; }
+    .legacy-btn-primary:hover:not(:disabled) { background: linear-gradient(to bottom, #60a5fa, #2563eb); }
+    .legacy-btn-danger { background: linear-gradient(to bottom, #fca5a5, #dc2626); color: #fff; border-color: #991b1b; }
+    .legacy-list-wrap { padding: 0 10px 10px; }
+    .legacy-list { width: 100%; border-collapse: collapse; font-size: 11px; font-family: 'Consolas', 'Courier New', monospace; background: #fffbeb; border: 1px solid #6b7280; }
+    .legacy-list th { background: #1e3a8a; color: #fff; padding: 4px 6px; text-align: left; font-weight: 600; border-right: 1px solid #1e40af; font-size: 11px; }
+    .legacy-list td { padding: 3px 6px; border-bottom: 1px dotted #94a3b8; border-right: 1px dotted #cbd5e1; }
+    .legacy-list tr:hover td { background: #fef9c3; }
+    .legacy-list tfoot td { background: #ece9d8; font-weight: 700; border-top: 2px solid #1f2937; }
+    .legacy-status-bar { background: #1e3a8a; color: #fff; padding: 4px 10px; font-size: 11px; font-family: 'Consolas', monospace; display: flex; justify-content: space-between; }
+    .legacy-banner { padding: 6px 10px; font-size: 12px; font-weight: 600; }
+    .legacy-banner-success { background: #bbf7d0; color: #064e3b; border-left: 4px solid #16a34a; }
+    .legacy-banner-error { background: #fecaca; color: #7f1d1d; border-left: 4px solid #dc2626; }
+    .legacy-fieldgrid .field-disabled { background: #d1d5db !important; color: #6b7280; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .modal-card { background: #ece9d8; border: 2px solid #4b5563; box-shadow: 4px 4px 0 #000; min-width: 500px; max-width: 600px; }
+</style>
+@endpush
+
 @section('content')
-<div class="container mx-auto px-4 py-8">
-    <div class="mb-6">
-        <a href="{{ route('timesheets.index') }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Timesheets</a>
+<div class="container mx-auto px-4 py-6" x-data="legacyTimesheet()">
+
+    <div class="mb-4 flex items-center justify-between">
+        <a href="{{ route('timesheets.index') }}" class="text-blue-600 hover:text-blue-900 text-sm">&larr; Back to Timesheets</a>
+        <div class="text-xs text-gray-500">Foundation-style batch entry · Save Record after each line</div>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-8">
-        <h1 class="text-3xl font-bold mb-6">Bulk Timesheet Entry</h1>
+    <div class="legacy-frame">
+        <div class="legacy-titlebar">
+            <div>BAK Construction · Payroll Batch Entry — Timesheet Records</div>
+            <div class="ctrls"><span>_</span><span>□</span><span>×</span></div>
+        </div>
 
-        <form method="POST" action="{{ route('timesheets.bulk-store') }}">
-            @csrf
+        <div class="legacy-headerstrip">
+            <div>
+                <label>Time period beginning:</label>
+                <input type="date" x-model="header.period_begin">
+            </div>
+            <div>
+                <label>Time period ending:</label>
+                <input type="date" x-model="header.period_end">
+            </div>
+            <div>
+                <label>Payroll for W/E Date:</label>
+                <input type="date" x-model="header.we_date">
+            </div>
+            <div class="ml-auto text-xs">
+                Records this batch: <strong x-text="savedRecords.length"></strong>
+            </div>
+        </div>
 
-            <!-- Header Section -->
-            <div class="mb-6 p-6 bg-gray-50 rounded-lg">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                        <label for="project_id" class="block text-sm font-medium text-gray-700 mb-2">Project *</label>
-                        <select name="project_id" id="project_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('project_id') border-red-500 @enderror" onchange="reloadWithCrew()">
-                            <option value="">Select Project</option>
-                            @foreach ($projects as $project)
-                                <option value="{{ $project->id }}" {{ request('project_id') == $project->id ? 'selected' : '' }}>
-                                    {{ $project->project_number ? $project->project_number . ' — ' : '' }}{{ $project->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('project_id')
-                            <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
+        {{-- Status / error banner --}}
+        <div x-show="banner.text" x-transition class="legacy-banner" :class="banner.kind === 'error' ? 'legacy-banner-error' : 'legacy-banner-success'">
+            <span x-text="banner.text"></span>
+        </div>
 
-                    <div>
-                        <label for="crew_id" class="block text-sm font-medium text-gray-700 mb-2">Crew *</label>
-                        <select name="crew_id" id="crew_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('crew_id') border-red-500 @enderror" onchange="reloadWithCrew()">
-                            <option value="">Select Crew</option>
-                            @foreach ($crews as $crew)
-                                <option value="{{ $crew->id }}" {{ request('crew_id') == $crew->id ? 'selected' : '' }}>
-                                    {{ $crew->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('crew_id')
-                            <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
+        <div class="legacy-body">
+            {{-- LEFT: data entry fields --}}
+            <div class="legacy-fieldgrid">
+                <label>Job No.:</label>
+                <select x-model="entry.project_id">
+                    <option value="">— Select Job —</option>
+                    @foreach ($projects as $project)
+                        <option value="{{ $project->id }}">{{ $project->project_number ?? '—' }} — {{ $project->name }}</option>
+                    @endforeach
+                </select>
 
-                    <div>
-                        <label for="date" class="block text-sm font-medium text-gray-700 mb-2">Date *</label>
-                        <input type="date" name="date" id="date" required value="{{ old('date') }}" class="w-full border-gray-300 rounded-lg shadow-sm @error('date') border-red-500 @enderror" onchange="refreshWeekHours()">
-                        @error('date')
-                            <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
+                <label>Work Date:</label>
+                <input type="date" x-model="entry.date">
 
-                    <div>
-                        <label for="shift_id" class="block text-sm font-medium text-gray-700 mb-2">Shift *</label>
-                        <select name="shift_id" id="shift_id" required class="w-full border-gray-300 rounded-lg shadow-sm @error('shift_id') border-red-500 @enderror">
-                            <option value="">Select Shift</option>
-                            @foreach ($shifts as $shift)
-                                <option value="{{ $shift->id }}" {{ old('shift_id') == $shift->id ? 'selected' : '' }}>
-                                    {{ $shift->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('shift_id')
-                            <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-                <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label for="cost_code_id" class="block text-sm font-medium text-gray-700 mb-2">Phase Code (applies to all rows, can be overridden)</label>
-                        <select name="cost_code_id" id="cost_code_id" class="w-full border-gray-300 rounded-lg shadow-sm">
-                            <option value="">— Optional —</option>
-                            @foreach ($costCodes ?? [] as $cc)
-                                <option value="{{ $cc->id }}" {{ old('cost_code_id') == $cc->id ? 'selected' : '' }}>{{ $cc->code }} — {{ $cc->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label for="cost_type_id" class="block text-sm font-medium text-gray-700 mb-2">Cost Type (crew-level fallback)</label>
-                        {{-- Crew-level Cost Type is only used when a row's dropdown is blank.
-                             Individual rows now pre-fill from each employee's default_cost_type_id
-                             (Employee file → Default Cost Type), so this is mostly a safety net. --}}
-                        <select name="cost_type_id" id="cost_type_id" class="w-full border-gray-300 rounded-lg shadow-sm">
-                            <option value="">— None —</option>
-                            @foreach ($costTypes ?? [] as $ct)
-                                <option value="{{ $ct->id }}" {{ old('cost_type_id') == $ct->id ? 'selected' : '' }}>{{ $ct->code }} — {{ $ct->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label for="work_order_number" class="block text-sm font-medium text-gray-700 mb-2">Work Order # <span class="text-gray-400 font-normal">(applies to all rows, optional)</span></label>
-                        {{-- Shop's internal WO — client asked for this spot on both the
-                             single and bulk timesheet forms. Free-text; per-row override
-                             available in each row below. --}}
-                        <input type="text" name="work_order_number" id="work_order_number" maxlength="100" value="{{ old('work_order_number') }}" placeholder="e.g. WO-12345" class="w-full border-gray-300 rounded-lg shadow-sm">
-                    </div>
-                </div>
+                <label>Employee #:</label>
+                <select x-model="entry.employee_id" @change="onEmployeeChange()">
+                    <option value="">— Select Employee —</option>
+                    @foreach ($employees as $emp)
+                        <option value="{{ $emp->id }}" data-craft-id="{{ $emp->craft_id }}" data-name="{{ $emp->first_name }} {{ $emp->last_name }}">
+                            {{ $emp->employee_number }} — {{ $emp->last_name }}, {{ $emp->first_name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <label>Shift:</label>
+                <select x-model="entry.shift_id">
+                    <option value="">— Select Shift —</option>
+                    @foreach ($shifts as $shift)
+                        <option value="{{ $shift->id }}">{{ $shift->name }}</option>
+                    @endforeach
+                </select>
+
+                <label>Cost Code:</label>
+                <select x-model="entry.cost_code_id">
+                    <option value="">— None —</option>
+                    @foreach ($costCodes as $cc)
+                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
+                    @endforeach
+                </select>
+
+                <label>Cost Type:</label>
+                <select x-model="entry.cost_type_id">
+                    <option value="">— None —</option>
+                    @foreach ($costTypes as $ct)
+                        <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                    @endforeach
+                </select>
+
+                <label>Craft:</label>
+                <select x-model="entry.craft_id">
+                    <option value="">— None —</option>
+                    @foreach ($crafts as $cr)
+                        <option value="{{ $cr->id }}">{{ $cr->code }} — {{ $cr->name }}</option>
+                    @endforeach
+                </select>
+
+                <label>Work Order #:</label>
+                <input type="text" x-model="entry.work_order_number" maxlength="100" placeholder="optional">
+
+                {{-- Earnings Category drives whether OT/PR are enabled.
+                     HE = Hourly Earnings → all three buckets allowed
+                     HO = Holiday        → flat ST hours only, OT/PR locked to 0
+                     VA = Vacation       → flat ST hours only, OT/PR locked to 0 --}}
+                <label>Earnings Cat.:</label>
+                <select x-model="entry.earnings_category" @change="onEarningsChange()">
+                    <option value="HE">HE — Hourly Earnings</option>
+                    <option value="HO">HO — Holiday</option>
+                    <option value="VA">VA — Vacation</option>
+                </select>
+
+                <label>ST Hours:</label>
+                <input type="number" step="0.25" min="0" x-model="entry.regular_hours" @keydown.enter.prevent="saveRecord()" @input="recalcTotal()">
+
+                <label>OT Hours:</label>
+                <input type="number" step="0.25" min="0" x-model="entry.overtime_hours" :disabled="lockOTPR" :class="lockOTPR ? 'field-disabled' : ''" @keydown.enter.prevent="saveRecord()" @input="recalcTotal()">
+
+                <label>PR Hours:</label>
+                <input type="number" step="0.25" min="0" x-model="entry.double_time_hours" :disabled="lockOTPR" :class="lockOTPR ? 'field-disabled' : ''" @keydown.enter.prevent="saveRecord()" @input="recalcTotal()">
+
+                <label>Total Hours:</label>
+                <input type="text" :value="totalHours.toFixed(2)" readonly class="field-disabled">
+
+                <label>Notes:</label>
+                <input type="text" x-model="entry.notes" maxlength="500" placeholder="optional" style="grid-column: span 3;">
             </div>
 
-            <!-- Quick fill toolbar: applies hours/per-diem/force-OT to the whole crew at once -->
-            <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p class="text-sm font-semibold text-blue-900 mb-3">Quick fill (apply to all rows below)</p>
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-blue-900 mb-1">Hours worked</label>
-                        <input type="number" id="bulk_hours_worked" step="0.25" min="0" placeholder="e.g. 10" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
-                        <p class="text-[11px] text-blue-700 mt-1">Splits OT only after 40 hrs/week (Mon–Sun).</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-blue-900 mb-1">Force OT (all)</label>
-                        <select id="bulk_force_ot" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
-                            <option value="">— No change —</option>
-                            <option value="1">Yes — all hours as OT</option>
-                            <option value="0">No — use weekly rule</option>
-                        </select>
-                        <p class="text-[11px] text-blue-700 mt-1">For holidays, weekend premium, etc.</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-blue-900 mb-1">Per diem (all)</label>
-                        <select id="bulk_per_diem" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
-                            <option value="">— No change —</option>
-                            <option value="1">Yes — pay per diem</option>
-                            <option value="0">No — skip per diem</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-blue-900 mb-1">Per diem amount ($)</label>
-                        <input type="number" id="bulk_per_diem_amount" step="0.01" min="0" placeholder="default from project" class="w-full border-blue-300 rounded-lg shadow-sm text-sm">
-                    </div>
-                    <div class="flex items-end">
-                        <button type="button" onclick="applyBulkFill()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-sm">
-                            Apply to all rows
-                        </button>
-                    </div>
-                </div>
-                <div class="mt-3 flex gap-2 flex-wrap text-xs">
-                    <button type="button" onclick="setAllPresent(true)" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded">
-                        Mark all present
-                    </button>
-                    <button type="button" onclick="setAllPresent(false)" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded">
-                        Mark all absent
-                    </button>
-                    <span class="text-[11px] text-blue-700 self-center ml-2">Unticked rows will be skipped — no timesheet created for absent employees.</span>
-                </div>
-            </div>
-
-            <!-- Crew Members Table -->
-            <div class="overflow-x-auto mb-6">
-                <table class="w-full">
-                    <thead class="bg-gray-100 border-b">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
-                            <th class="px-2 py-3 text-center text-sm font-semibold text-gray-700" title="Untick to mark this employee absent — no timesheet will be created for them.">Present</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Enter hours worked. System splits into Reg/OT using the weekly 40-hr rule.">Hours Worked</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Tick to treat this entry as OT regardless of the weekly total.">Force OT</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Reg</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">OT</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">DT</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Gate Log</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Lunch?</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Per Diem</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Per Diem $</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Cost Type</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" title="Shop's internal WO # — overrides the top-level value for this row only.">Work Order #</th>
-                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($crewMembers ?? [] as $employee)
-                            <tr class="border-b hover:bg-gray-50" data-employee-id="{{ $employee->id }}">
-                                <td class="px-4 py-3 text-sm text-gray-900 font-medium">
-                                    <div>{{ $employee->first_name }} {{ $employee->last_name }}</div>
-                                    <div class="week-hours-badge text-[11px] text-gray-500 mt-0.5">Week so far: —</div>
-                                    <input type="hidden" name="entries[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}" class="employee-id">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    {{-- Present: default ON. If unticked, the row is skipped on save
-                                         (no timesheet is created for absent employees). --}}
-                                    <input type="checkbox" name="entries[{{ $loop->index }}][present]" value="1" checked class="present-check rounded border-gray-300 text-green-600 w-5 h-5" onchange="togglePresent(this)">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    {{-- Hours worked: server splits Reg/OT using 40-hr/week rule --}}
-                                    <input type="number" step="0.25" min="0" placeholder="0" name="entries[{{ $loop->index }}][hours_worked]" class="hours-worked w-20 border-gray-300 rounded text-center font-semibold" onchange="distributeHours(this)">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <input type="checkbox" name="entries[{{ $loop->index }}][force_overtime]" value="1" class="force-ot rounded border-gray-300 text-amber-600" onchange="distributeHours(this)">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <span class="reg-preview text-sm text-gray-700">0</span>
-                                    <input type="hidden" name="entries[{{ $loop->index }}][regular_hours]" value="0" class="reg-input">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <span class="ot-preview text-sm text-gray-700">0</span>
-                                    <input type="hidden" name="entries[{{ $loop->index }}][overtime_hours]" value="0" class="ot-input">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <span class="dt-preview text-sm text-gray-700">0</span>
-                                    <input type="hidden" name="entries[{{ $loop->index }}][double_time_hours]" value="0" class="dt-input">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][gate_log_hours]" step="0.25" placeholder="—" class="w-16 border-gray-300 rounded text-center text-xs">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <input type="checkbox" name="entries[{{ $loop->index }}][work_through_lunch]" value="1" class="rounded border-gray-300 text-blue-600">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <input type="checkbox" name="entries[{{ $loop->index }}][per_diem]" value="1" class="rounded border-gray-300 text-blue-600">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <input type="number" name="entries[{{ $loop->index }}][per_diem_amount]" step="0.01" placeholder="default" class="w-20 border-gray-300 rounded text-center text-xs">
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    {{-- Pre-selected from the employee's Default Cost Type
-                                         (Employee file → Default Cost Type). User can still
-                                         override per row; leaving blank falls back to the
-                                         crew-level cost_type_id at the top of the form. --}}
-                                    <select name="entries[{{ $loop->index }}][cost_type_id]" class="w-28 border-gray-300 rounded text-xs">
-                                        <option value="">(default)</option>
-                                        @foreach ($costTypes ?? [] as $ct)
-                                            <option value="{{ $ct->id }}" {{ $employee->default_cost_type_id == $ct->id ? 'selected' : '' }}>{{ $ct->code }} — {{ $ct->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </td>
-                                <td class="px-2 py-3 text-center">
-                                    <input type="text" name="entries[{{ $loop->index }}][work_order_number]" maxlength="100" placeholder="—" class="w-24 border-gray-300 rounded text-center text-xs">
-                                </td>
-                                <td class="px-3 py-3 text-center text-sm font-semibold text-gray-900">
-                                    <span class="total">0</span> hrs
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="14" class="px-6 py-4 text-center text-gray-500">
-                                    Select a crew to view members
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="flex gap-4">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">
-                    Create All Timesheets
+            {{-- RIGHT: action rail --}}
+            <div class="legacy-rail">
+                <button type="button" class="legacy-btn" @click="showAddEmployee = true">Add Employee</button>
+                <button type="button" class="legacy-btn" @click="editSelectedEmployee()" :disabled="!entry.employee_id">Edit Employee</button>
+                <hr class="my-2 border-gray-400">
+                <button type="button" class="legacy-btn legacy-btn-primary" @click="saveRecord()" :disabled="saving">
+                    <span x-show="!saving">Save Record (F10)</span>
+                    <span x-show="saving">Saving…</span>
                 </button>
-                <a href="{{ route('timesheets.index') }}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded">
-                    Cancel
-                </a>
+                <button type="button" class="legacy-btn" @click="clearRow()">Clear Row</button>
+                <hr class="my-2 border-gray-400">
+                <button type="button" class="legacy-btn legacy-btn-danger" @click="exitForm()">Exit</button>
             </div>
-        </form>
+        </div>
+
+        {{-- Running list of saved records this session --}}
+        <div class="legacy-list-wrap">
+            <div class="text-xs font-semibold text-gray-700 mb-1">Records in this batch</div>
+            <table class="legacy-list">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Job</th>
+                        <th>Emp #</th>
+                        <th>Name</th>
+                        <th>Cost Code</th>
+                        <th>Craft</th>
+                        <th>Cat</th>
+                        <th class="text-right">ST</th>
+                        <th class="text-right">OT</th>
+                        <th class="text-right">PR</th>
+                        <th class="text-right">Total</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="savedRecords.length === 0">
+                        <tr><td colspan="12" class="text-center text-gray-500 py-3">No records keyed yet — fill out the form above and click Save Record.</td></tr>
+                    </template>
+                    <template x-for="rec in savedRecords" :key="rec.id">
+                        <tr>
+                            <td x-text="rec.date"></td>
+                            <td x-text="rec.project_number"></td>
+                            <td x-text="rec.employee_number"></td>
+                            <td x-text="rec.employee_name"></td>
+                            <td x-text="rec.cost_code"></td>
+                            <td x-text="rec.craft"></td>
+                            <td x-text="rec.earnings_category"></td>
+                            <td class="text-right" x-text="Number(rec.regular_hours).toFixed(2)"></td>
+                            <td class="text-right" x-text="Number(rec.overtime_hours).toFixed(2)"></td>
+                            <td class="text-right" x-text="Number(rec.double_time_hours).toFixed(2)"></td>
+                            <td class="text-right font-semibold" x-text="Number(rec.total_hours).toFixed(2)"></td>
+                            <td>
+                                <button type="button" class="text-red-600 hover:text-red-900 text-xs underline" @click="deleteRecord(rec)">Delete</button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+                <tfoot x-show="savedRecords.length > 0">
+                    <tr>
+                        <td colspan="7" class="text-right">Batch totals:</td>
+                        <td class="text-right" x-text="totals.st.toFixed(2)"></td>
+                        <td class="text-right" x-text="totals.ot.toFixed(2)"></td>
+                        <td class="text-right" x-text="totals.pr.toFixed(2)"></td>
+                        <td class="text-right" x-text="totals.total.toFixed(2)"></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="legacy-status-bar">
+            <span>Tip: Press <strong>Enter</strong> in any hours field to Save Record. Job No., Work Date, Shift, and Earnings Cat. carry over to the next entry.</span>
+            <span x-text="`Logged in: {{ auth()->user()->name ?? '—' }}`"></span>
+        </div>
+    </div>
+
+    {{-- Inline Add Employee modal --}}
+    <div x-show="showAddEmployee" x-cloak class="modal-backdrop" @keydown.escape.window="showAddEmployee = false">
+        <div class="modal-card">
+            <div class="legacy-titlebar">
+                <div>Add Employee — Quick Entry</div>
+                <div class="ctrls"><span @click="showAddEmployee = false" style="cursor:pointer">×</span></div>
+            </div>
+            <div class="p-4">
+                <div class="legacy-fieldgrid" style="grid-template-columns: 130px 1fr;">
+                    <label>Employee #:</label>
+                    <input type="text" x-model="newEmp.employee_number" placeholder="auto-generates if blank">
+
+                    <label>First Name:</label>
+                    <input type="text" x-model="newEmp.first_name">
+
+                    <label>Last Name:</label>
+                    <input type="text" x-model="newEmp.last_name">
+
+                    <label>Craft:</label>
+                    <select x-model="newEmp.craft_id">
+                        <option value="">— None —</option>
+                        @foreach ($crafts as $cr)
+                            <option value="{{ $cr->id }}">{{ $cr->code }} — {{ $cr->name }}</option>
+                        @endforeach
+                    </select>
+
+                    <label>Hourly Rate:</label>
+                    <input type="number" step="0.01" min="0" x-model="newEmp.hourly_rate" placeholder="optional">
+                </div>
+
+                <div x-show="newEmpError" class="legacy-banner legacy-banner-error mt-3" x-text="newEmpError"></div>
+
+                <div class="flex gap-2 justify-end mt-4">
+                    <button type="button" class="legacy-btn" @click="showAddEmployee = false">Cancel</button>
+                    <button type="button" class="legacy-btn legacy-btn-primary" @click="saveNewEmployee()" :disabled="newEmpSaving">
+                        <span x-show="!newEmpSaving">Save & Use</span>
+                        <span x-show="newEmpSaving">Saving…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
-    const WEEK_HOURS_URL = @json(route('timesheets.week-hours'));
-    const WEEKLY_OT_THRESHOLD = 40;
+    function legacyTimesheet() {
+        return {
+            header: { period_begin: '', period_end: '', we_date: '' },
+            entry: this.blankEntry(),
+            savedRecords: [],
+            saving: false,
+            banner: { text: '', kind: 'success' },
+            showAddEmployee: false,
+            newEmp: { employee_number: '', first_name: '', last_name: '', craft_id: '', hourly_rate: '' },
+            newEmpSaving: false,
+            newEmpError: '',
 
-    // Map of employee_id → hours already logged this week (Mon–Sun)
-    // Pre-fetched once whenever the date changes so per-row splits happen
-    // instantly without a round-trip on every keystroke.
-    let weekHoursMap = {};
+            init() {
+                // Default the W/E and period to the current Mon–Sun week.
+                const t = new Date();
+                const dow = (t.getDay() + 6) % 7; // 0 = Mon
+                const mon = new Date(t); mon.setDate(t.getDate() - dow);
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                this.header.period_begin = this.fmt(mon);
+                this.header.period_end = this.fmt(sun);
+                this.header.we_date = this.fmt(sun);
+                this.entry.date = this.fmt(t);
 
-    function reloadWithCrew() {
-        const projectId = document.getElementById('project_id').value;
-        const crewId = document.getElementById('crew_id').value;
-        let url = '{{ route("timesheets.bulk-create") }}?';
-        if (projectId) url += 'project_id=' + projectId + '&';
-        if (crewId) url += 'crew_id=' + crewId;
-        location.href = url;
-    }
-
-    // Re-split hours for one row using the client-side version of the
-    // weekly-40 rule against the pre-fetched weekHoursMap. This mirrors
-    // App\Services\OvertimeCalculator::splitWeekly exactly.
-    function distributeHours(inputEl) {
-        const row = inputEl.closest('tr');
-        if (!row) return;
-        const empId = row.querySelector('.employee-id').value;
-        const hours = parseFloat(row.querySelector('.hours-worked').value) || 0;
-        const forceOT = row.querySelector('.force-ot').checked;
-        const weekSoFar = parseFloat(weekHoursMap[empId] || 0);
-
-        let reg = 0, ot = 0, dt = 0;
-        if (forceOT) {
-            ot = hours;
-        } else {
-            const regCapacity = Math.max(0, WEEKLY_OT_THRESHOLD - weekSoFar);
-            reg = Math.min(hours, regCapacity);
-            ot = Math.max(0, hours - reg);
-        }
-
-        row.querySelector('.reg-input').value = reg.toFixed(2);
-        row.querySelector('.ot-input').value  = ot.toFixed(2);
-        row.querySelector('.dt-input').value  = dt.toFixed(2);
-        row.querySelector('.reg-preview').textContent = reg.toFixed(2);
-        row.querySelector('.ot-preview').textContent  = ot.toFixed(2);
-        row.querySelector('.dt-preview').textContent  = dt.toFixed(2);
-        row.querySelector('.total').textContent       = (reg + ot + dt).toFixed(2);
-    }
-
-    // When the date changes (or on first page load with crew members),
-    // fetch each crew member's already-logged week total so the split
-    // is accurate.
-    async function refreshWeekHours() {
-        const date = document.getElementById('date').value;
-        const rows = Array.from(document.querySelectorAll('tr[data-employee-id]'));
-        if (!date || rows.length === 0) return;
-
-        const empIds = rows.map(r => r.dataset.employeeId);
-        await Promise.all(empIds.map(async (id) => {
-            try {
-                const res = await fetch(`${WEEK_HOURS_URL}?employee_id=${id}&date=${encodeURIComponent(date)}`, {
-                    headers: { 'Accept': 'application/json' },
+                // F10 keyboard shortcut to Save Record (Foundation-style).
+                window.addEventListener('keydown', (e) => {
+                    if (e.key === 'F10') { e.preventDefault(); this.saveRecord(); }
                 });
-                if (!res.ok) return;
-                const data = await res.json();
-                weekHoursMap[id] = data.week_hours_before ?? 0;
-                const row = document.querySelector(`tr[data-employee-id="${id}"]`);
-                if (row) {
-                    const badge = row.querySelector('.week-hours-badge');
-                    if (badge) {
-                        badge.textContent = `Week so far: ${Number(data.week_hours_before).toFixed(2)} hrs`;
-                        badge.className = 'week-hours-badge text-[11px] mt-0.5 ' +
-                            (data.week_hours_before >= 40 ? 'text-amber-600 font-semibold' : 'text-gray-500');
+            },
+
+            blankEntry() {
+                return {
+                    project_id: '', date: '', employee_id: '', shift_id: '',
+                    cost_code_id: '', cost_type_id: '', craft_id: '',
+                    work_order_number: '', earnings_category: 'HE',
+                    regular_hours: '', overtime_hours: '', double_time_hours: '',
+                    notes: '',
+                };
+            },
+
+            get lockOTPR() { return this.entry.earnings_category !== 'HE'; },
+
+            get totalHours() {
+                const r = parseFloat(this.entry.regular_hours) || 0;
+                const o = this.lockOTPR ? 0 : (parseFloat(this.entry.overtime_hours) || 0);
+                const d = this.lockOTPR ? 0 : (parseFloat(this.entry.double_time_hours) || 0);
+                return r + o + d;
+            },
+
+            get totals() {
+                let st = 0, ot = 0, pr = 0;
+                this.savedRecords.forEach(r => {
+                    st += parseFloat(r.regular_hours) || 0;
+                    ot += parseFloat(r.overtime_hours) || 0;
+                    pr += parseFloat(r.double_time_hours) || 0;
+                });
+                return { st, ot, pr, total: st + ot + pr };
+            },
+
+            recalcTotal() { /* getter recomputes via Alpine; no-op kept for @input clarity */ },
+
+            onEmployeeChange() {
+                if (!this.entry.employee_id) return;
+                const opt = document.querySelector(`option[value="${this.entry.employee_id}"]`);
+                if (opt) {
+                    const craftId = opt.dataset.craftId;
+                    if (craftId && !this.entry.craft_id) this.entry.craft_id = craftId;
+                }
+            },
+
+            onEarningsChange() {
+                if (this.lockOTPR) {
+                    this.entry.overtime_hours = '';
+                    this.entry.double_time_hours = '';
+                }
+            },
+
+            fmt(d) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const da = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${da}`;
+            },
+
+            flash(kind, text, ms = 2500) {
+                this.banner = { kind, text };
+                setTimeout(() => { if (this.banner.text === text) this.banner = { text: '', kind: 'success' }; }, ms);
+            },
+
+            validate() {
+                if (!this.entry.project_id) return 'Job No. is required.';
+                if (!this.entry.date) return 'Work Date is required.';
+                if (!this.entry.employee_id) return 'Employee # is required.';
+                if (!this.entry.shift_id) return 'Shift is required.';
+                if (this.totalHours <= 0) return 'Enter at least one hour (ST, OT, or PR).';
+                return null;
+            },
+
+            async saveRecord() {
+                const err = this.validate();
+                if (err) { this.flash('error', err, 4000); return; }
+                if (this.saving) return;
+                this.saving = true;
+
+                const payload = {
+                    employee_id: this.entry.employee_id,
+                    project_id: this.entry.project_id,
+                    cost_code_id: this.entry.cost_code_id || null,
+                    cost_type_id: this.entry.cost_type_id || null,
+                    crew_id: null,
+                    date: this.entry.date,
+                    shift_id: this.entry.shift_id,
+                    work_order_number: this.entry.work_order_number || null,
+                    regular_hours: parseFloat(this.entry.regular_hours) || 0,
+                    overtime_hours: this.lockOTPR ? 0 : (parseFloat(this.entry.overtime_hours) || 0),
+                    double_time_hours: this.lockOTPR ? 0 : (parseFloat(this.entry.double_time_hours) || 0),
+                    // force_overtime: bypass the weekly 40-hr split — clerk is
+                    // typing the ST/OT/PR breakdown by hand and expects it to
+                    // be saved as-is.
+                    force_overtime: true,
+                    earnings_category: this.entry.earnings_category,
+                    notes: this.entry.notes || null,
+                    status: 'submitted',
+                };
+
+                try {
+                    const res = await fetch(@json(route('timesheets.store')), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (!res.ok) {
+                        let msg = 'Save failed (HTTP ' + res.status + ').';
+                        try {
+                            const j = await res.json();
+                            if (j.message) msg = j.message;
+                            if (j.errors) msg += ' ' + Object.values(j.errors).flat().join(' ');
+                        } catch (_) { /* ignore body parse */ }
+                        this.flash('error', msg, 5000);
+                        return;
                     }
+
+                    const data = await res.json();
+                    const ts = data.timesheet || data;
+
+                    // Pull display labels from the in-page selects so we don't
+                    // need a server round-trip.
+                    const projOpt = document.querySelector(`select[x-model="entry.project_id"] option[value="${this.entry.project_id}"]`);
+                    const empOpt = document.querySelector(`select[x-model="entry.employee_id"] option[value="${this.entry.employee_id}"]`);
+                    const ccOpt = this.entry.cost_code_id ? document.querySelector(`select[x-model="entry.cost_code_id"] option[value="${this.entry.cost_code_id}"]`) : null;
+                    const crOpt = this.entry.craft_id ? document.querySelector(`select[x-model="entry.craft_id"] option[value="${this.entry.craft_id}"]`) : null;
+
+                    this.savedRecords.push({
+                        id: ts.id,
+                        date: this.entry.date,
+                        project_number: projOpt ? projOpt.textContent.split('—')[0].trim() : '',
+                        employee_number: empOpt ? empOpt.textContent.split('—')[0].trim() : '',
+                        employee_name: empOpt ? (empOpt.dataset.name || '') : '',
+                        cost_code: ccOpt ? ccOpt.textContent.split('—')[0].trim() : '',
+                        craft: crOpt ? crOpt.textContent.split('—')[0].trim() : '',
+                        earnings_category: this.entry.earnings_category,
+                        regular_hours: payload.regular_hours,
+                        overtime_hours: payload.overtime_hours,
+                        double_time_hours: payload.double_time_hours,
+                        total_hours: this.totalHours,
+                    });
+
+                    this.flash('success', `Saved record #${ts.id} for ${empOpt ? empOpt.textContent.split('—')[0].trim() : ''}.`);
+
+                    // Carry-over fields per Brenda's flow (Job, Date, Shift,
+                    // Earnings Cat. stay; per-employee fields clear).
+                    const keep = {
+                        project_id: this.entry.project_id,
+                        date: this.entry.date,
+                        shift_id: this.entry.shift_id,
+                        earnings_category: this.entry.earnings_category,
+                        cost_code_id: this.entry.cost_code_id,
+                        cost_type_id: this.entry.cost_type_id,
+                    };
+                    this.entry = { ...this.blankEntry(), ...keep };
+                } catch (e) {
+                    this.flash('error', 'Network error: ' + (e.message || e), 5000);
+                } finally {
+                    this.saving = false;
                 }
-                // Re-run the split in case the user has already typed hours.
-                const row2 = document.querySelector(`tr[data-employee-id="${id}"]`);
-                if (row2) {
-                    const hw = row2.querySelector('.hours-worked');
-                    if (hw && hw.value) distributeHours(hw);
+            },
+
+            clearRow() {
+                this.entry = { ...this.blankEntry(), date: this.entry.date };
+            },
+
+            async deleteRecord(rec) {
+                if (!confirm(`Delete record #${rec.id} for ${rec.employee_name}?`)) return;
+                try {
+                    const res = await fetch(`/timesheets/${rec.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+                    if (!res.ok) { this.flash('error', 'Delete failed.', 4000); return; }
+                    this.savedRecords = this.savedRecords.filter(r => r.id !== rec.id);
+                    this.flash('success', `Deleted record #${rec.id}.`);
+                } catch (e) {
+                    this.flash('error', 'Network error: ' + (e.message || e), 5000);
                 }
-            } catch (e) { /* network issue — leave weekHoursMap[id] undefined → treated as 0 */ }
-        }));
+            },
+
+            editSelectedEmployee() {
+                if (!this.entry.employee_id) return;
+                window.open(`/employees/${this.entry.employee_id}/edit`, '_blank');
+            },
+
+            async saveNewEmployee() {
+                this.newEmpError = '';
+                if (!this.newEmp.first_name || !this.newEmp.last_name) {
+                    this.newEmpError = 'First and last name are required.';
+                    return;
+                }
+                this.newEmpSaving = true;
+                try {
+                    const fd = new FormData();
+                    if (this.newEmp.employee_number) fd.append('employee_number', this.newEmp.employee_number);
+                    fd.append('first_name', this.newEmp.first_name);
+                    fd.append('last_name', this.newEmp.last_name);
+                    if (this.newEmp.craft_id) fd.append('craft_id', this.newEmp.craft_id);
+                    if (this.newEmp.hourly_rate) fd.append('hourly_rate', this.newEmp.hourly_rate);
+                    fd.append('status', 'active');
+
+                    const res = await fetch(@json(route('employees.store')), {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: fd,
+                    });
+
+                    if (!res.ok) {
+                        try {
+                            const j = await res.json();
+                            this.newEmpError = j.message || 'Save failed.';
+                            if (j.errors) this.newEmpError += ' ' + Object.values(j.errors).flat().join(' ');
+                        } catch { this.newEmpError = 'Save failed (HTTP ' + res.status + ').'; }
+                        return;
+                    }
+
+                    const data = await res.json();
+                    const emp = data.employee || data;
+
+                    // Inject new option into the picker and select it.
+                    const sel = document.querySelector('select[x-model="entry.employee_id"]');
+                    if (sel && emp.id) {
+                        const opt = document.createElement('option');
+                        opt.value = emp.id;
+                        opt.dataset.craftId = emp.craft_id || '';
+                        opt.dataset.name = `${emp.first_name} ${emp.last_name}`;
+                        opt.textContent = `${emp.employee_number} — ${emp.last_name}, ${emp.first_name}`;
+                        sel.appendChild(opt);
+                        this.entry.employee_id = String(emp.id);
+                        if (emp.craft_id && !this.entry.craft_id) this.entry.craft_id = String(emp.craft_id);
+                    }
+
+                    this.showAddEmployee = false;
+                    this.newEmp = { employee_number: '', first_name: '', last_name: '', craft_id: '', hourly_rate: '' };
+                    this.flash('success', `Added employee ${emp.employee_number} — ${emp.first_name} ${emp.last_name}.`);
+                } catch (e) {
+                    this.newEmpError = 'Network error: ' + (e.message || e);
+                } finally {
+                    this.newEmpSaving = false;
+                }
+            },
+
+            exitForm() {
+                if (this.savedRecords.length > 0) {
+                    if (!confirm(`You've keyed ${this.savedRecords.length} record(s) this session. They are already saved to the database. Exit anyway?`)) return;
+                }
+                window.location.href = @json(route('timesheets.index'));
+            },
+        };
     }
-
-    // Push a quick-fill value from the blue toolbar down into every row.
-    function applyBulkFill() {
-        const hoursWorked = document.getElementById('bulk_hours_worked').value;
-        const forceOtSel  = document.getElementById('bulk_force_ot').value;
-        const perDiemSel  = document.getElementById('bulk_per_diem').value;
-        const perDiemAmt  = document.getElementById('bulk_per_diem_amount').value;
-
-        document.querySelectorAll('tr[data-employee-id]').forEach((row) => {
-            const hoursInput = row.querySelector('.hours-worked');
-            const forceOtInput = row.querySelector('.force-ot');
-
-            if (hoursWorked !== '' && hoursInput) {
-                hoursInput.value = hoursWorked;
-            }
-            if (forceOtSel === '1' && forceOtInput) forceOtInput.checked = true;
-            else if (forceOtSel === '0' && forceOtInput) forceOtInput.checked = false;
-
-            if (hoursInput) distributeHours(hoursInput);
-        });
-
-        document.querySelectorAll('input[name*="[per_diem]"]').forEach((cb) => {
-            if (perDiemSel === '1') cb.checked = true;
-            else if (perDiemSel === '0') cb.checked = false;
-        });
-
-        if (perDiemAmt !== '') {
-            document.querySelectorAll('input[name*="[per_diem_amount]"]').forEach((inp) => {
-                inp.value = perDiemAmt;
-            });
-        }
-
-        if (typeof Toast !== 'undefined') {
-            Toast.fire({icon:'success', title:'Applied to all rows'});
-        }
-    }
-
-    // Present toggle: visually dim the row and disable inputs when absent so
-    // the user can't accidentally type hours or tick per-diem for a no-show.
-    // Unchecked rows are dropped server-side in bulkStore(), so nothing gets
-    // saved for absent employees.
-    function togglePresent(checkbox) {
-        const row = checkbox.closest('tr');
-        if (!row) return;
-        const absent = !checkbox.checked;
-        row.classList.toggle('opacity-50', absent);
-        row.classList.toggle('bg-gray-100', absent);
-        // Disable the data-entry inputs — but NOT the employee_id hidden input
-        // or the Present checkbox itself.
-        row.querySelectorAll('input, select').forEach(el => {
-            if (el === checkbox) return;
-            if (el.type === 'hidden') return;
-            el.disabled = absent;
-        });
-        // Also zero out hours + uncheck per-diem so no lingering values get
-        // submitted if the user re-ticks Present later without reviewing.
-        if (absent) {
-            const hw = row.querySelector('.hours-worked');
-            if (hw) { hw.value = ''; distributeHours(hw); }
-            row.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-                if (cb !== checkbox) cb.checked = false;
-            });
-        }
-    }
-
-    function setAllPresent(present) {
-        document.querySelectorAll('.present-check').forEach(cb => {
-            cb.checked = present;
-            togglePresent(cb);
-        });
-    }
-
-    // First load: if the date field is pre-filled (old() or defaults), fetch.
-    document.addEventListener('DOMContentLoaded', () => {
-        if (document.getElementById('date').value) refreshWeekHours();
-    });
 </script>
 @endsection

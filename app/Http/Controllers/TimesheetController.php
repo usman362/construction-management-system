@@ -10,6 +10,7 @@ use App\Models\ProjectBillableRate;
 use App\Models\Crew;
 use App\Models\Shift;
 use App\Models\CostCode;
+use App\Models\Craft;
 use App\Services\OvertimeCalculator;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -168,6 +169,8 @@ class TimesheetController extends Controller
             'per_diem_amount' => 'nullable|numeric|min:0',
             'client_signature' => 'nullable|string',
             'client_signature_name' => 'nullable|string|max:150',
+            // 2026-04-28: Earnings category (HE/HO/VA). Default 'HE' = worked hours.
+            'earnings_category' => 'nullable|in:HE,HO,VA',
             'notes' => 'nullable|string',
         ]);
 
@@ -214,6 +217,7 @@ class TimesheetController extends Controller
             'billable_amount' => $isBillable ? $totals['billable_amount'] : 0,
             'is_billable' => $isBillable,
             'rate_type' => $totals['rate_type'],
+            'earnings_category' => $validated['earnings_category'] ?? 'HE',
             'project_billable_rate_id' => $totals['project_billable_rate_id'],
             'status' => 'draft',
             'notes' => $validated['notes'] ?? null,
@@ -392,6 +396,7 @@ class TimesheetController extends Controller
             'per_diem_amount' => 'nullable|numeric|min:0',
             'client_signature' => 'nullable|string',
             'client_signature_name' => 'nullable|string|max:150',
+            'earnings_category' => 'nullable|in:HE,HO,VA',
             'notes' => 'nullable|string',
         ]);
 
@@ -443,6 +448,7 @@ class TimesheetController extends Controller
             'billable_amount' => $isBillable ? $totals['billable_amount'] : 0,
             'is_billable' => $isBillable,
             'rate_type' => $totals['rate_type'],
+            'earnings_category' => $validated['earnings_category'] ?? $timesheet->earnings_category ?? 'HE',
             'project_billable_rate_id' => $totals['project_billable_rate_id'],
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -630,13 +636,23 @@ class TimesheetController extends Controller
     public function bulkCreate(Request $request): View
     {
         $crews = Crew::with(['project', 'foreman'])->get();
-        $projects = Project::where('status', 'active')->get();
+        $projects = Project::whereIn('status', ['active', 'awarded', 'bidding'])
+            ->orderBy('project_number')
+            ->get(['id', 'project_number', 'name']);
         $shifts = Shift::all();
-        $costCodes = CostCode::query()->orderBy('code')->get(['id', 'code', 'name']);
+        $costCodes = CostCode::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $costTypes = \App\Models\CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']);
-        $crewMembers = collect();
+        // 2026-04-28 — legacy-layout bulk entry needs the full employee + craft
+        // catalogs because the form lets payroll clerks key in a worker by ID
+        // and (optionally) mark the craft per row.
+        $employees = Employee::where('status', 'active')
+            ->orderBy('employee_number')
+            ->get(['id', 'employee_number', 'first_name', 'last_name', 'craft_id']);
+        $crafts = Craft::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
 
-        // Load crew members (employees) if crew_id is provided via query string
+        $crewMembers = collect();
         if ($request->filled('crew_id')) {
             $crew = Crew::find($request->crew_id);
             if ($crew) {
@@ -645,12 +661,14 @@ class TimesheetController extends Controller
         }
 
         return view('timesheets.bulk-create', [
-            'crews' => $crews,
-            'projects' => $projects,
-            'shifts' => $shifts,
+            'crews'       => $crews,
+            'projects'    => $projects,
+            'shifts'      => $shifts,
             'crewMembers' => $crewMembers,
-            'costCodes' => $costCodes,
-            'costTypes' => $costTypes,
+            'costCodes'   => $costCodes,
+            'costTypes'   => $costTypes,
+            'employees'   => $employees,
+            'crafts'      => $crafts,
         ]);
     }
 

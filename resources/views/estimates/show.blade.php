@@ -629,7 +629,20 @@ function estimateBuilder(estimateId) {
         openLineModalFlag: false,
         newSectionName:    '',
         newSectionDescription: '',
-        lineDraft: this.blankLine(),
+        // 2026-04-28 BUG FIX (Brenda): can't reference `this.blankLine()` during
+        // object literal construction — `this` isn't bound to the object yet,
+        // throws TypeError, Alpine catches it, and the whole component fails
+        // to initialize (which is why the Add Section button stopped working).
+        // Inline the same shape directly here, and `blankLine()` is still used
+        // by openLineModal() / saveLine() to reset between entries.
+        lineDraft: {
+            line_type: 'other', section_id: null, description: '',
+            cost_code_id: '', cost_type_id: '',
+            craft_id: '', hours: '', hourly_cost_rate: '',
+            material_id: '', equipment_id: '',
+            quantity: '', unit: '', unit_cost: '',
+            markup_percent: '', notes: '',
+        },
         totals: {
             total_cost:     {{ (float) $estimate->total_cost }},
             total_price:    {{ (float) $estimate->total_price }},
