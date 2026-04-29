@@ -340,6 +340,13 @@
             </div>
         </div>
 
+        {{-- 2026-04-29 (Brenda): "Just the daily hours on each day and one
+             weekly total." Simplified from the prior 5-row layout (Detail +
+             ST/OT/PR + Day Total) down to one detail row + one bold totals
+             row. ST/OT/PR breakdown is preserved in the per-entry detail cell
+             text but no longer gets its own row. Project breakdown table at
+             the bottom still gives the office the per-project ST/OT/PR split
+             they need for billing. --}}
         <table class="week">
             <thead>
                 <tr>
@@ -354,7 +361,9 @@
                 </tr>
             </thead>
             <tbody>
-                {{-- Per-day project + hours detail --}}
+                {{-- Per-day project + hours detail (one line per timesheet entry).
+                     ST/OT/PR shown inline so the breakdown is still visible
+                     when needed but doesn't take its own row. --}}
                 <tr>
                     <td class="row-label">Detail</td>
                     @for ($i = 0; $i < 7; $i++)
@@ -373,9 +382,9 @@
                                                 @endif
                                             </div>
                                             <div class="hrs">
-                                                ST {{ number_format($ts->regular_hours, 2) }}
-                                                @if ($ts->overtime_hours > 0) · OT {{ number_format($ts->overtime_hours, 2) }} @endif
-                                                @if ($ts->double_time_hours > 0) · PR {{ number_format($ts->double_time_hours, 2) }} @endif
+                                                {{ number_format($ts->total_hours, 2) }} hrs
+                                                @if ($ts->overtime_hours > 0) <span style="color:#b45309;">(OT {{ number_format($ts->overtime_hours, 2) }})</span> @endif
+                                                @if ($ts->double_time_hours > 0) <span style="color:#b91c1c;">(PR {{ number_format($ts->double_time_hours, 2) }})</span> @endif
                                                 @if (($ts->earnings_category ?? 'HE') !== 'HE')
                                                     <strong>· {{ $ts->earnings_category }}</strong>
                                                 @endif
@@ -386,55 +395,19 @@
                             @endif
                         </td>
                     @endfor
-                    <td class="col-total">
-                        @php
-                            $dayTotalsAll = 0;
-                            for ($j = 0; $j < 7; $j++) {
-                                foreach ($days[$j] as $ts2) { $dayTotalsAll += (float) $ts2->total_hours; }
-                            }
-                        @endphp
-                        {{ number_format($dayTotalsAll, 2) }}
-                    </td>
+                    <td class="col-total"></td>
                 </tr>
 
-                {{-- ST row --}}
-                <tr>
-                    <td class="row-label">ST Hours</td>
-                    @for ($i = 0; $i < 7; $i++)
-                        @php $st = $days[$i]->sum(fn($t) => (float) $t->regular_hours); @endphp
-                        <td class="hrs-num">{{ $st > 0 ? number_format($st, 2) : '—' }}</td>
-                    @endfor
-                    <td class="col-total">{{ number_format($totals['regular'], 2) }}</td>
-                </tr>
-
-                {{-- OT row --}}
-                <tr>
-                    <td class="row-label">OT Hours</td>
-                    @for ($i = 0; $i < 7; $i++)
-                        @php $ot = $days[$i]->sum(fn($t) => (float) $t->overtime_hours); @endphp
-                        <td class="hrs-num">{{ $ot > 0 ? number_format($ot, 2) : '—' }}</td>
-                    @endfor
-                    <td class="col-total">{{ number_format($totals['overtime'], 2) }}</td>
-                </tr>
-
-                {{-- PR / Double-time row --}}
-                <tr>
-                    <td class="row-label">PR Hours</td>
-                    @for ($i = 0; $i < 7; $i++)
-                        @php $dt = $days[$i]->sum(fn($t) => (float) $t->double_time_hours); @endphp
-                        <td class="hrs-num">{{ $dt > 0 ? number_format($dt, 2) : '—' }}</td>
-                    @endfor
-                    <td class="col-total">{{ number_format($totals['double_time'], 2) }}</td>
-                </tr>
-
-                {{-- Daily totals --}}
+                {{-- Daily hours total per day + the single weekly total.
+                     This is the headline row Brenda asked for — one number
+                     per day, one weekly grand total in the right column. --}}
                 <tr class="totals-row">
-                    <td class="row-label">Day Total</td>
+                    <td class="row-label">Hours</td>
                     @for ($i = 0; $i < 7; $i++)
                         @php $dt = $days[$i]->sum(fn($t) => (float) $t->total_hours); @endphp
-                        <td class="hrs-num">{{ $dt > 0 ? number_format($dt, 2) : '—' }}</td>
+                        <td class="hrs-num" style="font-size:14px;">{{ $dt > 0 ? number_format($dt, 2) : '—' }}</td>
                     @endfor
-                    <td class="col-total" style="background:#1f2937; color:#fff;">
+                    <td class="col-total" style="background:#1f2937; color:#fff; font-size:14px;">
                         {{ number_format($totals['total'], 2) }}
                     </td>
                 </tr>

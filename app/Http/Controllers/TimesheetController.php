@@ -415,11 +415,20 @@ class TimesheetController extends Controller
             $dow = (int) $date->dayOfWeekIso - 1;
 
             if (! isset($buckets[$key])) {
+                // BUG FIX 2026-04-29: array_fill(0, 7, collect()) makes all 7
+                // slots reference the SAME Collection object — pushing one
+                // timesheet into days[$dow] would clone it into every other
+                // day too, blowing up the print as 4× duplicates per cell.
+                // Build the array with distinct collect() instances.
+                $days = [];
+                for ($d = 0; $d < 7; $d++) {
+                    $days[$d] = collect();
+                }
                 $buckets[$key] = [
                     'employee'   => $ts->employee,
                     'week_start' => $weekStart,
                     'week_end'   => $weekEnd,
-                    'days'       => array_fill(0, 7, collect()),
+                    'days'       => $days,
                     'totals'     => [
                         'regular'     => 0.0,
                         'overtime'    => 0.0,
@@ -755,6 +764,12 @@ class TimesheetController extends Controller
             ->orderBy('project_number')
             ->get(['id', 'project_number', 'name']);
         $shifts = Shift::all();
+        // 2026-04-29 (Brenda): default Shift = Day Shift unless changed.
+        // Match by name (case-insensitive 'day') so seeded variations like
+        // "Day Shift" / "Day" / "1st Shift / Day" all resolve.
+        $defaultShiftId = optional(
+            $shifts->first(fn ($s) => stripos($s->name ?? '', 'day') !== false)
+        )->id ?? optional($shifts->first())->id;
         $costCodes = CostCode::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $costTypes = \App\Models\CostType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']);
         // 2026-04-28 — legacy-layout bulk entry needs the full employee + craft
@@ -776,14 +791,15 @@ class TimesheetController extends Controller
         }
 
         return view('timesheets.bulk-create', [
-            'crews'       => $crews,
-            'projects'    => $projects,
-            'shifts'      => $shifts,
-            'crewMembers' => $crewMembers,
-            'costCodes'   => $costCodes,
-            'costTypes'   => $costTypes,
-            'employees'   => $employees,
-            'crafts'      => $crafts,
+            'crews'          => $crews,
+            'projects'       => $projects,
+            'shifts'         => $shifts,
+            'defaultShiftId' => $defaultShiftId,
+            'crewMembers'    => $crewMembers,
+            'costCodes'      => $costCodes,
+            'costTypes'      => $costTypes,
+            'employees'      => $employees,
+            'crafts'         => $crafts,
         ]);
     }
 

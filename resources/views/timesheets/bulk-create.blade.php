@@ -110,12 +110,28 @@
                 <label>Work Date:</label>
                 <input type="date" x-model="entry.date">
 
+                {{-- 2026-04-29 (Brenda): Employee # and Name split into two
+                     side-by-side fields. Type the Employee # and Name +
+                     Craft auto-fill from the catalog (matches Foundation's
+                     keyed-by-number flow). Or pick from the Name dropdown —
+                     ID auto-fills back. Both fields stay in sync. --}}
                 <label>Employee #:</label>
+                <input type="text" x-model="entry.employee_number" @input="onEmployeeNumberInput()" @blur="onEmployeeNumberInput()" placeholder="Type # or pick name →" list="employeeNumberList" autocomplete="off">
+                <datalist id="employeeNumberList">
+                    @foreach ($employees as $emp)
+                        <option value="{{ $emp->employee_number }}">{{ $emp->last_name }}, {{ $emp->first_name }}</option>
+                    @endforeach
+                </datalist>
+
+                <label>Name:</label>
                 <select x-model="entry.employee_id" @change="onEmployeeChange()">
                     <option value="">— Select Employee —</option>
                     @foreach ($employees as $emp)
-                        <option value="{{ $emp->id }}" data-craft-id="{{ $emp->craft_id }}" data-name="{{ $emp->first_name }} {{ $emp->last_name }}">
-                            {{ $emp->employee_number }} — {{ $emp->last_name }}, {{ $emp->first_name }}
+                        <option value="{{ $emp->id }}"
+                                data-craft-id="{{ $emp->craft_id }}"
+                                data-employee-number="{{ $emp->employee_number }}"
+                                data-name="{{ $emp->first_name }} {{ $emp->last_name }}">
+                            {{ $emp->last_name }}, {{ $emp->first_name }}
                         </option>
                     @endforeach
                 </select>
@@ -307,7 +323,18 @@
     function legacyTimesheet() {
         return {
             header: { period_begin: '', period_end: '', we_date: '' },
-            entry: this.blankEntry(),
+            // BUG FIX 2026-04-29: `this.blankEntry()` here threw because
+            // `this` is undefined during object-literal construction —
+            // crashing the whole Alpine component and silently breaking
+            // the Save Record button (Brenda's "page is not saving" bug).
+            // Inline the literal here; init() reseats it on mount.
+            entry: {
+                project_id: '', date: '', employee_id: '', employee_number: '', shift_id: '',
+                cost_code_id: '', cost_type_id: '', craft_id: '',
+                work_order_number: '', earnings_category: 'HE',
+                regular_hours: '', overtime_hours: '', double_time_hours: '',
+                notes: '',
+            },
             savedRecords: [],
             saving: false,
             banner: { text: '', kind: 'success' },
@@ -315,6 +342,10 @@
             newEmp: { employee_number: '', first_name: '', last_name: '', craft_id: '', hourly_rate: '' },
             newEmpSaving: false,
             newEmpError: '',
+            // Default shift id pulled from the server config (Day Shift) so
+            // Brenda doesn't have to pick it on every line. Falls back to
+            // empty string if no Day-shift record exists in the DB.
+            defaultShiftId: @json($defaultShiftId ?? ''),
 
             init() {
                 // Default the W/E and period to the current Mon–Sun week.
@@ -326,6 +357,12 @@
                 this.header.period_end = this.fmt(sun);
                 this.header.we_date = this.fmt(sun);
                 this.entry.date = this.fmt(t);
+                // 2026-04-29 (Brenda): default Shift = Day Shift unless
+                // changed. Pre-fills on first load and on every "save and
+                // continue" reset.
+                if (this.defaultShiftId) {
+                    this.entry.shift_id = String(this.defaultShiftId);
+                }
 
                 // F10 keyboard shortcut to Save Record (Foundation-style).
                 window.addEventListener('keydown', (e) => {
@@ -335,7 +372,7 @@
 
             blankEntry() {
                 return {
-                    project_id: '', date: '', employee_id: '', shift_id: '',
+                    project_id: '', date: '', employee_id: '', employee_number: '', shift_id: '',
                     cost_code_id: '', cost_type_id: '', craft_id: '',
                     work_order_number: '', earnings_category: 'HE',
                     regular_hours: '', overtime_hours: '', double_time_hours: '',
@@ -364,12 +401,44 @@
 
             recalcTotal() { /* getter recomputes via Alpine; no-op kept for @input clarity */ },
 
+            // Triggered by the Name <select>. Pulls Employee # + craft from
+            // the picked option's data attributes and pushes them into the
+            // form so the two side-by-side fields stay in sync.
             onEmployeeChange() {
-                if (!this.entry.employee_id) return;
-                const opt = document.querySelector(`option[value="${this.entry.employee_id}"]`);
+                if (!this.entry.employee_id) {
+                    this.entry.employee_number = '';
+                    return;
+                }
+                const sel = document.querySelector('select[x-model="entry.employee_id"]');
+                const opt = sel ? sel.querySelector(`option[value="${this.entry.employee_id}"]`) : null;
                 if (opt) {
                     const craftId = opt.dataset.craftId;
-                    if (craftId && !this.entry.craft_id) this.entry.craft_id = craftId;
+                    const empNum  = opt.dataset.employeeNumber;
+                    // Always overwrite craft on employee change — Brenda
+                    // confirmed each worker's craft should auto-populate
+                    // (2026-04-29).
+                    if (craftId) this.entry.craft_id = String(craftId);
+                    if (empNum)  this.entry.employee_number = empNum;
+                }
+            },
+
+            // Triggered when the user types in the Employee # input. Looks
+            // up the matching option in the Name select and selects it,
+            // which fires onEmployeeChange() and fills craft.
+            onEmployeeNumberInput() {
+                const num = (this.entry.employee_number || '').trim();
+                if (!num) {
+                    this.entry.employee_id = '';
+                    return;
+                }
+                const sel = document.querySelector('select[x-model="entry.employee_id"]');
+                if (!sel) return;
+                const match = sel.querySelector(`option[data-employee-number="${num}"]`);
+                if (match && match.value !== this.entry.employee_id) {
+                    this.entry.employee_id = match.value;
+                    // Pull craft from the option directly since x-model
+                    // change won't re-fire onEmployeeChange synchronously.
+                    if (match.dataset.craftId) this.entry.craft_id = String(match.dataset.craftId);
                 }
             },
 
@@ -479,11 +548,12 @@
                     this.flash('success', `Saved record #${ts.id} for ${empOpt ? empOpt.textContent.split('—')[0].trim() : ''}.`);
 
                     // Carry-over fields per Brenda's flow (Job, Date, Shift,
-                    // Earnings Cat. stay; per-employee fields clear).
+                    // Earnings Cat. stay; per-employee fields including #
+                    // and Craft clear so the next worker can be keyed in).
                     const keep = {
                         project_id: this.entry.project_id,
                         date: this.entry.date,
-                        shift_id: this.entry.shift_id,
+                        shift_id: this.entry.shift_id || this.defaultShiftId || '',
                         earnings_category: this.entry.earnings_category,
                         cost_code_id: this.entry.cost_code_id,
                         cost_type_id: this.entry.cost_type_id,

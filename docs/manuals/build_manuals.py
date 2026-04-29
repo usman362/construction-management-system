@@ -675,7 +675,7 @@ def build_admin_manual():
         "When done, the backup appears in the list. Click Download to save a copy off-site.",
     ])
     add_callout(doc, "Recommended",
-        "Download a backup before any major data import or schema change. Keep at least 30 days of monthly backups in a separate location.")
+        "Download a backup before any major data import or system update. Keep at least 30 days of monthly backups in a separate location.")
 
     # ── 14. Settings ──
     add_h1(doc, "14. Settings (Logo, Company Info, Rates)")
