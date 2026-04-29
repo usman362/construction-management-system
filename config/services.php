@@ -37,20 +37,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Anthropic (Claude) — used by the Timesheet OCR feature
+    | Snap-a-Timesheet OCR — provider switch
     |--------------------------------------------------------------------------
     | Brenda 2026-04-29 killer feature: foreman snaps a photo of a paper
     | timesheet and the system extracts every employee + hours + project
     | + date into structured entries the office can confirm in one click.
     |
-    | Sonnet is the default — it's accurate enough on handwritten timesheet
-    | layouts and a fraction of Opus pricing per scan.
+    | Two providers are wired — flip via OCR_PROVIDER in .env without
+    | touching code:
+    |   - 'gemini'    : Google Gemini 1.5 Flash. Has a generous FREE tier
+    |                   (1500 requests/day). Default for demos / pre-sales.
+    |   - 'anthropic' : Claude Sonnet 4.5. Paid (~$0.02/scan) but slightly
+    |                   better on messy handwriting. Switch when client
+    |                   approves the feature and is ready to budget.
     */
+    'ocr' => [
+        'provider' => env('OCR_PROVIDER', 'gemini'),
+    ],
+
     'anthropic' => [
         'api_key'  => env('ANTHROPIC_API_KEY'),
         'model'    => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
         'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com/v1'),
         'version'  => env('ANTHROPIC_VERSION', '2023-06-01'),
+    ],
+
+    'gemini' => [
+        'api_key'  => env('GEMINI_API_KEY'),
+        'model'    => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
     ],
 
 ];

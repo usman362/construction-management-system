@@ -40,16 +40,42 @@ class TimesheetOcrService
      */
     public function extractFromImage(string $imageBase64, string $mediaType): array
     {
-        $apiKey = config('services.anthropic.api_key');
-        if (empty($apiKey)) {
-            throw new \RuntimeException(
-                'ANTHROPIC_API_KEY is not set. Add it to .env so the Snap-a-Timesheet feature can call Claude.'
-            );
-        }
+        // Provider switch — flip via OCR_PROVIDER in .env. Both providers use
+        // the same system prompt, parser, and matcher; only the HTTP call
+        // shape and auth differ.
+        $provider = config('services.ocr.provider', 'gemini');
+        $systemPrompt = $this->buildSystemPrompt();
 
-        // Build catalog hints so the model can prefer real employee numbers /
-        // project numbers when transcribing fuzzy handwriting. Capped to keep
-        // the prompt short — at scale we'd switch to RAG-style retrieval.
+        [$rawText, $rawBody] = match ($provider) {
+            'anthropic' => $this->callAnthropic($systemPrompt, $imageBase64, $mediaType),
+            'gemini'    => $this->callGemini($systemPrompt, $imageBase64, $mediaType),
+            default     => throw new \RuntimeException("Unknown OCR provider: {$provider}. Set OCR_PROVIDER to 'gemini' or 'anthropic'."),
+        };
+
+        $parsed = $this->parseJsonEnvelope($rawText);
+
+        // Apply server-side fuzzy matching so the UI can pre-select employees
+        // and projects. We don't trust the model with our DB IDs.
+        $parsed['entries'] = array_map(
+            fn ($e) => $this->matchEntry($e, $parsed['common'] ?? []),
+            $parsed['entries'] ?? []
+        );
+
+        return [
+            'entries' => $parsed['entries'],
+            'summary' => $parsed['summary'] ?? null,
+            'common'  => $parsed['common'] ?? [],
+            'raw'     => $rawBody,
+        ];
+    }
+
+    /**
+     * Build the system prompt — shared between providers. Includes catalog
+     * hints (employees + active projects) so the model can prefer real
+     * names/numbers when transcribing fuzzy handwriting.
+     */
+    protected function buildSystemPrompt(): string
+    {
         $employees = Employee::where('status', 'active')
             ->orderBy('employee_number')
             ->limit(500)
@@ -64,7 +90,7 @@ class TimesheetOcrService
             ->map(fn ($p) => trim(($p->project_number ?? '?') . ' — ' . $p->name))
             ->implode("\n");
 
-        $systemPrompt = <<<PROMPT
+        return <<<PROMPT
 You are an OCR + data extractor for handwritten construction payroll timesheets.
 
 Your job: read the image and return a JSON object describing every labor row visible. Be tolerant of messy handwriting, smudges, and cell overlaps.
@@ -113,6 +139,20 @@ ACTIVE PROJECTS:
 
 Return ONLY the JSON. No explanation, no code fences.
 PROMPT;
+    }
+
+    /**
+     * Call Anthropic Claude vision endpoint. Paid (~$0.02/scan).
+     * @return array{0:string, 1:array}  [raw text response, full body]
+     */
+    protected function callAnthropic(string $systemPrompt, string $imageBase64, string $mediaType): array
+    {
+        $apiKey = config('services.anthropic.api_key');
+        if (empty($apiKey)) {
+            throw new \RuntimeException(
+                'ANTHROPIC_API_KEY is not set. Add it to .env, or set OCR_PROVIDER=gemini for the free demo.'
+            );
+        }
 
         $payload = [
             'model'      => config('services.anthropic.model'),
@@ -146,18 +186,13 @@ PROMPT;
             ->post(config('services.anthropic.base_url') . '/messages', $payload);
 
         if (! $response->successful()) {
-            Log::error('Anthropic API error', [
-                'status' => $response->status(),
-                'body'   => $response->body(),
-            ]);
+            Log::error('Anthropic API error', ['status' => $response->status(), 'body' => $response->body()]);
             throw new \RuntimeException(
                 'Claude API call failed (HTTP ' . $response->status() . '). ' . substr($response->body(), 0, 200)
             );
         }
 
         $body = $response->json();
-
-        // The vision response comes back as content[].text — grab the first text block.
         $rawText = '';
         foreach (($body['content'] ?? []) as $block) {
             if (($block['type'] ?? null) === 'text') {
@@ -165,22 +200,74 @@ PROMPT;
                 break;
             }
         }
+        return [$rawText, $body];
+    }
 
-        $parsed = $this->parseJsonEnvelope($rawText);
+    /**
+     * Call Google Gemini 1.5 Flash vision. Free tier: 1500 requests/day,
+     * 15 RPM, 1M tokens/min. Plenty for demos and small offices.
+     *
+     * Get a free key: https://aistudio.google.com/app/apikey
+     *
+     * Gemini's responseMimeType=application/json forces pure JSON output
+     * (no markdown fences, no prose) — eliminates one class of parsing bug.
+     *
+     * @return array{0:string, 1:array}  [raw text response, full body]
+     */
+    protected function callGemini(string $systemPrompt, string $imageBase64, string $mediaType): array
+    {
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            throw new \RuntimeException(
+                'GEMINI_API_KEY is not set. Get a free key at https://aistudio.google.com/app/apikey and add to .env.'
+            );
+        }
 
-        // Apply server-side fuzzy matching so the UI can pre-select employees
-        // and projects. We don't trust the model with our DB IDs.
-        $parsed['entries'] = array_map(
-            fn ($e) => $this->matchEntry($e, $parsed['common'] ?? []),
-            $parsed['entries'] ?? []
-        );
+        $model = config('services.gemini.model', 'gemini-1.5-flash');
+        $url = config('services.gemini.base_url') . "/models/{$model}:generateContent?key=" . urlencode($apiKey);
 
-        return [
-            'entries' => $parsed['entries'],
-            'summary' => $parsed['summary'] ?? null,
-            'common'  => $parsed['common'] ?? [],
-            'raw'     => $body,
+        $payload = [
+            'systemInstruction' => [
+                'parts' => [['text' => $systemPrompt]],
+            ],
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [
+                    ['inline_data' => [
+                        'mime_type' => $mediaType,
+                        'data'      => $imageBase64,
+                    ]],
+                    ['text' => 'Extract every timesheet row from this image and return the JSON envelope described in your instructions.'],
+                ],
+            ]],
+            'generationConfig' => [
+                // Forces pure JSON — no markdown fences, no extra prose
+                'responseMimeType' => 'application/json',
+                'temperature'      => 0.1,
+                'maxOutputTokens'  => 4096,
+            ],
         ];
+
+        $response = Http::withHeaders(['content-type' => 'application/json'])
+            ->timeout(60)
+            ->post($url, $payload);
+
+        if (! $response->successful()) {
+            Log::error('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
+            throw new \RuntimeException(
+                'Gemini API call failed (HTTP ' . $response->status() . '). ' . substr($response->body(), 0, 300)
+            );
+        }
+
+        $body = $response->json();
+        // candidates[0].content.parts[0].text
+        $rawText = $body['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        if ($rawText === '') {
+            // Sometimes Gemini returns blockedReason or finishReason without text
+            $reason = $body['candidates'][0]['finishReason'] ?? 'UNKNOWN';
+            throw new \RuntimeException("Gemini returned no text (finishReason: {$reason}). Try a clearer image.");
+        }
+        return [$rawText, $body];
     }
 
     /**
