@@ -290,6 +290,11 @@ Route::middleware('auth')->group(function () {
         Route::post('timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])->name('timesheets.reject');
         Route::get('timesheets-bulk', [TimesheetController::class, 'bulkCreate'])->name('timesheets.bulk-create');
         Route::post('timesheets-bulk', [TimesheetController::class, 'bulkStore'])->name('timesheets.bulk-store');
+
+        // 2026-04-29 — Snap-a-Timesheet (AI OCR). Upload a photo of a paper
+        // timesheet, Claude extracts the rows, office confirms and bulk-creates.
+        Route::post('timesheets/scan-photo',  [TimesheetController::class, 'scanPhoto'])->name('timesheets.scan-photo');
+        Route::post('timesheets/scan-commit', [TimesheetController::class, 'scanCommit'])->name('timesheets.scan-commit');
     });
 
     // Payroll — Admin, Accountant

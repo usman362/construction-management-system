@@ -11,7 +11,9 @@ use App\Models\Crew;
 use App\Models\Shift;
 use App\Models\CostCode;
 use App\Models\Craft;
+use App\Models\TimesheetScanLog;
 use App\Services\OvertimeCalculator;
+use App\Services\TimesheetOcrService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
@@ -1216,6 +1218,156 @@ class TimesheetController extends Controller
             'overtime'          => $split['overtime'],
             'double'            => $split['double'],
             'threshold'         => OvertimeCalculator::WEEKLY_OT_THRESHOLD,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  Snap-a-Timesheet (AI OCR) — Brenda's killer feature 04.29.2026
+    //  Foreman uploads a photo of a paper timesheet → Claude vision
+    //  extracts every row → office reviews + bulk-creates timesheets.
+    //  Two endpoints: scanPhoto() does the AI extraction, scanCommit()
+    //  takes the (possibly user-edited) entries and inserts the rows.
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Accept an uploaded image, send it to Claude for OCR, return the
+     * structured entries (with employee/project pre-matched against the
+     * live catalog) plus a scan_log_id the client uses on commit.
+     */
+    public function scanPhoto(Request $request, TimesheetOcrService $ocr): JsonResponse
+    {
+        $request->validate([
+            'photo' => 'required|file|image|max:10240',  // 10 MB cap
+        ]);
+
+        $file = $request->file('photo');
+        $bytes = file_get_contents($file->getRealPath());
+        $b64 = base64_encode($bytes);
+        $mime = $file->getMimeType() ?: 'image/jpeg';
+
+        // Persist the image first so the audit log always has it,
+        // even if the AI call later fails. Stored under a private
+        // disk so a leaked URL can't expose payroll photos.
+        $stored = $file->store('timesheet-scans', 'local');
+
+        $log = TimesheetScanLog::create([
+            'user_id'           => auth()->id(),
+            'image_path'        => $stored,
+            'original_filename' => $file->getClientOriginalName(),
+            'file_size_bytes'   => strlen($bytes),
+            'status'            => 'extracted',
+        ]);
+
+        try {
+            $result = $ocr->extractFromImage($b64, $mime);
+        } catch (\Throwable $e) {
+            $log->update([
+                'status'        => 'failed',
+                'error_message' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        $log->update([
+            'extracted_payload' => [
+                'entries' => $result['entries'],
+                'summary' => $result['summary'],
+                'common'  => $result['common'],
+            ],
+            'raw_response'      => $result['raw'],
+        ]);
+
+        return response()->json([
+            'success'      => true,
+            'scan_log_id'  => $log->id,
+            'summary'      => $result['summary'],
+            'common'       => $result['common'],
+            'entries'      => $result['entries'],
+        ]);
+    }
+
+    /**
+     * Commit a previously-scanned set of entries as real timesheets.
+     * The client sends back the entries (likely with user corrections)
+     * and we run them through the same business logic Timesheet::create
+     * uses (rate computation, cost allocation sync, per-diem default).
+     */
+    public function scanCommit(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'scan_log_id'           => 'required|exists:timesheet_scan_logs,id',
+            'entries'               => 'required|array|min:1',
+            'entries.*.employee_id' => 'required|exists:employees,id',
+            'entries.*.project_id'  => 'required|exists:projects,id',
+            'entries.*.date'        => 'required|date',
+            'entries.*.shift_id'        => 'nullable|exists:shifts,id',
+            'entries.*.cost_code_id'    => 'nullable|exists:cost_codes,id',
+            'entries.*.cost_type_id'    => 'nullable|exists:cost_types,id',
+            'entries.*.regular_hours'   => 'nullable|numeric|min:0',
+            'entries.*.overtime_hours'  => 'nullable|numeric|min:0',
+            'entries.*.double_time_hours' => 'nullable|numeric|min:0',
+            'entries.*.earnings_category' => 'nullable|in:HE,HO,VA',
+            'entries.*.notes'           => 'nullable|string|max:500',
+        ]);
+
+        $createdIds = [];
+        \DB::transaction(function () use ($data, &$createdIds) {
+            foreach ($data['entries'] as $row) {
+                $employee = Employee::findOrFail($row['employee_id']);
+                $reg = (float) ($row['regular_hours']     ?? 0);
+                $ot  = (float) ($row['overtime_hours']    ?? 0);
+                $dt  = (float) ($row['double_time_hours'] ?? 0);
+
+                // Skip empty rows the user un-selected.
+                if ($reg + $ot + $dt <= 0) continue;
+
+                $totals = $this->computeLaborTotals(
+                    $employee, $reg, $ot, $dt, (int) $row['project_id'], $row['date']
+                );
+
+                $ts = Timesheet::create([
+                    'employee_id'      => $row['employee_id'],
+                    'project_id'       => $row['project_id'],
+                    'cost_code_id'     => $row['cost_code_id']   ?? null,
+                    'cost_type_id'     => $row['cost_type_id']   ?? null,
+                    'shift_id'         => $row['shift_id']       ?? null,
+                    'date'             => $row['date'],
+                    'regular_hours'    => $reg,
+                    'overtime_hours'   => $ot,
+                    'double_time_hours'=> $dt,
+                    // OCR'd splits are explicit — don't let the weekly-40 rule
+                    // re-bucket them after the user has confirmed.
+                    'force_overtime'   => true,
+                    'total_hours'      => $totals['total_hours'],
+                    'regular_rate'     => $totals['regular_rate'],
+                    'overtime_rate'    => $totals['overtime_rate'],
+                    'total_cost'       => $totals['total_cost'],
+                    'billable_rate'    => $totals['billable_rate'],
+                    'billable_amount'  => $totals['billable_amount'],
+                    'is_billable'      => true,
+                    'rate_type'        => $totals['rate_type'],
+                    'earnings_category' => $row['earnings_category'] ?? 'HE',
+                    'project_billable_rate_id' => $totals['project_billable_rate_id'],
+                    'status'           => 'submitted',
+                    'notes'            => trim(($row['notes'] ?? '') . ' [via Snap-a-Timesheet OCR]'),
+                ]);
+                $this->syncTimesheetCostAllocation($ts->fresh());
+                $createdIds[] = $ts->id;
+            }
+
+            TimesheetScanLog::where('id', $data['scan_log_id'])->update([
+                'status'                => 'confirmed',
+                'created_timesheet_ids' => $createdIds,
+            ]);
+        });
+
+        return response()->json([
+            'success'  => true,
+            'message'  => count($createdIds) . ' timesheet(s) created from scan.',
+            'created'  => $createdIds,
         ]);
     }
 }

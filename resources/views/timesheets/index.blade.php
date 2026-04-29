@@ -19,6 +19,16 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             Bulk Entry
         </a>
+
+        {{-- 2026-04-29 — "Snap-a-Timesheet" AI OCR. The standout button on
+             this page: gradient + sparkle icon + "AI" pill so it visually
+             pops. Click → modal where the user uploads a photo of a paper
+             timesheet, AI extracts every row, office confirms in 1 click. --}}
+        <button onclick="openScanModal()" class="relative inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-purple-700 hover:via-fuchsia-700 hover:to-pink-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-md transition" title="Snap a photo of a paper timesheet — AI fills it in for you">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.178-.398a2.25 2.25 0 001.423-1.423l.398-1.178.398 1.178a2.25 2.25 0 001.423 1.423l1.178.398-1.178.398a2.25 2.25 0 00-1.423 1.423z"/></svg>
+            Scan Timesheet
+            <span class="absolute -top-1 -right-1 bg-yellow-400 text-[9px] font-black text-purple-900 px-1.5 py-0.5 rounded-full shadow">AI</span>
+        </button>
         <button type="button" onclick="openBatchPrint()" class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition" title="Print timesheets for billing (date range + filters)">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z"/></svg>
             Print for Billing
@@ -151,6 +161,220 @@
             <th>Date</th><th>Employee</th><th>Project</th><th>Phase code</th><th>Crew</th><th>Regular</th><th>OT</th><th>DT</th><th>Total</th><th>Cost</th><th>Status</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
+</div>
+
+{{-- ───── Snap-a-Timesheet (AI OCR) modal ─────
+     Brenda 04.29.2026 killer feature. Three views inside the same shell:
+       1) "upload"    — drag-drop / file picker, plus a sample image hint
+       2) "extracting"— spinner with rotating witty status lines
+       3) "review"    — side-by-side: photo on the left, AI-extracted rows
+                       on the right (editable selects/inputs). User fixes
+                       any wrong matches and clicks "Create All".
+     The Alpine component owns all state and posts twice:
+       POST /timesheets/scan-photo  → returns extracted entries
+       POST /timesheets/scan-commit → creates the timesheets
+--}}
+<div id="scanModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay"
+     x-data="snapTimesheet()" x-init="init()"
+     onclick="if(event.target===this)closeModal('scanModal')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl mx-4 max-h-[92vh] overflow-hidden flex flex-col">
+        {{-- Header --}}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white">
+            <div class="flex items-center gap-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+                <div>
+                    <h3 class="text-lg font-bold">Snap-a-Timesheet</h3>
+                    <p class="text-xs text-purple-100" x-text="stage === 'review' ? summary : 'Photo of a paper timesheet → AI fills in every row'"></p>
+                </div>
+            </div>
+            <button type="button" onclick="closeModal('scanModal')" class="text-purple-100 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        {{-- ───── STAGE 1: upload ───── --}}
+        <div x-show="stage === 'upload'" class="p-6">
+            <label class="block">
+                <input type="file" accept="image/*" capture="environment" class="hidden" @change="onFileSelected($event)">
+                <div class="border-2 border-dashed border-purple-300 rounded-xl p-12 text-center hover:bg-purple-50 transition cursor-pointer"
+                     @dragover.prevent @drop.prevent="onFileDropped($event)">
+                    <svg class="w-16 h-16 mx-auto text-purple-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                    <p class="mt-4 text-base font-semibold text-gray-900">Drop a photo here, or click to choose</p>
+                    <p class="mt-1 text-xs text-gray-500">Supports JPG, PNG, HEIC up to 10 MB. Snap with your phone, paste from email — anything works.</p>
+                </div>
+            </label>
+
+            <div class="mt-6 grid grid-cols-3 gap-4 text-xs">
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <div class="font-bold text-gray-900 mb-1">📸 What works</div>
+                    <ul class="text-gray-600 space-y-0.5">
+                        <li>• Daily roster sheets</li>
+                        <li>• Foreman's notebook page</li>
+                        <li>• Sign-in / sign-out logs</li>
+                    </ul>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <div class="font-bold text-gray-900 mb-1">🤖 What AI extracts</div>
+                    <ul class="text-gray-600 space-y-0.5">
+                        <li>• Each employee + hours</li>
+                        <li>• Date, project, cost code</li>
+                        <li>• ST / OT / PR splits</li>
+                    </ul>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <div class="font-bold text-gray-900 mb-1">✅ You stay in control</div>
+                    <ul class="text-gray-600 space-y-0.5">
+                        <li>• Review every row</li>
+                        <li>• Fix anything wrong</li>
+                        <li>• One-click to save all</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        {{-- ───── STAGE 2: extracting ───── --}}
+        <div x-show="stage === 'extracting'" class="p-12 text-center">
+            <div class="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 animate-pulse">
+                <svg class="w-10 h-10 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </div>
+            <p class="mt-6 text-lg font-bold text-gray-900" x-text="extractStatus"></p>
+            <p class="mt-2 text-sm text-gray-500">This usually takes 3–8 seconds depending on the image.</p>
+        </div>
+
+        {{-- ───── STAGE 3: review ───── --}}
+        <div x-show="stage === 'review'" class="flex-1 overflow-hidden flex flex-col">
+            <div class="grid grid-cols-12 gap-4 p-6 overflow-y-auto" style="max-height: calc(92vh - 180px);">
+                {{-- LEFT: original photo --}}
+                <div class="col-span-4">
+                    <div class="sticky top-0">
+                        <p class="text-xs font-semibold text-gray-700 uppercase mb-2">Original photo</p>
+                        <div class="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                            <img :src="photoPreview" alt="Uploaded timesheet" class="w-full h-auto">
+                        </div>
+                        <div class="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                            <p class="text-xs font-semibold text-purple-900 mb-1">AI Summary</p>
+                            <p class="text-xs text-purple-800" x-text="summary || 'No summary'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- RIGHT: extracted entries --}}
+                <div class="col-span-8">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-semibold text-gray-700 uppercase">
+                            Extracted entries — <span x-text="entries.length"></span> row(s)
+                        </p>
+                        <div class="flex items-center gap-2 text-[11px]">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 rounded-full">●&nbsp;Matched</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">●&nbsp;Guessed</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-800 rounded-full">●&nbsp;Pick one</span>
+                        </div>
+                    </div>
+
+                    {{-- Common fields strip — what AI extracted at the form level --}}
+                    <div class="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg mb-3 text-xs">
+                        <div>
+                            <label class="block font-semibold text-gray-600 uppercase tracking-wide mb-1">Date (applies to all)</label>
+                            <input type="date" x-model="commonDate" @change="syncCommonDate()" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-600 uppercase tracking-wide mb-1">Project (applies to all)</label>
+                            <select x-model="commonProjectId" @change="syncCommonProject()" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">
+                                <option value="">— pick a project —</option>
+                                @foreach($projects as $p)
+                                    <option value="{{ $p->id }}">{{ $p->project_number }} — {{ $p->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                        <table class="w-full text-xs">
+                            <thead class="bg-gray-100 border-b border-gray-200">
+                                <tr class="text-[10px] uppercase text-gray-600">
+                                    <th class="px-2 py-2 text-center w-8"><input type="checkbox" :checked="allSelected" @change="toggleAll($event)"></th>
+                                    <th class="px-2 py-2 text-left">Employee</th>
+                                    <th class="px-2 py-2 text-right">ST</th>
+                                    <th class="px-2 py-2 text-right">OT</th>
+                                    <th class="px-2 py-2 text-right">PR</th>
+                                    <th class="px-2 py-2 text-center">Cat.</th>
+                                    <th class="px-2 py-2 text-left">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <template x-for="(row, idx) in entries" :key="idx">
+                                    <tr :class="row.selected ? '' : 'opacity-40'">
+                                        <td class="px-2 py-2 text-center"><input type="checkbox" x-model="row.selected"></td>
+                                        <td class="px-2 py-1.5">
+                                            <select x-model="row.employee_id" :class="employeeRowClass(row)" class="w-full border rounded px-1.5 py-1 text-xs">
+                                                <option value="">— pick employee —</option>
+                                                @foreach($employees as $emp)
+                                                    <option value="{{ $emp->id }}">{{ $emp->employee_number }} — {{ $emp->last_name }}, {{ $emp->first_name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <p class="text-[10px] text-gray-500 mt-0.5">
+                                                <span class="italic">As written:</span> <span x-text="row.employee_name || '—'"></span>
+                                                <span x-show="row.confidence !== undefined" class="ml-2">·&nbsp;<span x-text="(Math.round((row.confidence||0)*100)) + '%'"></span> conf.</span>
+                                            </p>
+                                        </td>
+                                        <td class="px-2 py-1.5"><input type="number" step="0.25" min="0" x-model.number="row.regular_hours" class="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs text-right"></td>
+                                        <td class="px-2 py-1.5"><input type="number" step="0.25" min="0" x-model.number="row.overtime_hours" class="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs text-right"></td>
+                                        <td class="px-2 py-1.5"><input type="number" step="0.25" min="0" x-model.number="row.double_time_hours" class="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs text-right"></td>
+                                        <td class="px-2 py-1.5">
+                                            <select x-model="row.earnings_category" class="w-full border border-gray-300 rounded px-1.5 py-1 text-xs">
+                                                <option value="HE">HE</option>
+                                                <option value="HO">HO</option>
+                                                <option value="VA">VA</option>
+                                            </select>
+                                        </td>
+                                        <td class="px-2 py-1.5"><input type="text" x-model="row.notes" placeholder="—" class="w-full border border-gray-300 rounded px-1.5 py-1 text-xs"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="entries.length === 0">
+                                    <td colspan="7" class="px-4 py-6 text-center text-gray-500 text-xs">
+                                        AI didn't find any rows in this image. Try a clearer photo.
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot class="bg-gray-50 border-t border-gray-200">
+                                <tr class="font-bold text-xs">
+                                    <td class="px-2 py-2 text-right" colspan="2">Totals (selected only)</td>
+                                    <td class="px-2 py-2 text-right" x-text="totals.st.toFixed(2)"></td>
+                                    <td class="px-2 py-2 text-right" x-text="totals.ot.toFixed(2)"></td>
+                                    <td class="px-2 py-2 text-right" x-text="totals.pr.toFixed(2)"></td>
+                                    <td class="px-2 py-2 text-right" colspan="2">
+                                        <span x-text="(totals.st + totals.ot + totals.pr).toFixed(2)"></span> hrs
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-100 px-6 py-4 bg-gray-50 flex items-center justify-between">
+                <div class="text-xs text-gray-600">
+                    <span x-text="selectedCount"></span> of <span x-text="entries.length"></span> rows selected ·
+                    Unmatched employees must be picked before saving.
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" @click="reset()" class="px-4 py-2 text-sm bg-white border border-gray-300 hover:bg-gray-50 rounded-lg">Start over</button>
+                    <button type="button" @click="commit()" :disabled="!canCommit" class="px-5 py-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span x-show="!committing">✓ Create <span x-text="selectedCount"></span> Timesheet(s)</span>
+                        <span x-show="committing">Creating…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Status banner (errors / success) --}}
+        <div x-show="banner.text" x-transition class="px-6 py-3" :class="banner.kind === 'error' ? 'bg-red-50 text-red-800 border-t border-red-200' : 'bg-green-50 text-green-800 border-t border-green-200'">
+            <p class="text-sm font-semibold" x-text="banner.text"></p>
+        </div>
+    </div>
 </div>
 
 <!-- Create Modal — mirrors the Edit modal's UX so the add + edit flows feel
@@ -480,6 +704,236 @@ function submitBatchPrint(mode){
     var url = '{{ route("timesheets.print-batch") }}?' + params.toString();
     window.open(url, '_blank');
     closeModal('batchPrintModal');
+}
+
+// ─── Snap-a-Timesheet (Brenda 04.29.2026) ────────────────────────────
+// All UI state for the AI scanner lives in the Alpine component below
+// (snapTimesheet()). This wrapper just shows the modal — Alpine takes
+// over from there so we can keep reactive state for stage transitions,
+// the editable entries grid, and the upload/extract/commit pipeline.
+function openScanModal(){
+    openModal('scanModal');
+    // Reset Alpine state on each open so a stale review doesn't reappear
+    const modal = document.getElementById('scanModal');
+    if (modal && modal._x_dataStack) {
+        Alpine.$data(modal).reset();
+    }
+}
+
+function snapTimesheet(){
+    return {
+        // Pipeline stages: upload → extracting → review
+        stage: 'upload',
+        // Photo + AI response
+        photoFile: null,
+        photoPreview: null,
+        scanLogId: null,
+        summary: null,
+        commonDate: '',
+        commonProjectId: '',
+        // Editable rows the user reviews + commits
+        entries: [],
+        // UX
+        extractStatus: 'Reading your timesheet…',
+        extractStatuses: [
+            'Reading your timesheet…',
+            'Identifying employees…',
+            'Pulling out hours…',
+            'Matching against your roster…',
+            'Almost done…',
+        ],
+        extractTimer: null,
+        committing: false,
+        banner: { kind: 'success', text: '' },
+
+        init() { /* nothing on first mount; reset() handles it */ },
+
+        reset() {
+            if (this.extractTimer) { clearInterval(this.extractTimer); this.extractTimer = null; }
+            this.stage = 'upload';
+            this.photoFile = null;
+            this.photoPreview = null;
+            this.scanLogId = null;
+            this.summary = null;
+            this.commonDate = '';
+            this.commonProjectId = '';
+            this.entries = [];
+            this.banner = { kind: 'success', text: '' };
+            this.committing = false;
+        },
+
+        onFileSelected(e) {
+            const f = e.target.files && e.target.files[0];
+            if (f) this.uploadPhoto(f);
+        },
+        onFileDropped(e) {
+            const f = e.dataTransfer.files && e.dataTransfer.files[0];
+            if (f) this.uploadPhoto(f);
+        },
+
+        async uploadPhoto(file) {
+            this.photoFile = file;
+            this.photoPreview = URL.createObjectURL(file);
+            this.stage = 'extracting';
+            this.banner = { kind: 'success', text: '' };
+
+            // Rotate witty status lines so the wait feels alive
+            let i = 0;
+            this.extractStatus = this.extractStatuses[0];
+            this.extractTimer = setInterval(() => {
+                i = (i + 1) % this.extractStatuses.length;
+                this.extractStatus = this.extractStatuses[i];
+            }, 1800);
+
+            const fd = new FormData();
+            fd.append('photo', file);
+            try {
+                const r = await fetch('{{ route("timesheets.scan-photo") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: fd,
+                });
+                const data = await r.json();
+                if (this.extractTimer) { clearInterval(this.extractTimer); this.extractTimer = null; }
+
+                if (!r.ok || !data.success) {
+                    this.banner = { kind: 'error', text: data.message || 'AI extraction failed.' };
+                    this.stage = 'upload';
+                    return;
+                }
+
+                // Hydrate the review grid
+                this.scanLogId = data.scan_log_id;
+                this.summary = data.summary;
+                this.commonDate = (data.common && data.common.date) || new Date().toISOString().slice(0, 10);
+                this.entries = (data.entries || []).map(e => ({
+                    selected: true,
+                    employee_id: e.employee_id || '',
+                    employee_name: e.employee_name || '',
+                    confidence: e.confidence,
+                    project_id: e.project_id || '',
+                    date: e.date || this.commonDate,
+                    regular_hours: Number(e.regular_hours || 0),
+                    overtime_hours: Number(e.overtime_hours || 0),
+                    double_time_hours: Number(e.double_time_hours || 0),
+                    earnings_category: e.earnings_category || 'HE',
+                    notes: e.notes || '',
+                    cost_code_id: e.cost_code_id || null,
+                    cost_type_id: e.cost_type_id || null,
+                    shift_id: null,
+                    match_status: e.match_status || 'unmatched',
+                }));
+                // Default the project dropdown to whatever the AI guessed
+                // for the form so all rows pick it up via syncCommonProject.
+                const firstWithProj = this.entries.find(e => e.project_id);
+                if (firstWithProj) this.commonProjectId = String(firstWithProj.project_id);
+                else this.commonProjectId = '';
+                this.syncCommonProject();
+                this.stage = 'review';
+            } catch (err) {
+                if (this.extractTimer) { clearInterval(this.extractTimer); this.extractTimer = null; }
+                this.banner = { kind: 'error', text: 'Network error: ' + (err.message || err) };
+                this.stage = 'upload';
+            }
+        },
+
+        syncCommonDate() {
+            this.entries.forEach(e => { if (!e.date) e.date = this.commonDate; });
+        },
+        syncCommonProject() {
+            if (!this.commonProjectId) return;
+            this.entries.forEach(e => { if (!e.project_id) e.project_id = this.commonProjectId; });
+        },
+
+        toggleAll(e) {
+            const v = e.target.checked;
+            this.entries.forEach(row => row.selected = v);
+        },
+
+        get allSelected() {
+            return this.entries.length > 0 && this.entries.every(e => e.selected);
+        },
+        get selectedCount() {
+            return this.entries.filter(e => e.selected).length;
+        },
+        get totals() {
+            return this.entries.reduce((acc, e) => {
+                if (!e.selected) return acc;
+                acc.st += Number(e.regular_hours) || 0;
+                acc.ot += Number(e.overtime_hours) || 0;
+                acc.pr += Number(e.double_time_hours) || 0;
+                return acc;
+            }, { st: 0, ot: 0, pr: 0 });
+        },
+        get canCommit() {
+            if (this.committing) return false;
+            const selected = this.entries.filter(e => e.selected);
+            if (selected.length === 0) return false;
+            // Every selected row must have employee + project + date
+            return selected.every(e => e.employee_id && (e.project_id || this.commonProjectId) && (e.date || this.commonDate));
+        },
+
+        employeeRowClass(row) {
+            if (!row.employee_id) return 'border-red-400 bg-red-50';
+            if (row.match_status === 'matched') return 'border-green-400 bg-green-50';
+            if (row.match_status === 'guessed') return 'border-amber-400 bg-amber-50';
+            return 'border-gray-300';
+        },
+
+        async commit() {
+            if (!this.canCommit) return;
+            this.committing = true;
+            this.banner = { kind: 'success', text: '' };
+
+            const payload = {
+                scan_log_id: this.scanLogId,
+                entries: this.entries.filter(e => e.selected).map(e => ({
+                    employee_id: parseInt(e.employee_id, 10),
+                    project_id: parseInt(e.project_id || this.commonProjectId, 10),
+                    date: e.date || this.commonDate,
+                    regular_hours: e.regular_hours,
+                    overtime_hours: e.overtime_hours,
+                    double_time_hours: e.double_time_hours,
+                    earnings_category: e.earnings_category,
+                    cost_code_id: e.cost_code_id,
+                    cost_type_id: e.cost_type_id,
+                    shift_id: e.shift_id,
+                    notes: e.notes,
+                })),
+            };
+
+            try {
+                const r = await fetch('{{ route("timesheets.scan-commit") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await r.json();
+                if (!r.ok || !data.success) {
+                    this.banner = { kind: 'error', text: data.message || 'Save failed.' };
+                    this.committing = false;
+                    return;
+                }
+                this.banner = { kind: 'success', text: data.message };
+                // Close after a short victory beat + reload the table
+                setTimeout(() => {
+                    closeModal('scanModal');
+                    this.reset();
+                    if (typeof table !== 'undefined' && table.ajax) table.ajax.reload();
+                }, 1200);
+            } catch (err) {
+                this.banner = { kind: 'error', text: 'Network error: ' + (err.message || err) };
+                this.committing = false;
+            }
+        },
+    };
 }
 </script>
 @include('timesheets.partials.timesheet-edit-script')

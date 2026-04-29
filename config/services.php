@@ -35,4 +35,22 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Anthropic (Claude) — used by the Timesheet OCR feature
+    |--------------------------------------------------------------------------
+    | Brenda 2026-04-29 killer feature: foreman snaps a photo of a paper
+    | timesheet and the system extracts every employee + hours + project
+    | + date into structured entries the office can confirm in one click.
+    |
+    | Sonnet is the default — it's accurate enough on handwritten timesheet
+    | layouts and a fraction of Opus pricing per scan.
+    */
+    'anthropic' => [
+        'api_key'  => env('ANTHROPIC_API_KEY'),
+        'model'    => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
+        'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com/v1'),
+        'version'  => env('ANTHROPIC_VERSION', '2023-06-01'),
+    ],
+
 ];
