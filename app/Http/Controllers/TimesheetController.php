@@ -324,7 +324,34 @@ class TimesheetController extends Controller
             ->orderBy('employee_id')
             ->get();
 
-        abort_if($timesheets->isEmpty(), 404, 'No timesheets match the selected filters.');
+        // 2026-04-29 (Brenda): Empty result no longer aborts with a 404
+        // page. The clerk picked filters that just didn't match anything —
+        // show a friendly screen with the filters they used + a "back"
+        // link so they can adjust and try again. Only abort 404 when
+        // someone hits the URL directly without any filters at all.
+        if ($timesheets->isEmpty()) {
+            // For PDF mode, fall back to redirecting with a flash so the
+            // browser shows the message instead of an empty PDF.
+            if ($request->query('mode') === 'pdf') {
+                return redirect()->route('timesheets.index')
+                    ->with('error', 'No timesheets match the selected filters. Try widening the date range or removing a filter.');
+            }
+            return response()->view('timesheets.print-empty', [
+                'companyName'  => \App\Models\Setting::get('company_name', 'BuildTrack'),
+                'companyLogo'  => \App\Models\Setting::get('company_logo'),
+                'primaryColor' => \App\Models\Setting::get('primary_color', '#2563eb'),
+                'filters'      => $request->only(['employee_id','project_id','crew_id','status','date_from','date_to','layout']),
+                'projectName'  => $request->filled('project_id')
+                    ? optional(\App\Models\Project::find($request->project_id))->name
+                    : null,
+                'crewName'     => $request->filled('crew_id')
+                    ? optional(\App\Models\Crew::find($request->crew_id))->name
+                    : null,
+                'employeeName' => $request->filled('employee_id')
+                    ? optional(\App\Models\Employee::find($request->employee_id))->fullName ?? null
+                    : null,
+            ], 200);
+        }
 
         $layout = $request->query('layout', 'daily');
 
