@@ -465,6 +465,9 @@ class TimesheetController extends Controller
                         'total'       => 0.0,
                         'cost'        => 0.0,
                         'billable'    => 0.0,
+                        // 2026-04-30 (Brenda): per diem rolls up from
+                        // TimesheetCostAllocation.per_diem_amount per row.
+                        'per_diem'    => 0.0,
                     ],
                 ];
             }
@@ -476,6 +479,9 @@ class TimesheetController extends Controller
             $buckets[$key]['totals']['total']       += (float) $ts->total_hours;
             $buckets[$key]['totals']['cost']        += (float) $ts->total_cost;
             $buckets[$key]['totals']['billable']    += (float) $ts->billable_amount;
+            // Sum every cost allocation's per_diem_amount on this timesheet.
+            // costAllocations is eager-loaded by printBatch().
+            $buckets[$key]['totals']['per_diem']    += (float) $ts->costAllocations->sum('per_diem_amount');
         }
 
         // Sort: employee name, then week_start

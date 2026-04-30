@@ -33,12 +33,30 @@
         <form id="createForm" class="p-6 space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
-                <select name="project_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
+                <select name="project_id" id="create_project_id" onchange="filterPosByProject(this.value, 'create_purchase_order_id')" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
                     <option value="">Select project</option>
                     @foreach($projects as $p)
-                        <option value="{{ $p->id }}">{{ $p->project_number }} — {{ $p->name }}</option>
+                        <option value="{{ $p->id }}">{{ $p->project_number ?? $p->name }}</option>
                     @endforeach
                 </select>
+            </div>
+            {{-- 2026-04-30 (Brenda): vendor-invoice → PO cross-reference. Two ways to link:
+                 (a) pick an internal PO from the dropdown (auto-filtered to chosen project)
+                 (b) type a free-text PO number from the vendor's invoice (external PO #) --}}
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PO # (internal)</label>
+                    <select name="purchase_order_id" id="create_purchase_order_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None —</option>
+                        @foreach($purchaseOrders ?? [] as $po)
+                            <option value="{{ $po->id }}" data-project="{{ $po->project_id }}">{{ $po->po_number }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PO Reference <span class="text-gray-400 font-normal">(vendor's #)</span></label>
+                    <input type="text" name="po_reference" maxlength="100" placeholder="optional" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number *</label><input type="text" name="invoice_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date *</label><input type="date" name="invoice_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
@@ -63,12 +81,27 @@
             <input type="hidden" name="_id" id="edit_id">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
-                <select name="project_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
+                <select name="project_id" id="edit_project_id" onchange="filterPosByProject(this.value, 'edit_purchase_order_id')" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
                     <option value="">Select project</option>
                     @foreach($projects as $p)
-                        <option value="{{ $p->id }}">{{ $p->project_number }} — {{ $p->name }}</option>
+                        <option value="{{ $p->id }}">{{ $p->project_number ?? $p->name }}</option>
                     @endforeach
                 </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PO # (internal)</label>
+                    <select name="purchase_order_id" id="edit_purchase_order_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                        <option value="">— None —</option>
+                        @foreach($purchaseOrders ?? [] as $po)
+                            <option value="{{ $po->id }}" data-project="{{ $po->project_id }}">{{ $po->po_number }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PO Reference <span class="text-gray-400 font-normal">(vendor's #)</span></label>
+                    <input type="text" name="po_reference" maxlength="100" placeholder="optional" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number *</label><input type="text" name="invoice_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date *</label><input type="date" name="invoice_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
@@ -101,13 +134,39 @@ var table = $('#dataTable').DataTable({
     ]
 });
 
-function openCreateModal(){ document.getElementById('createForm').reset(); openModal('createModal'); }
+function openCreateModal(){
+    document.getElementById('createForm').reset();
+    // Reset PO dropdown to "all visible" since no project is selected yet
+    filterPosByProject('', 'create_purchase_order_id');
+    openModal('createModal');
+}
+
+// 2026-04-30 (Brenda): client-side filter so the PO dropdown only shows POs
+// that belong to the currently-selected project. We rendered every PO with
+// a data-project attribute on its <option>; here we just hide/show.
+function filterPosByProject(projectId, dropdownId){
+    const sel = document.getElementById(dropdownId);
+    if (!sel) return;
+    const currentValue = sel.value;
+    Array.from(sel.options).forEach(opt => {
+        if (!opt.value) { opt.hidden = false; return; } // keep "— None —"
+        const ownerProject = opt.dataset.project;
+        opt.hidden = projectId && ownerProject && String(ownerProject) !== String(projectId);
+    });
+    // If the previously-selected PO no longer belongs to the new project, clear it
+    const cur = sel.querySelector('option[value="' + currentValue + '"]');
+    if (cur && cur.hidden) sel.value = '';
+}
 
 function editBilling(id){
     $.get(window.BASE_URL+'/billing/'+id+'/edit', function(d){
         let f=document.getElementById('editForm');
         f.querySelector('#edit_id').value=d.id;
         f.querySelector('[name="project_id"]').value=d.project_id;
+        // Filter the PO dropdown to the loaded project before setting the saved value
+        filterPosByProject(d.project_id, 'edit_purchase_order_id');
+        f.querySelector('[name="purchase_order_id"]').value=d.purchase_order_id||'';
+        f.querySelector('[name="po_reference"]').value=d.po_reference||'';
         f.querySelector('[name="invoice_number"]').value=d.invoice_number||'';
         f.querySelector('[name="invoice_date"]').value=d.invoice_date||'';
         f.querySelector('[name="due_date"]').value=d.due_date||'';

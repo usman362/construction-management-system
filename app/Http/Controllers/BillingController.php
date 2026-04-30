@@ -21,7 +21,14 @@ class BillingController extends Controller
         }
 
         return view('billing.index', [
-            'projects' => Project::query()->orderBy('name')->get(['id', 'name', 'project_number']),
+            'projects' => Project::query()->orderBy('project_number')->get(['id', 'name', 'project_number']),
+            // 2026-04-30 (Brenda): the create/edit modals let the office link
+            // a vendor invoice to an internal PO. We pass *all* active POs and
+            // filter them client-side based on the chosen project (data-project
+            // attribute on each <option>).
+            'purchaseOrders' => \App\Models\PurchaseOrder::query()
+                ->orderBy('po_number')
+                ->get(['id', 'po_number', 'project_id']),
         ]);
     }
 
@@ -97,6 +104,11 @@ class BillingController extends Controller
     {
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
+            // 2026-04-30 (Brenda): vendor-invoice → PO cross reference.
+            // Either link to an internal PO, or type a free-text vendor PO
+            // number, or both. Both nullable.
+            'purchase_order_id' => 'nullable|exists:purchase_orders,id',
+            'po_reference'      => 'nullable|string|max:100',
             'invoice_number' => 'required|string|max:100',
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
@@ -105,6 +117,8 @@ class BillingController extends Controller
 
         BillingInvoice::create([
             'project_id' => $validated['project_id'],
+            'purchase_order_id' => $validated['purchase_order_id'] ?? null,
+            'po_reference'      => $validated['po_reference'] ?? null,
             'invoice_number' => $validated['invoice_number'],
             'invoice_date' => $validated['invoice_date'],
             'due_date' => $validated['due_date'] ?? null,
@@ -130,6 +144,8 @@ class BillingController extends Controller
         return response()->json([
             'id' => $billingInvoice->id,
             'project_id' => $billingInvoice->project_id,
+            'purchase_order_id' => $billingInvoice->purchase_order_id,
+            'po_reference' => $billingInvoice->po_reference,
             'invoice_number' => $billingInvoice->invoice_number,
             'invoice_date' => $billingInvoice->invoice_date?->format('Y-m-d')
                 ?? $billingInvoice->billing_period_start?->format('Y-m-d'),
@@ -142,6 +158,8 @@ class BillingController extends Controller
     {
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
+            'purchase_order_id' => 'nullable|exists:purchase_orders,id',
+            'po_reference'      => 'nullable|string|max:100',
             'invoice_number' => 'required|string|max:100',
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
@@ -150,6 +168,8 @@ class BillingController extends Controller
 
         $billingInvoice->update([
             'project_id' => $validated['project_id'],
+            'purchase_order_id' => $validated['purchase_order_id'] ?? null,
+            'po_reference'      => $validated['po_reference'] ?? null,
             'invoice_number' => $validated['invoice_number'],
             'invoice_date' => $validated['invoice_date'],
             'due_date' => $validated['due_date'] ?? null,

@@ -13,11 +13,14 @@
             <div class="grid grid-cols-2 gap-6">
                 <div>
                     <label for="project_id" class="block text-sm font-semibold text-gray-700 mb-2">Project *</label>
+                    {{-- 2026-04-30 (Brenda): show project NUMBER first so the
+                         payroll clerk can scan/type by job number (the way she
+                         already keys POs and timesheets). --}}
                     <select name="project_id" id="project_id" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 @error('project_id') border-red-500 @enderror">
                         <option value="">Select a project</option>
                         @foreach($projects as $proj)
                             <option value="{{ $proj->id }}" {{ old('project_id') == $proj->id ? 'selected' : '' }}>
-                                {{ $proj->name }} ({{ $proj->project_number }})
+                                {{ $proj->project_number ?? '—' }} — {{ $proj->name }}
                             </option>
                         @endforeach
                     </select>

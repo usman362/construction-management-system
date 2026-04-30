@@ -65,7 +65,11 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // 2026-04-30 (Brenda): defaults to America/Chicago (Central Time —
+    // Louisiana / BAK Construction's office). Override per-deployment via
+    // APP_TIMEZONE in .env so the dev / staging / prod servers can each
+    // run on the right clock without code changes.
+    'timezone' => env('APP_TIMEZONE', 'America/Chicago'),
 
     /*
     |--------------------------------------------------------------------------

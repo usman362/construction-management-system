@@ -276,7 +276,7 @@
         $days       = $bucket['days'];
         $totals     = $bucket['totals'];
 
-        // Project-level breakdown for the week (sum hours by project)
+        // Project-level breakdown for the week (sum hours + per diem by project)
         $projTotals = [];
         for ($i = 0; $i < 7; $i++) {
             foreach ($days[$i] as $ts) {
@@ -290,6 +290,9 @@
                         'total'        => 0,
                         'cost'         => 0,
                         'billable'     => 0,
+                        // 2026-04-30 (Brenda): per diem column requested for the
+                        // weekly billing print. Pulled from cost-allocation rows.
+                        'per_diem'     => 0,
                     ];
                 }
                 $projTotals[$pid]['regular']     += (float) $ts->regular_hours;
@@ -298,6 +301,7 @@
                 $projTotals[$pid]['total']       += (float) $ts->total_hours;
                 $projTotals[$pid]['cost']        += (float) $ts->total_cost;
                 $projTotals[$pid]['billable']    += (float) $ts->billable_amount;
+                $projTotals[$pid]['per_diem']    += (float) $ts->costAllocations->sum('per_diem_amount');
             }
         }
     @endphp
@@ -449,6 +453,7 @@
                         <th class="num">OT</th>
                         <th class="num">PR</th>
                         <th class="num">Total Hours</th>
+                        <th class="num">Per Diem</th>
                         <th class="num">Billable</th>
                     </tr>
                 </thead>
@@ -461,6 +466,7 @@
                             <td class="num">{{ number_format($row['overtime'], 2) }}</td>
                             <td class="num">{{ number_format($row['double_time'], 2) }}</td>
                             <td class="num">{{ number_format($row['total'], 2) }}</td>
+                            <td class="num">{{ $row['per_diem'] > 0 ? '$' . number_format($row['per_diem'], 2) : '—' }}</td>
                             <td class="num">${{ number_format($row['billable'], 2) }}</td>
                         </tr>
                     @endforeach
@@ -472,6 +478,7 @@
                         <td class="num">{{ number_format($totals['overtime'], 2) }}</td>
                         <td class="num">{{ number_format($totals['double_time'], 2) }}</td>
                         <td class="num">{{ number_format($totals['total'], 2) }}</td>
+                        <td class="num">{{ $totals['per_diem'] > 0 ? '$' . number_format($totals['per_diem'], 2) : '—' }}</td>
                         <td class="num">${{ number_format($totals['billable'], 2) }}</td>
                     </tr>
                 </tfoot>

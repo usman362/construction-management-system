@@ -14,6 +14,11 @@ class BillingInvoice extends Model
 
     protected $fillable = [
         'project_id',
+        // 2026-04-30 (Brenda): vendor invoices link back to an internal PO
+        // (purchase_order_id) and/or carry a free-text vendor PO number
+        // (po_reference) for cross-reference at payment time.
+        'purchase_order_id',
+        'po_reference',
         'invoice_number',
         'invoice_date',
         'due_date',
@@ -64,6 +69,11 @@ class BillingInvoice extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
     }
 
     /**
