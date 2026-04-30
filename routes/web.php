@@ -111,6 +111,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
     // ─── Employee Certifications ─────────────────────────────────
+    // 2026-05-01 (Brenda): "We will need a certification training matrix"
+    // — single-page pivot view across every employee × every cert type.
+    Route::get('certifications/matrix', [EmployeeCertificationController::class, 'matrix'])->name('certifications.matrix');
     Route::post('employees/{employee}/certifications', [EmployeeCertificationController::class, 'store'])->name('employees.certifications.store');
     Route::put('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'update'])->name('employees.certifications.update');
     Route::delete('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'destroy'])->name('employees.certifications.destroy');

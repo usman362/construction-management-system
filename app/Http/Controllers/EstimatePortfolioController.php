@@ -56,11 +56,15 @@ class EstimatePortfolioController extends Controller
         // Roll-ups for the summary tiles at the top of the page — calculated
         // independently of pagination so the totals reflect the full filter,
         // not just the current page.
+        // 2026-05-01 (Brenda): older estimates carry status='approved'
+        // which wasn't in any summary bucket — all four cards rolled up
+        // as $0 even when total_price was populated. Treating 'approved'
+        // as Won (it's a synonym for 'accepted' from the legacy schema).
         $summaryQuery = (clone $query);
         $summary = [
             'total_count'  => (clone $summaryQuery)->count(),
             'pipeline'     => (float) (clone $summaryQuery)->whereIn('status', ['draft', 'submitted', 'sent_to_client'])->sum('total_price'),
-            'won'          => (float) (clone $summaryQuery)->whereIn('status', ['accepted', 'converted_to_project'])->sum('total_price'),
+            'won'          => (float) (clone $summaryQuery)->whereIn('status', ['accepted', 'approved', 'converted_to_project'])->sum('total_price'),
             'lost'         => (float) (clone $summaryQuery)->where('status', 'rejected')->sum('total_price'),
         ];
 
@@ -75,6 +79,7 @@ class EstimatePortfolioController extends Controller
                 'submitted'             => 'Submitted',
                 'sent_to_client'        => 'Sent',
                 'accepted'              => 'Accepted',
+                'approved'              => 'Approved', // legacy synonym of "Accepted"
                 'rejected'              => 'Rejected',
                 'converted_to_project'  => 'Converted',
             ],

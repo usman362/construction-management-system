@@ -915,8 +915,16 @@ class ReportController extends Controller
         $commitments = $project->commitments()->get()->groupBy('cost_code_id');
         $invoices = $project->invoices()->get()->groupBy('cost_code_id');
 
-        $keys = $manhourBudgets->map(fn ($b) => $normalizeCcKey($b->cost_code_id))
-            ->merge($timesheets->map(fn ($t) => $normalizeCcKey($t->cost_code_id)))
+        // 2026-05-01 BUG FIX (Brenda): "the cost reports and the forecast
+        // reports are not working". Eloquent's Collection::merge() assumes
+        // items are models and calls ->getKey() on each — when both sides
+        // are scalar string keys (cost code IDs normalized to strings), it
+        // blows up with "Call to a member function getKey() on string".
+        // Coerce to base Collections via collect(...->all()) so the plain
+        // Illuminate\Support\Collection::merge() runs and concatenates the
+        // string lists correctly.
+        $keys = collect($manhourBudgets->map(fn ($b) => $normalizeCcKey($b->cost_code_id))->all())
+            ->merge($timesheets->map(fn ($t) => $normalizeCcKey($t->cost_code_id))->all())
             ->unique()
             ->sort()
             ->values();
@@ -1002,8 +1010,16 @@ class ReportController extends Controller
 
         $manhourBudgets = $project->manhourBudgets()->with('costCode')->get();
 
-        $keys = $manhourBudgets->map(fn ($b) => $normalizeCcKey($b->cost_code_id))
-            ->merge($timesheets->map(fn ($t) => $normalizeCcKey($t->cost_code_id)))
+        // 2026-05-01 BUG FIX (Brenda): "the cost reports and the forecast
+        // reports are not working". Eloquent's Collection::merge() assumes
+        // items are models and calls ->getKey() on each — when both sides
+        // are scalar string keys (cost code IDs normalized to strings), it
+        // blows up with "Call to a member function getKey() on string".
+        // Coerce to base Collections via collect(...->all()) so the plain
+        // Illuminate\Support\Collection::merge() runs and concatenates the
+        // string lists correctly.
+        $keys = collect($manhourBudgets->map(fn ($b) => $normalizeCcKey($b->cost_code_id))->all())
+            ->merge($timesheets->map(fn ($t) => $normalizeCcKey($t->cost_code_id))->all())
             ->unique()
             ->sort()
             ->values();

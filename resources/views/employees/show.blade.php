@@ -160,6 +160,22 @@
                                 <td class="px-3 py-2 text-center"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusBadge }}">{{ ucwords(str_replace('_', ' ', $cert->status)) }}</span></td>
                                 <td class="px-3 py-2 text-center">
                                     <div class="flex items-center justify-center gap-1">
+                                        {{-- 2026-05-01 (Brenda): Edit button — clerks needed to fix
+                                             a typo'd expiry year (2026 instead of 2028). Pulls all
+                                             current values into the edit modal via data-* attrs. --}}
+                                        <button type="button"
+                                                onclick='editCert(@json([
+                                                    "id" => $cert->id,
+                                                    "name" => $cert->name,
+                                                    "certification_number" => $cert->certification_number,
+                                                    "issuing_authority" => $cert->issuing_authority,
+                                                    "issue_date" => optional($cert->issue_date)->format("Y-m-d"),
+                                                    "expiry_date" => optional($cert->expiry_date)->format("Y-m-d"),
+                                                    "notes" => $cert->notes,
+                                                ]))'
+                                                class="w-7 h-7 inline-flex items-center justify-center rounded-md text-amber-600 hover:bg-amber-50" title="Edit">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
+                                        </button>
                                         @if($cert->file_path)
                                             <a href="{{ route('certifications.download', $cert) }}" class="w-7 h-7 inline-flex items-center justify-center rounded-md text-blue-600 hover:bg-blue-50" title="Download">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
@@ -205,6 +221,35 @@
         </div>
     </div>
 
+    {{-- 2026-05-01 (Brenda): Edit Certification modal — same fields as Add,
+         minus the file upload (file edits stay on the original create flow
+         since they go through a different validation path). --}}
+    <div id="editCertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editCertModal')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900">Edit Certification</h3>
+                <button type="button" onclick="closeModal('editCertModal')" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <form id="editCertForm" class="p-6 space-y-4">
+                <input type="hidden" name="_id" id="edit_cert_id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Certification Name *</label><input type="text" name="name" id="edit_cert_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Cert Number</label><input type="text" name="certification_number" id="edit_cert_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Issuing Authority</label><input type="text" name="issuing_authority" id="edit_cert_authority" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label><input type="date" name="issue_date" id="edit_cert_issue_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label><input type="date" name="expiry_date" id="edit_cert_expiry_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea name="notes" id="edit_cert_notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea></div>
+            </form>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+                <button type="button" onclick="closeModal('editCertModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="button" onclick="submitEditCert()" class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700">Update Certification</button>
+            </div>
+        </div>
+    </div>
+
     @push('scripts')
     <script>
     function submitCert() {
@@ -223,6 +268,47 @@
             },
             error: function(xhr) {
                 var msg = xhr.responseJSON?.message || 'Save failed.';
+                if (xhr.responseJSON?.errors) msg = Object.values(xhr.responseJSON.errors).flat().join('\n');
+                Swal.fire({ icon: 'error', title: 'Error', text: msg });
+            }
+        });
+    }
+
+    // 2026-05-01 (Brenda): Edit certification — fill the modal with current
+    // values, then PUT the form data to the existing update endpoint.
+    function editCert(cert) {
+        document.getElementById('edit_cert_id').value         = cert.id || '';
+        document.getElementById('edit_cert_name').value       = cert.name || '';
+        document.getElementById('edit_cert_number').value     = cert.certification_number || '';
+        document.getElementById('edit_cert_authority').value  = cert.issuing_authority || '';
+        document.getElementById('edit_cert_issue_date').value = cert.issue_date || '';
+        document.getElementById('edit_cert_expiry_date').value= cert.expiry_date || '';
+        document.getElementById('edit_cert_notes').value      = cert.notes || '';
+        openModal('editCertModal');
+    }
+    function submitEditCert() {
+        var id = document.getElementById('edit_cert_id').value;
+        var payload = {
+            name:                 document.getElementById('edit_cert_name').value,
+            certification_number: document.getElementById('edit_cert_number').value || null,
+            issuing_authority:    document.getElementById('edit_cert_authority').value || null,
+            issue_date:           document.getElementById('edit_cert_issue_date').value || null,
+            expiry_date:          document.getElementById('edit_cert_expiry_date').value || null,
+            notes:                document.getElementById('edit_cert_notes').value || null,
+        };
+        $.ajax({
+            url: '{{ url("employees/" . $employee->id . "/certifications") }}/' + id,
+            type: 'PUT',
+            data: JSON.stringify(payload),
+            contentType: 'application/json',
+            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'), 'Accept': 'application/json' },
+            success: function(res) {
+                closeModal('editCertModal');
+                Swal.fire({ icon: 'success', title: 'Updated', text: res.message || 'Certification updated.', timer: 1800, showConfirmButton: false });
+                setTimeout(function() { location.reload(); }, 1300);
+            },
+            error: function(xhr) {
+                var msg = xhr.responseJSON?.message || 'Update failed.';
                 if (xhr.responseJSON?.errors) msg = Object.values(xhr.responseJSON.errors).flat().join('\n');
                 Swal.fire({ icon: 'error', title: 'Error', text: msg });
             }
