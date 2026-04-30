@@ -305,9 +305,29 @@
     <div class="page sheet">
         <div class="hdr">
             <div class="hdr-left">
+                {{-- 2026-04-30 (Brenda): logo was rendering as a broken
+                     image because the stored path was relative ("/uploads/…")
+                     and DomPDF + some print contexts can't resolve it.
+                     Convert to an absolute URL via asset() and only emit the
+                     <img> tag if the path looks valid. Fall back to clean
+                     typographic initials so the print never shows a broken
+                     box. --}}
                 <div class="hdr-logo">
-                    @if ($companyLogo)
-                        <img src="{{ $companyLogo }}" alt="Logo">
+                    @php
+                        $logoSrc = null;
+                        if (! empty($companyLogo)) {
+                            if (preg_match('#^(https?:|data:)#i', $companyLogo)) {
+                                $logoSrc = $companyLogo;
+                            } elseif (($printMode ?? 'html') === 'pdf') {
+                                $abs = public_path(ltrim($companyLogo, '/'));
+                                if (file_exists($abs)) $logoSrc = $abs;
+                            } else {
+                                $logoSrc = asset(ltrim($companyLogo, '/'));
+                            }
+                        }
+                    @endphp
+                    @if ($logoSrc)
+                        <img src="{{ $logoSrc }}" alt="{{ $companyName }}">
                     @else
                         {{ strtoupper(substr($companyName, 0, 2)) }}
                     @endif
@@ -415,6 +435,10 @@
         </table>
 
         @if (count($projTotals) > 0)
+            {{-- 2026-04-30 (Brenda): "we can take the Labor cost off also"
+                 — internal labor cost shouldn't show on a sheet that goes
+                 to the employee/client. Only Billable stays so the office
+                 can match the print to invoices. --}}
             <h3 class="section">Project Breakdown</h3>
             <table class="proj-totals">
                 <thead>
@@ -425,7 +449,6 @@
                         <th class="num">OT</th>
                         <th class="num">PR</th>
                         <th class="num">Total Hours</th>
-                        <th class="num">Labor Cost</th>
                         <th class="num">Billable</th>
                     </tr>
                 </thead>
@@ -438,7 +461,6 @@
                             <td class="num">{{ number_format($row['overtime'], 2) }}</td>
                             <td class="num">{{ number_format($row['double_time'], 2) }}</td>
                             <td class="num">{{ number_format($row['total'], 2) }}</td>
-                            <td class="num">${{ number_format($row['cost'], 2) }}</td>
                             <td class="num">${{ number_format($row['billable'], 2) }}</td>
                         </tr>
                     @endforeach
@@ -450,7 +472,6 @@
                         <td class="num">{{ number_format($totals['overtime'], 2) }}</td>
                         <td class="num">{{ number_format($totals['double_time'], 2) }}</td>
                         <td class="num">{{ number_format($totals['total'], 2) }}</td>
-                        <td class="num">${{ number_format($totals['cost'], 2) }}</td>
                         <td class="num">${{ number_format($totals['billable'], 2) }}</td>
                     </tr>
                 </tfoot>

@@ -267,9 +267,31 @@
             {{-- Header: company branding + document title --}}
             <div class="hdr">
                 <div class="hdr-left">
+                    {{-- 2026-04-30 (Brenda): logo was broken when printed
+                         in browser HTML mode because the src was a filesystem
+                         path. Pick the right form for the rendering target:
+                         PDF (DomPDF) wants a local file path; HTML print wants
+                         a URL. Skip the <img> entirely if the file is missing
+                         or the setting is empty so the page never shows a
+                         broken-image box. --}}
                     <div class="hdr-logo">
-                        @if($companyLogo)
-                            <img src="{{ public_path(ltrim($companyLogo, '/')) }}" alt="{{ $companyName }}">
+                        @php
+                            $logoSrc = null;
+                            if (! empty($companyLogo)) {
+                                if (preg_match('#^(https?:|data:)#i', $companyLogo)) {
+                                    $logoSrc = $companyLogo;
+                                } elseif (($printMode ?? 'html') === 'pdf') {
+                                    // DomPDF: needs a real file path, and skip if missing
+                                    $abs = public_path(ltrim($companyLogo, '/'));
+                                    if (file_exists($abs)) $logoSrc = $abs;
+                                } else {
+                                    // Browser HTML print: needs a URL
+                                    $logoSrc = asset(ltrim($companyLogo, '/'));
+                                }
+                            }
+                        @endphp
+                        @if($logoSrc)
+                            <img src="{{ $logoSrc }}" alt="{{ $companyName }}">
                         @else
                             {{ strtoupper(substr($companyName, 0, 2)) }}
                         @endif
