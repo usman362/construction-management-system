@@ -12,9 +12,13 @@ use Illuminate\Support\Facades\Log;
  *
  * Foremen take a photo of their paper timesheet (handwritten daily roster
  * with names + hours + project number on top). Office staff upload the
- * photo here and we hit Claude's vision endpoint to extract every line
+ * photo here and we hit Groq Cloud's vision endpoint to extract every line
  * into structured JSON: employee name (or number), date, project, ST/OT
  * hours, cost code, notes.
+ *
+ * Provider: Groq Cloud (Llama 4 Scout 17B Vision). Truly free — no credit
+ * card, no billing setup. Sign up at https://console.groq.com/keys.
+ * Free tier: 30 requests/min, ~14k requests/day. Famously fast (~1-3 sec).
  *
  * Why service-layer (not controller-side):
  *   - Same logic will be reused from a future mobile/PWA upload route.
@@ -40,18 +44,8 @@ class TimesheetOcrService
      */
     public function extractFromImage(string $imageBase64, string $mediaType): array
     {
-        // Provider switch — flip via OCR_PROVIDER in .env. All three providers
-        // use the same system prompt, parser, and matcher; only the HTTP call
-        // shape and auth differ.
-        $provider = config('services.ocr.provider', 'groq');
         $systemPrompt = $this->buildSystemPrompt();
-
-        [$rawText, $rawBody] = match ($provider) {
-            'anthropic' => $this->callAnthropic($systemPrompt, $imageBase64, $mediaType),
-            'gemini'    => $this->callGemini($systemPrompt, $imageBase64, $mediaType),
-            'groq'      => $this->callGroq($systemPrompt, $imageBase64, $mediaType),
-            default     => throw new \RuntimeException("Unknown OCR provider: {$provider}. Set OCR_PROVIDER to 'groq', 'gemini', or 'anthropic'."),
-        };
+        [$rawText, $rawBody] = $this->callGroq($systemPrompt, $imageBase64, $mediaType);
 
         $parsed = $this->parseJsonEnvelope($rawText);
 
@@ -71,9 +65,9 @@ class TimesheetOcrService
     }
 
     /**
-     * Build the system prompt — shared between providers. Includes catalog
-     * hints (employees + active projects) so the model can prefer real
-     * names/numbers when transcribing fuzzy handwriting.
+     * Build the system prompt — includes catalog hints (employees +
+     * active projects) so the model can prefer real names/numbers when
+     * transcribing fuzzy handwriting.
      */
     protected function buildSystemPrompt(): string
     {
@@ -143,160 +137,11 @@ PROMPT;
     }
 
     /**
-     * Call Anthropic Claude vision endpoint. Paid (~$0.02/scan).
-     * @return array{0:string, 1:array}  [raw text response, full body]
-     */
-    protected function callAnthropic(string $systemPrompt, string $imageBase64, string $mediaType): array
-    {
-        $apiKey = config('services.anthropic.api_key');
-        if (empty($apiKey)) {
-            throw new \RuntimeException(
-                'ANTHROPIC_API_KEY is not set. Add it to .env, or set OCR_PROVIDER=gemini for the free demo.'
-            );
-        }
-
-        $payload = [
-            'model'      => config('services.anthropic.model'),
-            'max_tokens' => 4096,
-            'system'     => $systemPrompt,
-            'messages'   => [[
-                'role' => 'user',
-                'content' => [
-                    [
-                        'type' => 'image',
-                        'source' => [
-                            'type'       => 'base64',
-                            'media_type' => $mediaType,
-                            'data'       => $imageBase64,
-                        ],
-                    ],
-                    [
-                        'type' => 'text',
-                        'text' => 'Extract every timesheet row from this image and return the JSON envelope described in your instructions.',
-                    ],
-                ],
-            ]],
-        ];
-
-        $response = Http::withHeaders([
-            'x-api-key'         => $apiKey,
-            'anthropic-version' => config('services.anthropic.version'),
-            'content-type'      => 'application/json',
-        ])
-            ->timeout(60)
-            ->post(config('services.anthropic.base_url') . '/messages', $payload);
-
-        if (! $response->successful()) {
-            Log::error('Anthropic API error', ['status' => $response->status(), 'body' => $response->body()]);
-            throw new \RuntimeException(
-                'Claude API call failed (HTTP ' . $response->status() . '). ' . substr($response->body(), 0, 200)
-            );
-        }
-
-        $body = $response->json();
-        $rawText = '';
-        foreach (($body['content'] ?? []) as $block) {
-            if (($block['type'] ?? null) === 'text') {
-                $rawText = $block['text'];
-                break;
-            }
-        }
-        return [$rawText, $body];
-    }
-
-    /**
-     * Call Google Gemini 1.5 Flash vision. Free tier: 1500 requests/day,
-     * 15 RPM, 1M tokens/min. Plenty for demos and small offices.
-     *
-     * Get a free key: https://aistudio.google.com/app/apikey
-     *
-     * Gemini's responseMimeType=application/json forces pure JSON output
-     * (no markdown fences, no prose) — eliminates one class of parsing bug.
-     *
-     * @return array{0:string, 1:array}  [raw text response, full body]
-     */
-    protected function callGemini(string $systemPrompt, string $imageBase64, string $mediaType): array
-    {
-        $apiKey = config('services.gemini.api_key');
-        if (empty($apiKey)) {
-            throw new \RuntimeException(
-                'GEMINI_API_KEY is not set. Get a free key at https://aistudio.google.com/app/apikey and add to .env.'
-            );
-        }
-
-        $model = config('services.gemini.model', 'gemini-1.5-flash');
-        $url = config('services.gemini.base_url') . "/models/{$model}:generateContent?key=" . urlencode($apiKey);
-
-        $payload = [
-            'systemInstruction' => [
-                'parts' => [['text' => $systemPrompt]],
-            ],
-            'contents' => [[
-                'role' => 'user',
-                'parts' => [
-                    ['inline_data' => [
-                        'mime_type' => $mediaType,
-                        'data'      => $imageBase64,
-                    ]],
-                    ['text' => 'Extract every timesheet row from this image and return the JSON envelope described in your instructions.'],
-                ],
-            ]],
-            'generationConfig' => [
-                // Forces pure JSON — no markdown fences, no extra prose
-                'responseMimeType' => 'application/json',
-                'temperature'      => 0.1,
-                'maxOutputTokens'  => 4096,
-            ],
-        ];
-
-        $response = Http::withHeaders(['content-type' => 'application/json'])
-            ->timeout(60)
-            ->post($url, $payload);
-
-        if (! $response->successful()) {
-            Log::error('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
-
-            // Common case: Google retires a model name. Surface a friendly
-            // hint pointing the operator at ListModels so they can grab the
-            // current name and update GEMINI_MODEL in .env.
-            $body = $response->body();
-            if ($response->status() === 404 && str_contains($body, 'is not found')) {
-                throw new \RuntimeException(
-                    "Gemini model '{$model}' is no longer available. List the current models with:\n" .
-                    "curl 'https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY' | grep displayName\n" .
-                    "Then update GEMINI_MODEL in .env (and run 'php artisan config:clear')."
-                );
-            }
-
-            throw new \RuntimeException(
-                'Gemini API call failed (HTTP ' . $response->status() . '). ' . substr($body, 0, 300)
-            );
-        }
-
-        $body = $response->json();
-        // candidates[0].content.parts[0].text
-        $rawText = $body['candidates'][0]['content']['parts'][0]['text'] ?? '';
-        if ($rawText === '') {
-            // Sometimes Gemini returns blockedReason or finishReason without text
-            $reason = $body['candidates'][0]['finishReason'] ?? 'UNKNOWN';
-            throw new \RuntimeException("Gemini returned no text (finishReason: {$reason}). Try a clearer image.");
-        }
-        return [$rawText, $body];
-    }
-
-    /**
      * Call Groq Cloud — Llama 4 Scout 17B vision (or whatever GROQ_MODEL is set to).
-     *
-     * TRULY FREE — no credit card, no Google Cloud billing nags. Sign up at
-     * https://console.groq.com/keys and the API key works immediately.
-     *
-     * Free tier: 30 requests/min, ~14k requests/day. More than enough for any
-     * single construction office. Groq is also famously FAST — vision OCR
-     * typically returns in 1-3 seconds vs. 5-8 for cloud competitors.
      *
      * Uses OpenAI-compatible chat-completions shape with image_url, plus the
      * `response_format: json_object` knob to force pure JSON output (no
-     * markdown fences, no prose) — same trick we use for Gemini.
+     * markdown fences, no prose).
      *
      * @return array{0:string, 1:array}  [raw text response, full body]
      */
@@ -317,7 +162,7 @@ PROMPT;
         // can be a regular URL or an inlined data URI — we use the latter so
         // we don't need a public-facing image host.
         $payload = [
-            'model'    => $model,
+            'model'       => $model,
             'temperature' => 0.1,
             'max_tokens'  => 4096,
             // Force JSON-shape output. Llama 4 Scout supports this knob;

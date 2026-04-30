@@ -37,47 +37,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Snap-a-Timesheet OCR — provider switch
+    | Groq Cloud — Snap-a-Timesheet OCR (Brenda 2026-04-29 killer feature)
     |--------------------------------------------------------------------------
-    | Brenda 2026-04-29 killer feature: foreman snaps a photo of a paper
-    | timesheet and the system extracts every employee + hours + project
-    | + date into structured entries the office can confirm in one click.
+    | Foreman snaps a photo of a paper timesheet → AI extracts every row
+    | into structured entries the office confirms in one click.
     |
-    | Three providers are wired — flip via OCR_PROVIDER in .env without
-    | touching code:
-    |   - 'groq'      : Meta Llama 4 Scout 17B vision via Groq Cloud. TRULY
-    |                   FREE — no billing setup, no credit card. Just sign up
-    |                   at console.groq.com. 30 req/min free tier. Default.
-    |   - 'gemini'    : Google Gemini 2.0 Flash. Free tier exists but
-    |                   sometimes Google Cloud nags for billing setup.
-    |   - 'anthropic' : Claude Sonnet 4.5. Paid (~$0.02/scan) but best
-    |                   handwriting recognition. Production upgrade path.
+    | Provider: Groq Cloud (Llama 4 Scout 17B Vision). Truly free — no
+    | credit card, no billing setup. Sign up at https://console.groq.com/keys.
+    | Free tier: 30 req/min, ~14k requests/day. Famously fast (~1-3 sec).
     */
-    'ocr' => [
-        'provider' => env('OCR_PROVIDER', 'groq'),
-    ],
-
-    'anthropic' => [
-        'api_key'  => env('ANTHROPIC_API_KEY'),
-        'model'    => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
-        'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com/v1'),
-        'version'  => env('ANTHROPIC_VERSION', '2023-06-01'),
-    ],
-
-    'gemini' => [
-        'api_key'  => env('GEMINI_API_KEY'),
-        // 2026-04-30: gemini-1.5-flash was retired from the v1beta endpoint.
-        // gemini-2.0-flash is the current free-tier vision model. If Google
-        // rotates again, override via GEMINI_MODEL in .env without touching code.
-        'model'    => env('GEMINI_MODEL', 'gemini-2.0-flash'),
-        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
-    ],
-
     'groq' => [
         'api_key'  => env('GROQ_API_KEY'),
         // Llama 4 Scout 17B is Groq's current vision model. If Meta/Groq
-        // rotates, override via GROQ_MODEL in .env. Other vision-capable
-        // options if needed: llama-3.2-90b-vision-preview (older).
+        // rotates, override via GROQ_MODEL in .env without touching code.
         'model'    => env('GROQ_MODEL', 'meta-llama/llama-4-scout-17b-16e-instruct'),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
     ],
