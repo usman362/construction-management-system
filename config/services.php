@@ -64,7 +64,10 @@ return [
 
     'gemini' => [
         'api_key'  => env('GEMINI_API_KEY'),
-        'model'    => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+        // 2026-04-30: gemini-1.5-flash was retired from the v1beta endpoint.
+        // gemini-2.0-flash is the current free-tier vision model. If Google
+        // rotates again, override via GEMINI_MODEL in .env without touching code.
+        'model'    => env('GEMINI_MODEL', 'gemini-2.0-flash'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
     ],
 

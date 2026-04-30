@@ -254,8 +254,21 @@ PROMPT;
 
         if (! $response->successful()) {
             Log::error('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
+
+            // Common case: Google retires a model name. Surface a friendly
+            // hint pointing the operator at ListModels so they can grab the
+            // current name and update GEMINI_MODEL in .env.
+            $body = $response->body();
+            if ($response->status() === 404 && str_contains($body, 'is not found')) {
+                throw new \RuntimeException(
+                    "Gemini model '{$model}' is no longer available. List the current models with:\n" .
+                    "curl 'https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY' | grep displayName\n" .
+                    "Then update GEMINI_MODEL in .env (and run 'php artisan config:clear')."
+                );
+            }
+
             throw new \RuntimeException(
-                'Gemini API call failed (HTTP ' . $response->status() . '). ' . substr($response->body(), 0, 300)
+                'Gemini API call failed (HTTP ' . $response->status() . '). ' . substr($body, 0, 300)
             );
         }
 
