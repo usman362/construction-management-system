@@ -488,10 +488,15 @@
                     regular_hours: parseFloat(this.entry.regular_hours) || 0,
                     overtime_hours: this.lockOTPR ? 0 : (parseFloat(this.entry.overtime_hours) || 0),
                     double_time_hours: this.lockOTPR ? 0 : (parseFloat(this.entry.double_time_hours) || 0),
-                    // force_overtime: bypass the weekly 40-hr split — clerk is
-                    // typing the ST/OT/PR breakdown by hand and expects it to
-                    // be saved as-is.
-                    force_overtime: true,
+                    // 2026-04-30 (Brenda): force_overtime was hardcoded TRUE
+                    // and was rolling every ST hour into OT (TimesheetController
+                    // line 1175 — `if ($forceOvertime && $reg > 0) { $ot += $reg; $reg = 0; }`).
+                    // Always send FALSE — the clerk's manually-typed ST/OT/PR
+                    // buckets are still preserved verbatim because we send
+                    // explicit regular/overtime/double_time fields and never
+                    // send `hours_worked`, so the splitWeekly() path is never
+                    // triggered. The server takes our buckets as-is.
+                    force_overtime: false,
                     earnings_category: this.entry.earnings_category,
                     notes: this.entry.notes || null,
                     status: 'submitted',

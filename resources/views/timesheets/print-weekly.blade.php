@@ -309,29 +309,16 @@
     <div class="page sheet">
         <div class="hdr">
             <div class="hdr-left">
-                {{-- 2026-04-30 (Brenda): logo was rendering as a broken
-                     image because the stored path was relative ("/uploads/…")
-                     and DomPDF + some print contexts can't resolve it.
-                     Convert to an absolute URL via asset() and only emit the
-                     <img> tag if the path looks valid. Fall back to clean
-                     typographic initials so the print never shows a broken
-                     box. --}}
+                {{-- 2026-04-30 (Brenda, 2nd round): logo was STILL not
+                     rendering on production. Replaced URL resolution with
+                     server-side base64 inlining via App\Support\BrandLogo.
+                     Now $companyLogo arrives as a fully-formed data: URI
+                     (or null), so the blade just emits it directly. No
+                     remote fetch, no symlink dependency, no APP_URL gotchas.
+                     Falls back to typographic initials when no logo set. --}}
                 <div class="hdr-logo">
-                    @php
-                        $logoSrc = null;
-                        if (! empty($companyLogo)) {
-                            if (preg_match('#^(https?:|data:)#i', $companyLogo)) {
-                                $logoSrc = $companyLogo;
-                            } elseif (($printMode ?? 'html') === 'pdf') {
-                                $abs = public_path(ltrim($companyLogo, '/'));
-                                if (file_exists($abs)) $logoSrc = $abs;
-                            } else {
-                                $logoSrc = asset(ltrim($companyLogo, '/'));
-                            }
-                        }
-                    @endphp
-                    @if ($logoSrc)
-                        <img src="{{ $logoSrc }}" alt="{{ $companyName }}">
+                    @if (! empty($companyLogo))
+                        <img src="{{ $companyLogo }}" alt="{{ $companyName }}">
                     @else
                         {{ strtoupper(substr($companyName, 0, 2)) }}
                     @endif
@@ -439,10 +426,11 @@
         </table>
 
         @if (count($projTotals) > 0)
-            {{-- 2026-04-30 (Brenda): "we can take the Labor cost off also"
-                 — internal labor cost shouldn't show on a sheet that goes
-                 to the employee/client. Only Billable stays so the office
-                 can match the print to invoices. --}}
+            {{-- 2026-04-30 (Brenda's manager, evening update):
+                 "remove the billable cost from the weekly printed timesheets"
+                 — the printout now only shows hours + per diem. Internal cost
+                 and revenue stay in the system but never appear on the sheet
+                 the employee or client sees. --}}
             <h3 class="section">Project Breakdown</h3>
             <table class="proj-totals">
                 <thead>
@@ -454,7 +442,6 @@
                         <th class="num">PR</th>
                         <th class="num">Total Hours</th>
                         <th class="num">Per Diem</th>
-                        <th class="num">Billable</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -467,7 +454,6 @@
                             <td class="num">{{ number_format($row['double_time'], 2) }}</td>
                             <td class="num">{{ number_format($row['total'], 2) }}</td>
                             <td class="num">{{ $row['per_diem'] > 0 ? '$' . number_format($row['per_diem'], 2) : '—' }}</td>
-                            <td class="num">${{ number_format($row['billable'], 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -479,7 +465,6 @@
                         <td class="num">{{ number_format($totals['double_time'], 2) }}</td>
                         <td class="num">{{ number_format($totals['total'], 2) }}</td>
                         <td class="num">{{ $totals['per_diem'] > 0 ? '$' . number_format($totals['per_diem'], 2) : '—' }}</td>
-                        <td class="num">${{ number_format($totals['billable'], 2) }}</td>
                     </tr>
                 </tfoot>
             </table>

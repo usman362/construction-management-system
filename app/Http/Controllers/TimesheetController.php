@@ -273,7 +273,7 @@ class TimesheetController extends Controller
             'printMode'    => $request->query('mode', 'html'),
             'generatedAt'  => now(),
             'companyName'  => \App\Models\Setting::get('company_name', 'BuildTrack'),
-            'companyLogo'  => \App\Models\Setting::get('company_logo'),
+            'companyLogo'  => \App\Support\BrandLogo::asDataUri(),
             'primaryColor' => \App\Models\Setting::get('primary_color', '#2563eb'),
         ];
 
@@ -340,7 +340,7 @@ class TimesheetController extends Controller
             }
             return response()->view('timesheets.print-empty', [
                 'companyName'  => \App\Models\Setting::get('company_name', 'BuildTrack'),
-                'companyLogo'  => \App\Models\Setting::get('company_logo'),
+                'companyLogo'  => \App\Support\BrandLogo::asDataUri(),
                 'primaryColor' => \App\Models\Setting::get('primary_color', '#2563eb'),
                 'filters'      => $request->only(['employee_id','project_id','crew_id','status','date_from','date_to','layout']),
                 'projectName'  => $request->filled('project_id')
@@ -384,7 +384,7 @@ class TimesheetController extends Controller
             'printMode'    => $request->query('mode', 'html'),
             'generatedAt'  => now(),
             'companyName'  => \App\Models\Setting::get('company_name', 'BuildTrack'),
-            'companyLogo'  => \App\Models\Setting::get('company_logo'),
+            'companyLogo'  => \App\Support\BrandLogo::asDataUri(),
             'primaryColor' => \App\Models\Setting::get('primary_color', '#2563eb'),
             'filters'      => $request->only(['employee_id','project_id','crew_id','status','date_from','date_to']),
         ];
