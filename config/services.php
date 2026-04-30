@@ -43,16 +43,18 @@ return [
     | timesheet and the system extracts every employee + hours + project
     | + date into structured entries the office can confirm in one click.
     |
-    | Two providers are wired — flip via OCR_PROVIDER in .env without
+    | Three providers are wired — flip via OCR_PROVIDER in .env without
     | touching code:
-    |   - 'gemini'    : Google Gemini 1.5 Flash. Has a generous FREE tier
-    |                   (1500 requests/day). Default for demos / pre-sales.
-    |   - 'anthropic' : Claude Sonnet 4.5. Paid (~$0.02/scan) but slightly
-    |                   better on messy handwriting. Switch when client
-    |                   approves the feature and is ready to budget.
+    |   - 'groq'      : Meta Llama 4 Scout 17B vision via Groq Cloud. TRULY
+    |                   FREE — no billing setup, no credit card. Just sign up
+    |                   at console.groq.com. 30 req/min free tier. Default.
+    |   - 'gemini'    : Google Gemini 2.0 Flash. Free tier exists but
+    |                   sometimes Google Cloud nags for billing setup.
+    |   - 'anthropic' : Claude Sonnet 4.5. Paid (~$0.02/scan) but best
+    |                   handwriting recognition. Production upgrade path.
     */
     'ocr' => [
-        'provider' => env('OCR_PROVIDER', 'gemini'),
+        'provider' => env('OCR_PROVIDER', 'groq'),
     ],
 
     'anthropic' => [
@@ -69,6 +71,15 @@ return [
         // rotates again, override via GEMINI_MODEL in .env without touching code.
         'model'    => env('GEMINI_MODEL', 'gemini-2.0-flash'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+    ],
+
+    'groq' => [
+        'api_key'  => env('GROQ_API_KEY'),
+        // Llama 4 Scout 17B is Groq's current vision model. If Meta/Groq
+        // rotates, override via GROQ_MODEL in .env. Other vision-capable
+        // options if needed: llama-3.2-90b-vision-preview (older).
+        'model'    => env('GROQ_MODEL', 'meta-llama/llama-4-scout-17b-16e-instruct'),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
     ],
 
 ];

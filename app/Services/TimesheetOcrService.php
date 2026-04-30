@@ -40,16 +40,17 @@ class TimesheetOcrService
      */
     public function extractFromImage(string $imageBase64, string $mediaType): array
     {
-        // Provider switch — flip via OCR_PROVIDER in .env. Both providers use
-        // the same system prompt, parser, and matcher; only the HTTP call
+        // Provider switch — flip via OCR_PROVIDER in .env. All three providers
+        // use the same system prompt, parser, and matcher; only the HTTP call
         // shape and auth differ.
-        $provider = config('services.ocr.provider', 'gemini');
+        $provider = config('services.ocr.provider', 'groq');
         $systemPrompt = $this->buildSystemPrompt();
 
         [$rawText, $rawBody] = match ($provider) {
             'anthropic' => $this->callAnthropic($systemPrompt, $imageBase64, $mediaType),
             'gemini'    => $this->callGemini($systemPrompt, $imageBase64, $mediaType),
-            default     => throw new \RuntimeException("Unknown OCR provider: {$provider}. Set OCR_PROVIDER to 'gemini' or 'anthropic'."),
+            'groq'      => $this->callGroq($systemPrompt, $imageBase64, $mediaType),
+            default     => throw new \RuntimeException("Unknown OCR provider: {$provider}. Set OCR_PROVIDER to 'groq', 'gemini', or 'anthropic'."),
         };
 
         $parsed = $this->parseJsonEnvelope($rawText);
@@ -279,6 +280,95 @@ PROMPT;
             // Sometimes Gemini returns blockedReason or finishReason without text
             $reason = $body['candidates'][0]['finishReason'] ?? 'UNKNOWN';
             throw new \RuntimeException("Gemini returned no text (finishReason: {$reason}). Try a clearer image.");
+        }
+        return [$rawText, $body];
+    }
+
+    /**
+     * Call Groq Cloud — Llama 4 Scout 17B vision (or whatever GROQ_MODEL is set to).
+     *
+     * TRULY FREE — no credit card, no Google Cloud billing nags. Sign up at
+     * https://console.groq.com/keys and the API key works immediately.
+     *
+     * Free tier: 30 requests/min, ~14k requests/day. More than enough for any
+     * single construction office. Groq is also famously FAST — vision OCR
+     * typically returns in 1-3 seconds vs. 5-8 for cloud competitors.
+     *
+     * Uses OpenAI-compatible chat-completions shape with image_url, plus the
+     * `response_format: json_object` knob to force pure JSON output (no
+     * markdown fences, no prose) — same trick we use for Gemini.
+     *
+     * @return array{0:string, 1:array}  [raw text response, full body]
+     */
+    protected function callGroq(string $systemPrompt, string $imageBase64, string $mediaType): array
+    {
+        $apiKey = config('services.groq.api_key');
+        if (empty($apiKey)) {
+            throw new \RuntimeException(
+                'GROQ_API_KEY is not set. Get a free key (no credit card needed) at https://console.groq.com/keys and add to .env.'
+            );
+        }
+
+        $model = config('services.groq.model', 'meta-llama/llama-4-scout-17b-16e-instruct');
+        $url   = config('services.groq.base_url') . '/chat/completions';
+
+        // Groq follows OpenAI's chat schema. Vision input is a "user" message
+        // whose content is an array with text + image_url parts. The image_url
+        // can be a regular URL or an inlined data URI — we use the latter so
+        // we don't need a public-facing image host.
+        $payload = [
+            'model'    => $model,
+            'temperature' => 0.1,
+            'max_tokens'  => 4096,
+            // Force JSON-shape output. Llama 4 Scout supports this knob;
+            // older Llama 3.2 vision models ignore it but the prompt still
+            // tells the model to emit pure JSON anyway.
+            'response_format' => ['type' => 'json_object'],
+            'messages' => [
+                [
+                    'role'    => 'system',
+                    'content' => $systemPrompt,
+                ],
+                [
+                    'role'    => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => 'Extract every timesheet row from this image and return the JSON envelope described in your instructions.'],
+                        ['type' => 'image_url', 'image_url' => [
+                            'url' => 'data:' . $mediaType . ';base64,' . $imageBase64,
+                        ]],
+                    ],
+                ],
+            ],
+        ];
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $apiKey,
+            'Content-Type'  => 'application/json',
+        ])
+            ->timeout(60)
+            ->post($url, $payload);
+
+        if (! $response->successful()) {
+            Log::error('Groq API error', ['status' => $response->status(), 'body' => $response->body()]);
+
+            // If the model name is wrong / deprecated, give a useful hint.
+            $body = $response->body();
+            if ($response->status() === 404 || str_contains($body, 'model_not_found')) {
+                throw new \RuntimeException(
+                    "Groq model '{$model}' is not available. Pick a current vision model from " .
+                    "https://console.groq.com/docs/models and update GROQ_MODEL in .env, then run 'php artisan config:clear'."
+                );
+            }
+
+            throw new \RuntimeException(
+                'Groq API call failed (HTTP ' . $response->status() . '). ' . substr($body, 0, 300)
+            );
+        }
+
+        $body = $response->json();
+        $rawText = $body['choices'][0]['message']['content'] ?? '';
+        if ($rawText === '') {
+            throw new \RuntimeException('Groq returned empty content. Try a clearer image.');
         }
         return [$rawText, $body];
     }
