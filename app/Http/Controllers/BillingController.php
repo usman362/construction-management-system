@@ -113,6 +113,10 @@ class BillingController extends Controller
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
             'description' => 'nullable|string',
+            // 2026-05-01 (Brenda): "How to we put an amount in client billing?"
+            // — direct entry on the create form. Auto-Generate flow still
+            // available on the show page for pulling from timesheets.
+            'total_amount' => 'required|numeric|min:0',
         ]);
 
         BillingInvoice::create([
@@ -125,7 +129,8 @@ class BillingController extends Controller
             'description' => $validated['description'] ?? null,
             'billing_period_start' => $validated['invoice_date'],
             'billing_period_end' => $validated['invoice_date'],
-            'total_amount' => 0,
+            'subtotal' => $validated['total_amount'],
+            'total_amount' => $validated['total_amount'],
             'status' => 'draft',
         ]);
 
@@ -151,6 +156,7 @@ class BillingController extends Controller
                 ?? $billingInvoice->billing_period_start?->format('Y-m-d'),
             'due_date' => $billingInvoice->due_date?->format('Y-m-d'),
             'description' => $billingInvoice->description,
+            'total_amount' => $billingInvoice->total_amount,
         ]);
     }
 
@@ -164,9 +170,11 @@ class BillingController extends Controller
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
             'description' => 'nullable|string',
+            // 2026-05-01 (Brenda): allow editing the amount as well
+            'total_amount' => 'nullable|numeric|min:0',
         ]);
 
-        $billingInvoice->update([
+        $billingInvoice->update(array_filter([
             'project_id' => $validated['project_id'],
             'purchase_order_id' => $validated['purchase_order_id'] ?? null,
             'po_reference'      => $validated['po_reference'] ?? null,
@@ -176,7 +184,10 @@ class BillingController extends Controller
             'description' => $validated['description'] ?? null,
             'billing_period_start' => $validated['invoice_date'],
             'billing_period_end' => $validated['invoice_date'],
-        ]);
+            // Only overwrite the amount when the form actually carried one.
+            'subtotal' => $validated['total_amount'] ?? null,
+            'total_amount' => $validated['total_amount'] ?? null,
+        ], fn ($v) => $v !== null));
 
         return response()->json(['message' => 'Billing invoice updated successfully']);
     }
