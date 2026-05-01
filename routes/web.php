@@ -300,6 +300,10 @@ Route::middleware('auth')->group(function () {
         // timesheet, Claude extracts the rows, office confirms and bulk-creates.
         Route::post('timesheets/scan-photo',  [TimesheetController::class, 'scanPhoto'])->name('timesheets.scan-photo');
         Route::post('timesheets/scan-commit', [TimesheetController::class, 'scanCommit'])->name('timesheets.scan-commit');
+        // 2026-05-01: pinpoint diagnostic for the AI Snap feature. Admin
+        // hits this URL in a browser, gets back JSON saying exactly what
+        // (if anything) is misconfigured. No image upload required.
+        Route::get('timesheets/scan-health', [TimesheetController::class, 'scanHealth'])->name('timesheets.scan-health');
     });
 
     // Payroll — Admin, Accountant

@@ -51,9 +51,23 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
 
+        // 2026-05-01 (Brenda): "password it way too easy" — bumped policy
+        // from min:8 to a real strength requirement: 12+ chars, mixed case,
+        // numbers, and a special char. Uses Laravel's Password rule so the
+        // error messages name each missing requirement.
         $request->validate([
             'current_password' => 'required',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                \Illuminate\Validation\Rules\Password::min(12)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
         ]);
 
         // Verify current password

@@ -1390,4 +1390,101 @@ class TimesheetController extends Controller
             'created'  => $createdIds,
         ]);
     }
+
+    /**
+     * Diagnostic for the AI Snap-a-Timesheet feature (Brenda 2026-05-01).
+     *
+     * Brenda reported "AI snapshot still doesn't work on my end" without an
+     * error message we can see. This endpoint runs through every dependency
+     * the feature touches and returns structured JSON pinpointing exactly
+     * what's misconfigured. Hit it in a browser as an admin — no image
+     * upload needed — and screenshot the response.
+     *
+     * Checks (in order, short-circuits on first hard failure):
+     *   1. Is GROQ_API_KEY set?           → tells us if .env was deployed
+     *   2. Is GROQ_MODEL set?             → tells us if the model var was set
+     *   3. Can we reach api.groq.com?     → tells us if firewall is blocking
+     *   4. Is the API key accepted (auth)? → tells us if the key is valid
+     *   5. Is the configured model live?  → tells us if Groq retired it
+     *
+     * Returns 200 with details no matter what — never crashes, never throws.
+     */
+    public function scanHealth(): JsonResponse
+    {
+        $checks = [];
+        $apiKey = config('services.groq.api_key');
+        $model  = config('services.groq.model');
+        $base   = config('services.groq.base_url');
+
+        // 1. Key present?
+        $checks[] = [
+            'name'   => 'GROQ_API_KEY set',
+            'pass'   => ! empty($apiKey),
+            'detail' => empty($apiKey)
+                ? 'Missing — add GROQ_API_KEY=gsk_... to your .env on the server, then run `php artisan config:clear`.'
+                : 'set (length ' . strlen($apiKey) . ', ends with ...' . substr($apiKey, -4) . ')',
+        ];
+        if (empty($apiKey)) {
+            return response()->json(['provider' => 'groq', 'overall' => 'fail', 'checks' => $checks]);
+        }
+
+        // 2. Model name present?
+        $checks[] = [
+            'name'   => 'GROQ_MODEL set',
+            'pass'   => ! empty($model),
+            'detail' => $model ?: 'falling back to default — set GROQ_MODEL in .env',
+        ];
+
+        // 3. Reachable + auth?  Use models list endpoint — cheap, no token spend.
+        try {
+            $resp = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+            ])->timeout(10)->get(rtrim($base, '/') . '/models');
+
+            $checks[] = [
+                'name'   => 'Reach api.groq.com',
+                'pass'   => $resp->status() !== 0,
+                'detail' => 'HTTP ' . $resp->status(),
+            ];
+
+            $checks[] = [
+                'name'   => 'API key accepted',
+                'pass'   => $resp->status() !== 401,
+                'detail' => $resp->status() === 401
+                    ? 'Got 401 Unauthorized — the GROQ_API_KEY is invalid or revoked. Generate a new one at https://console.groq.com/keys.'
+                    : ($resp->successful() ? 'authenticated' : 'unexpected HTTP ' . $resp->status()),
+            ];
+
+            // 4. Configured model is in the list?
+            if ($resp->successful()) {
+                $availableModels = collect($resp->json('data', []))->pluck('id');
+                $modelInList = $availableModels->contains($model);
+                $checks[] = [
+                    'name'   => "Model '{$model}' available",
+                    'pass'   => $modelInList,
+                    'detail' => $modelInList
+                        ? 'live'
+                        : 'NOT in Groq catalog. Pick a current model and update GROQ_MODEL. Currently available vision-capable: '
+                            . $availableModels->filter(fn ($m) => str_contains(strtolower($m), 'vision') || str_contains(strtolower($m), 'scout') || str_contains(strtolower($m), 'maverick'))->implode(', '),
+                ];
+            }
+        } catch (\Throwable $e) {
+            $checks[] = [
+                'name'   => 'Reach api.groq.com',
+                'pass'   => false,
+                'detail' => 'Network error: ' . $e->getMessage() . '. The server may not have outbound HTTPS to api.groq.com (firewall, proxy, no internet egress).',
+            ];
+        }
+
+        $allPassed = collect($checks)->every(fn ($c) => $c['pass']);
+
+        return response()->json([
+            'provider' => 'groq',
+            'overall'  => $allPassed ? 'ok' : 'fail',
+            'checks'   => $checks,
+            'next_step' => $allPassed
+                ? 'All checks passed. The AI scan should work — try uploading a photo. If it still fails, screenshot the error message in the modal.'
+                : 'See the first failing check above for the fix.',
+        ]);
+    }
 }

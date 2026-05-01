@@ -65,10 +65,18 @@ class UserController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // 2026-05-01 (Brenda): tightened password policy across the app —
+        // was min:8 only, now 12+ chars with mixed case, numbers, and a
+        // symbol, plus haveibeenpwned check via uncompromised().
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
+            'password' => [
+                'required',
+                'string',
+                \Illuminate\Validation\Rules\Password::min(12)
+                    ->letters()->mixedCase()->numbers()->symbols()->uncompromised(),
+            ],
             'role' => ['required', Rule::in(array_keys(User::ROLES))],
             'is_active' => 'boolean',
         ]);
@@ -100,7 +108,12 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'password' => 'nullable|string|min:8',
+            'password' => [
+                'nullable',
+                'string',
+                \Illuminate\Validation\Rules\Password::min(12)
+                    ->letters()->mixedCase()->numbers()->symbols()->uncompromised(),
+            ],
             'role' => ['required', Rule::in(array_keys(User::ROLES))],
             'is_active' => 'boolean',
         ]);
