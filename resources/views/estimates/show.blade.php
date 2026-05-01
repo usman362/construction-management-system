@@ -619,8 +619,15 @@ function submitAddLine() {
     });
 }
 
-/* ─── Estimating Phase 1 — sections + typed lines builder ───────────── */
-const EST_BASE = window.BASE_URL + '/projects/{{ $project->id }}/estimates/{{ $estimate->id }}';
+/* ─── Estimating Phase 1 — sections + typed lines builder ─────────────
+   2026-05-01 (Brenda): "Add line on change order not working". Root cause
+   was the same as the broken View Estimate button — EST_BASE depended on
+   window.BASE_URL, which on production sometimes loaded after this script
+   block. POSTs to /lines became POSTs to "undefined/projects/.../lines"
+   → 404 → "Add Line silently does nothing". Switched to a server-rendered
+   absolute URL via @json(url(...)) so it's always a real string.
+*/
+const EST_BASE = @json(url('/projects/' . $project->id . '/estimates/' . $estimate->id));
 
 function estimateBuilder(estimateId) {
     return {
