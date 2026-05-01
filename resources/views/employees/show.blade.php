@@ -159,20 +159,25 @@
                                 <td class="px-3 py-2 text-gray-500">{{ $cert->expiry_date?->format('M j, Y') ?? 'N/A' }}</td>
                                 <td class="px-3 py-2 text-center"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusBadge }}">{{ ucwords(str_replace('_', ' ', $cert->status)) }}</span></td>
                                 <td class="px-3 py-2 text-center">
+                                    @php
+                                        // 2026-05-01 (Brenda): Edit button — clerks need to fix a
+                                        // typo'd expiry year (2026 vs 2028). Build the JSON
+                                        // payload as a single-line string OUTSIDE the onclick
+                                        // attribute so Blade's parser doesn't choke on the
+                                        // multi-line `@json([...])` inside a quoted attribute.
+                                        $certPayload = json_encode([
+                                            'id'                   => $cert->id,
+                                            'name'                 => $cert->name,
+                                            'certification_number' => $cert->certification_number,
+                                            'issuing_authority'    => $cert->issuing_authority,
+                                            'issue_date'           => optional($cert->issue_date)->format('Y-m-d'),
+                                            'expiry_date'          => optional($cert->expiry_date)->format('Y-m-d'),
+                                            'notes'                => $cert->notes,
+                                        ], JSON_HEX_APOS | JSON_HEX_QUOT);
+                                    @endphp
                                     <div class="flex items-center justify-center gap-1">
-                                        {{-- 2026-05-01 (Brenda): Edit button — clerks needed to fix
-                                             a typo'd expiry year (2026 instead of 2028). Pulls all
-                                             current values into the edit modal via data-* attrs. --}}
                                         <button type="button"
-                                                onclick='editCert(@json([
-                                                    "id" => $cert->id,
-                                                    "name" => $cert->name,
-                                                    "certification_number" => $cert->certification_number,
-                                                    "issuing_authority" => $cert->issuing_authority,
-                                                    "issue_date" => optional($cert->issue_date)->format("Y-m-d"),
-                                                    "expiry_date" => optional($cert->expiry_date)->format("Y-m-d"),
-                                                    "notes" => $cert->notes,
-                                                ]))'
+                                                onclick="editCert({{ $certPayload }})"
                                                 class="w-7 h-7 inline-flex items-center justify-center rounded-md text-amber-600 hover:bg-amber-50" title="Edit">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
                                         </button>

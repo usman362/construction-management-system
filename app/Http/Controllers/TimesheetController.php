@@ -80,24 +80,37 @@ class TimesheetController extends Controller
         // Get filtered records count
         $recordsFiltered = $query->count();
 
-        // Ordering (columns match index DataTable: date, employee, project, cost code, crew, reg, ot, dt, total, cost, status, actions)
-        $orderColumn = (int) $request->input('order.0.column', 0);
+        // Ordering — column indices match the JS columns:[] array on the
+        // index page. Index 0 is the bulk-select checkbox (not orderable),
+        // so the ordering map starts at 1.
+        //
+        // 2026-05-01 (Brenda): added a Project # column in place of the Crew
+        // column so the office can sort timesheets by project number. The
+        // sort uses a JOIN on the projects table because project_number lives
+        // on Project, not on Timesheet itself.
+        $orderColumn = (int) $request->input('order.0.column', 1);
         $orderDir = $request->input('order.0.dir', 'desc');
         $columns = [
-            0 => 'date',
-            1 => 'employee_id',
-            2 => 'project_id',
-            3 => 'cost_code_id',
-            4 => 'crew_id',
-            5 => 'regular_hours',
-            6 => 'overtime_hours',
-            7 => 'double_time_hours',
-            8 => 'total_hours',
-            9 => 'total_cost',
-            10 => 'status',
+            1  => 'date',
+            2  => 'employee_id',
+            3  => 'project_id',       // Project (name) column — orders by FK
+            4  => 'cost_code_id',
+            5  => 'project_number',   // NEW (replaces crew column)
+            6  => 'regular_hours',
+            7  => 'overtime_hours',
+            8  => 'double_time_hours',
+            9  => 'total_hours',
+            10 => 'total_cost',
+            11 => 'status',
         ];
 
-        if (isset($columns[$orderColumn])) {
+        if (($columns[$orderColumn] ?? null) === 'project_number') {
+            // project_number lives on the projects table — JOIN to sort.
+            // Aliased select() so the joined columns don't shadow timesheet.id etc.
+            $query->leftJoin('projects', 'timesheets.project_id', '=', 'projects.id')
+                  ->orderBy('projects.project_number', $orderDir)
+                  ->select('timesheets.*');
+        } elseif (isset($columns[$orderColumn])) {
             $query->orderBy($columns[$orderColumn], $orderDir);
         } else {
             $query->orderBy('date', 'desc');
@@ -117,6 +130,7 @@ class TimesheetController extends Controller
                 'employee_id' => $timesheet->employee_id,
                 'employee_name' => $emp ? trim($emp->first_name.' '.$emp->last_name) : '—',
                 'project_id' => $timesheet->project_id,
+                'project_number' => $timesheet->project?->project_number ?? '—',
                 'project_name' => $timesheet->project->name ?? '',
                 'cost_code' => $timesheet->costCode?->code ?? '—',
                 'crew_id' => $timesheet->crew_id,

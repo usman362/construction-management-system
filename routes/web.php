@@ -114,6 +114,8 @@ Route::middleware('auth')->group(function () {
     // 2026-05-01 (Brenda): "We will need a certification training matrix"
     // — single-page pivot view across every employee × every cert type.
     Route::get('certifications/matrix', [EmployeeCertificationController::class, 'matrix'])->name('certifications.matrix');
+    // 2026-05-01 (Brenda): Excel export for the safety department.
+    Route::get('certifications/matrix/excel', [EmployeeCertificationController::class, 'matrixExcel'])->name('certifications.matrix.excel');
     Route::post('employees/{employee}/certifications', [EmployeeCertificationController::class, 'store'])->name('employees.certifications.store');
     Route::put('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'update'])->name('employees.certifications.update');
     Route::delete('employees/{employee}/certifications/{certification}', [EmployeeCertificationController::class, 'destroy'])->name('employees.certifications.destroy');

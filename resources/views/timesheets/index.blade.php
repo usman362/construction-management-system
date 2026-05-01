@@ -158,7 +158,7 @@
     <table id="dataTable" class="w-full">
         <thead><tr>
             <th width="30"><input type="checkbox" id="bulkSelectAll" onclick="toggleAllBulk(this)" title="Select all on this page"></th>
-            <th>Date</th><th>Employee</th><th>Project</th><th>Phase code</th><th>Crew</th><th>Regular</th><th>OT</th><th>DT</th><th>Total</th><th>Cost</th><th>Status</th><th class="text-center" width="100">Actions</th>
+            <th>Date</th><th>Employee</th><th>Project</th><th>Phase code</th><th>Project #</th><th>Regular</th><th>OT</th><th>DT</th><th>Total</th><th>Cost</th><th>Status</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
@@ -532,7 +532,9 @@ var table = $('#dataTable').DataTable({
             if (parts.length !== 3) return s;
             return parts[1] + '/' + parts[2] + '/' + parts[0];
         }}, {data:'employee_name'}, {data:'project_name'}, {data:'cost_code'},
-        {data:'crew_name'},
+        // 2026-05-01 (Brenda): Project # column in place of Crew —
+        // sortable so the office can group all rows for a given job together.
+        {data:'project_number'},
         {data:'regular_hours', className:'text-right'}, {data:'overtime_hours', className:'text-right'}, {data:'double_time_hours', className:'text-right'},
         {data:'total_hours', className:'text-right font-semibold'}, {data:'cost', render: d=>'$'+parseFloat(d||0).toFixed(2), className:'text-right'},
         {data:'status', className:'text-center', render: function(d) {

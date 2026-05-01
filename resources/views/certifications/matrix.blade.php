@@ -81,6 +81,13 @@
         </div>
         <div class="flex items-center gap-2 legend-actions">
             <a href="{{ route('employees.index') }}" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50">← Employees</a>
+            {{-- 2026-05-01 (Brenda): Excel download for the safety department —
+                 keeps current craft/status filters on the URL. --}}
+            <a href="{{ route('certifications.matrix.excel', request()->only(['craft_id', 'status'])) }}"
+               class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                Download Excel
+            </a>
             <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18M9.75 9V3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V9"/></svg>
                 Print
