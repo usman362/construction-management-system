@@ -1515,10 +1515,18 @@ class ReportController extends Controller
             }
 
             // 2) Labor (timesheets, non-rejected) --------------------------
+            // 2026-05-01 (KH cost controller): "Please Add Crafts Code
+            // associated with each person." Eager-load employee.craft so
+            // the JSON includes a craft_code per row.
             $tsQuery = Timesheet::query()
                 ->where('project_id', $project->id)
                 ->where('status', '!=', 'rejected')
-                ->with(['employee:id,first_name,last_name,employee_number', 'costCode:id,code,name', 'costType:id,code,name'])
+                ->with([
+                    'employee:id,first_name,last_name,employee_number,craft_id',
+                    'employee.craft:id,code,name',
+                    'costCode:id,code,name',
+                    'costType:id,code,name',
+                ])
                 ->when($ccId !== null, fn ($q) => $q->where('cost_code_id', $ccId))
                 ->when($ctId !== null, fn ($q) => $q->where('cost_type_id', $ctId))
                 ->orderByDesc('date');
@@ -1535,6 +1543,7 @@ class ReportController extends Controller
                         'description' => $t->employee
                             ? trim($t->employee->first_name . ' ' . $t->employee->last_name) . ' (' . $t->total_hours . ' hrs)'
                             : '—',
+                        'craft_code'  => $t->employee?->craft?->code ?? '—',
                         'cost_code'   => $t->costCode?->code,
                         'cost_type'   => $t->costType?->code,
                         'amount'      => round((float) $t->total_cost, 2),
@@ -1590,7 +1599,10 @@ class ReportController extends Controller
                         'cost_code'   => $i->costCode?->code,
                         'cost_type'   => null,
                         'amount'      => round((float) $i->amount, 2),
-                        'link'        => null,
+                        // 2026-05-01 (KH cost controller): "This arrow not
+                        // working" — vendor invoice rows had link=null. Wire
+                        // up the actual show route so the ↗ icon renders.
+                        'link'        => route('invoices.show', $i),
                     ])->all(),
                 ];
             }

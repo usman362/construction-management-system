@@ -99,8 +99,15 @@
     <div class="bg-white rounded-lg shadow p-6 mb-6" id="phase1Builder"
          x-data="estimateBuilder({{ $estimate->id }})">
 
-        {{-- ── Totals strip ── --}}
-        <div class="grid grid-cols-3 gap-4 mb-6">
+        {{-- ── Totals strip ──
+             2026-05-01 (KH cost controller): "When creating an estimate –
+             the total needs to be visible on that screen as lines are added."
+             Made the totals strip STICKY so it stays pinned to the top of
+             the viewport while the user scrolls down to add sections/lines.
+             Updates live after each save (the page reloads after Save Line,
+             so the totals re-pull from the model — which is correct).
+        --}}
+        <div class="grid grid-cols-3 gap-3 mb-6 sticky top-0 z-30 bg-white py-3 -mx-2 px-2 shadow-sm">
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Total Cost</p>
                 <p class="text-2xl font-bold text-gray-900 mt-1" x-text="'$' + fmt(totals.total_cost)"></p>

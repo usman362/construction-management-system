@@ -400,11 +400,14 @@
                                 '<h4 class="text-sm font-bold text-gray-800 uppercase tracking-wide">' + sec.title + ' <span class="text-xs text-gray-500 font-normal">(' + sec.count + ')</span></h4>' +
                                 '<span class="text-sm font-bold text-blue-700">$' + Number(sec.total).toFixed(2) + '</span>' +
                                 '</div>';
+                        // Show Craft column only for the Labor (Timesheets) section
+                        const showCraft = sec.title === 'Labor (Timesheets)';
                         html += '<table class="w-full text-xs">';
                         html += '<thead class="bg-gray-50"><tr>' +
                                 '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Date</th>' +
                                 '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Reference</th>' +
                                 '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Description</th>' +
+                                (showCraft ? '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Craft</th>' : '') +
                                 '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Cost Code</th>' +
                                 '<th class="px-2 py-1.5 text-right font-semibold text-gray-600">Amount</th>' +
                                 '<th class="px-2 py-1.5 w-8"></th>' +
@@ -414,9 +417,14 @@
                                     '<td class="px-2 py-1.5 text-gray-700">' + (row.date || '—') + '</td>' +
                                     '<td class="px-2 py-1.5 font-medium">' + (row.reference || '—') + '</td>' +
                                     '<td class="px-2 py-1.5 text-gray-700">' + escapeHtml(row.description || '—') + '</td>' +
+                                    (showCraft ? '<td class="px-2 py-1.5 text-gray-700 font-mono text-[10px]">' + escapeHtml(row.craft_code || '—') + '</td>' : '') +
                                     '<td class="px-2 py-1.5 text-gray-500">' + (row.cost_code || '—') + (row.cost_type ? ' / ' + row.cost_type : '') + '</td>' +
                                     '<td class="px-2 py-1.5 text-right font-semibold text-gray-900">$' + Number(row.amount).toFixed(2) + '</td>' +
-                                    '<td class="px-2 py-1.5 text-right">' + (row.link ? '<a href="' + row.link + '" target="_blank" class="text-blue-600 hover:text-blue-800" title="Open in new tab">↗</a>' : '') + '</td>' +
+                                    '<td class="px-2 py-1.5 text-right">' +
+                                        (row.link
+                                            ? '<a href="' + row.link + '" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 inline-flex items-center" title="Open ' + escapeHtml(row.reference || 'record') + ' in new tab"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg></a>'
+                                            : '<span class="text-gray-300" title="No source link">—</span>') +
+                                    '</td>' +
                                     '</tr>';
                         });
                         html += '</tbody></table></div>';

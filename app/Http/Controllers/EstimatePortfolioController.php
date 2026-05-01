@@ -186,24 +186,65 @@ class EstimatePortfolioController extends Controller
     }
 
     /**
-     * Show a portfolio estimate. Re-uses the project-scoped show view so we
-     * don't fork the UI — passes a "virtual" project derived from the
-     * estimate's project_id (or a stub when standalone).
+     * Show a portfolio estimate.
+     *
+     * 2026-05-01 (KH cost controller): "The open to 'OPEN' the estimate is
+     * not working." The placeholder page that used to show for standalone
+     * estimates had no edit capability — clicking Open felt broken because
+     * she couldn't actually USE the estimate.
+     *
+     * Fix: when the estimate has no project_id yet, auto-spawn a DRAFT-####
+     * project (in `bidding` status), link it, and redirect to the full
+     * estimate editor in one shot. KH never sees the placeholder anymore.
+     * Spawning a draft project is idempotent (next Open just sees the
+     * existing project_id and redirects without creating a second project).
      */
     public function show(Estimate $estimate)
     {
-        // If the estimate belongs to a project, redirect to the project-scoped
-        // detail page so the full feature set (sections + lines + convert)
-        // is reachable without a duplicate template.
+        // Already linked to a project → straight to the project-scoped editor.
         if ($estimate->project_id) {
             return redirect()->route('projects.estimates.show', [
                 $estimate->project_id, $estimate->id,
             ]);
         }
 
-        // Standalone bid (no project yet) — render a lighter view so the user
-        // can edit metadata before conversion. After conversion, the redirect
-        // above kicks in on subsequent visits.
+        // No project yet → auto-spawn a draft project so KH gets a working
+        // editor on first click, not a stub page. Wrapped in a transaction
+        // so a failure mid-spawn doesn't leave a dangling project row.
+        $project = \DB::transaction(function () use ($estimate) {
+            $projNumber = 'DRAFT-' . str_pad((string) ($estimate->id), 4, '0', STR_PAD_LEFT);
+            $project = Project::create([
+                'project_number'  => $projNumber,
+                'name'            => $estimate->name ?: 'Bid #' . $estimate->id,
+                'client_id'       => $estimate->client_id,
+                'status'          => 'bidding',
+                'start_date'      => $estimate->start_date ?? now()->toDateString(),
+                'end_date'        => $estimate->end_date ?? now()->addMonths(3)->toDateString(),
+                'original_budget' => 0,
+                'current_budget'  => 0,
+                'estimate'        => $estimate->total_price,
+                'contract_value'  => $estimate->total_price,
+                'description'     => $estimate->description,
+            ]);
+            $estimate->update(['project_id' => $project->id]);
+            return $project;
+        });
+
+        return redirect()->route('projects.estimates.show', [$project->id, $estimate->id])
+            ->with('info', "Draft project {$project->project_number} created so you can edit this estimate.");
+    }
+
+    /**
+     * Legacy "show" placeholder — kept reachable in case any old links
+     * point here, but no longer the default. Prefer show() above.
+     */
+    public function legacyStub(Estimate $estimate)
+    {
+        if ($estimate->project_id) {
+            return redirect()->route('projects.estimates.show', [
+                $estimate->project_id, $estimate->id,
+            ]);
+        }
         $estimate->load(['client', 'sections.lines.craft', 'sections.lines.material',
                          'sections.lines.equipment', 'lines' => fn ($q) => $q->whereNull('section_id')]);
 
