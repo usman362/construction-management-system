@@ -233,6 +233,9 @@ Route::middleware('auth')->group(function () {
         // Project Reports — Admin, PM, Accountant
         Route::middleware('role:admin,project_manager,accountant')->group(function () {
             Route::get('reports/cost-report', [ReportController::class, 'costReport'])->name('reports.cost-report');
+            // 2026-05-01 (Brenda's cost controller): drill-down JSON for the
+            // Committed and Invoiced cells on the Cost Report.
+            Route::get('reports/cost-report/drill', [ReportController::class, 'costReportDrill'])->name('reports.cost-report.drill');
             Route::get('reports/forecast', [ReportController::class, 'forecast'])->name('reports.forecast');
             Route::get('reports/manhours', [ReportController::class, 'manhourReport'])->name('reports.manhours');
             Route::get('reports/profit-loss', [ReportController::class, 'profitLoss'])->name('reports.profit-loss');

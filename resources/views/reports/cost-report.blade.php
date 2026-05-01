@@ -96,8 +96,32 @@
                             <tr class="{{ $bgClass }} border border-gray-300">
                                 <td class="border border-gray-300 px-4 py-2 {{ $item['indent'] ?? false ? 'pl-8' : '' }}">{{ $item['code'] ?? 'N/A' }} - {{ $item['name'] ?? 'N/A' }}</td>
                                 <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['budget'] ?? 0, 2) }}</td>
-                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['committed'] ?? 0, 2) }}</td>
-                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['invoiced'] ?? 0, 2) }}</td>
+                                {{-- 2026-05-01 (Brenda's cost controller): clickable drill-down.
+                                     Click a Committed/Invoiced number → modal lists every PO,
+                                     timesheet, per-diem allocation, and vendor invoice that
+                                     makes up the total. --}}
+                                <td class="border border-gray-300 px-4 py-2 text-right">
+                                    @if (($item['committed'] ?? 0) > 0)
+                                        <button type="button" class="text-blue-700 hover:underline drill-link"
+                                                data-bucket="committed"
+                                                data-cost-code-id="{{ $item['cost_code_id'] ?? '' }}"
+                                                data-cost-type-id="{{ $item['cost_type_id'] ?? '' }}"
+                                                data-label="{{ $item['code'] ?? 'N/A' }} — {{ $item['name'] ?? 'N/A' }}">${{ number_format($item['committed'] ?? 0, 2) }}</button>
+                                    @else
+                                        ${{ number_format(0, 2) }}
+                                    @endif
+                                </td>
+                                <td class="border border-gray-300 px-4 py-2 text-right">
+                                    @if (($item['invoiced'] ?? 0) > 0)
+                                        <button type="button" class="text-blue-700 hover:underline drill-link"
+                                                data-bucket="invoiced"
+                                                data-cost-code-id="{{ $item['cost_code_id'] ?? '' }}"
+                                                data-cost-type-id="{{ $item['cost_type_id'] ?? '' }}"
+                                                data-label="{{ $item['code'] ?? 'N/A' }} — {{ $item['name'] ?? 'N/A' }}">${{ number_format($item['invoiced'] ?? 0, 2) }}</button>
+                                    @else
+                                        ${{ number_format(0, 2) }}
+                                    @endif
+                                </td>
                                 <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($item['balance'] ?? 0, 2) }}</td>
                                 <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($pctComplete, 1) }}%</td>
                             </tr>
@@ -309,4 +333,107 @@
         </div>
     </div>
 </div>
+
+{{-- 2026-05-01: Drill-down modal — opens when a Committed/Invoiced number
+     is clicked. Pulls JSON from /reports/cost-report/drill and groups
+     records by source (POs, timesheets, per diem, vendor invoices). --}}
+<div id="drillModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeDrill()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-700 to-indigo-700 text-white">
+            <div>
+                <h3 class="text-lg font-bold">Drill-down</h3>
+                <p class="text-xs text-blue-100" id="drillSubtitle">Loading…</p>
+            </div>
+            <button type="button" onclick="closeDrill()" class="text-blue-100 hover:text-white text-xl leading-none">&times;</button>
+        </div>
+        <div id="drillBody" class="flex-1 overflow-y-auto p-6">
+            <div class="text-center text-gray-500 text-sm py-12">Loading…</div>
+        </div>
+        <div class="border-t border-gray-200 px-6 py-3 bg-gray-50 flex items-center justify-between">
+            <div class="text-sm text-gray-700"><strong>Grand total:</strong> <span id="drillTotal">—</span></div>
+            <button type="button" onclick="closeDrill()" class="px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const drillUrl = @json(route('projects.reports.cost-report.drill', $project));
+
+    function openDrill() {
+        document.getElementById('drillModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    window.closeDrill = function() {
+        document.getElementById('drillModal').classList.add('hidden');
+        document.body.style.overflow = '';
+    };
+
+    document.querySelectorAll('.drill-link').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const bucket  = btn.dataset.bucket;
+            const ccId    = btn.dataset.costCodeId || '';
+            const ctId    = btn.dataset.costTypeId || '';
+            const label   = btn.dataset.label || '';
+            const subtitle = (bucket === 'committed' ? 'Committed Cost' : 'Invoiced') + ' · ' + label;
+
+            document.getElementById('drillSubtitle').textContent = subtitle;
+            document.getElementById('drillBody').innerHTML = '<div class="text-center text-gray-500 text-sm py-12">Loading…</div>';
+            document.getElementById('drillTotal').textContent = '—';
+            openDrill();
+
+            const params = new URLSearchParams({ bucket, cost_code_id: ccId, cost_type_id: ctId });
+            fetch(drillUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+                .then(r => r.json())
+                .then(data => {
+                    if (! data.sections || data.sections.length === 0) {
+                        document.getElementById('drillBody').innerHTML =
+                            '<div class="text-center text-gray-500 text-sm py-12">No underlying records found for this cell.</div>';
+                        document.getElementById('drillTotal').textContent = '$' + Number(data.grand_total || 0).toFixed(2);
+                        return;
+                    }
+
+                    let html = '';
+                    data.sections.forEach(function (sec) {
+                        html += '<div class="mb-6">';
+                        html += '<div class="flex items-baseline justify-between mb-2 pb-1 border-b border-gray-200">' +
+                                '<h4 class="text-sm font-bold text-gray-800 uppercase tracking-wide">' + sec.title + ' <span class="text-xs text-gray-500 font-normal">(' + sec.count + ')</span></h4>' +
+                                '<span class="text-sm font-bold text-blue-700">$' + Number(sec.total).toFixed(2) + '</span>' +
+                                '</div>';
+                        html += '<table class="w-full text-xs">';
+                        html += '<thead class="bg-gray-50"><tr>' +
+                                '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Date</th>' +
+                                '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Reference</th>' +
+                                '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Description</th>' +
+                                '<th class="px-2 py-1.5 text-left font-semibold text-gray-600">Cost Code</th>' +
+                                '<th class="px-2 py-1.5 text-right font-semibold text-gray-600">Amount</th>' +
+                                '<th class="px-2 py-1.5 w-8"></th>' +
+                                '</tr></thead><tbody>';
+                        sec.rows.forEach(function (row) {
+                            html += '<tr class="border-b border-gray-100 hover:bg-blue-50">' +
+                                    '<td class="px-2 py-1.5 text-gray-700">' + (row.date || '—') + '</td>' +
+                                    '<td class="px-2 py-1.5 font-medium">' + (row.reference || '—') + '</td>' +
+                                    '<td class="px-2 py-1.5 text-gray-700">' + escapeHtml(row.description || '—') + '</td>' +
+                                    '<td class="px-2 py-1.5 text-gray-500">' + (row.cost_code || '—') + (row.cost_type ? ' / ' + row.cost_type : '') + '</td>' +
+                                    '<td class="px-2 py-1.5 text-right font-semibold text-gray-900">$' + Number(row.amount).toFixed(2) + '</td>' +
+                                    '<td class="px-2 py-1.5 text-right">' + (row.link ? '<a href="' + row.link + '" target="_blank" class="text-blue-600 hover:text-blue-800" title="Open in new tab">↗</a>' : '') + '</td>' +
+                                    '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+                    });
+                    document.getElementById('drillBody').innerHTML = html;
+                    document.getElementById('drillTotal').textContent = '$' + Number(data.grand_total || 0).toFixed(2);
+                })
+                .catch(function (err) {
+                    document.getElementById('drillBody').innerHTML =
+                        '<div class="text-center text-red-600 text-sm py-12">Error loading drill-down: ' + (err.message || err) + '</div>';
+                });
+        });
+    });
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+})();
+</script>
 @endsection

@@ -1455,4 +1455,155 @@ class ReportController extends Controller
         $filename = "forecast-{$project->project_number}-" . now()->format('Ymd') . '.csv';
         return $this->streamCsv($filename, $header, $rows);
     }
+
+    /**
+     * Cost Report drill-down — Brenda's cost controller 2026-05-01.
+     *
+     *   "Cost controller wants to know if all reports can have a drill down
+     *    to see where the data is coming from."
+     *
+     * Click a Committed/Invoiced number on the cost report → see the
+     * underlying records (POs, timesheets, vendor invoices) that make up
+     * that total. Returns JSON keyed by source type so the front-end can
+     * render section headers per source.
+     *
+     * Query params:
+     *   bucket          'committed' | 'invoiced'   (required)
+     *   cost_code_id    int | 'all'                (defaults to 'all')
+     *   cost_type_id    int | null
+     */
+    public function costReportDrill(Request $request, Project $project): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'bucket'       => 'required|in:committed,invoiced',
+            'cost_code_id' => 'nullable',
+            'cost_type_id' => 'nullable',
+        ]);
+
+        $bucket  = $request->query('bucket');
+        $ccId    = $request->query('cost_code_id');
+        $ccId    = ($ccId === '' || $ccId === 'all' || $ccId === null) ? null : (int) $ccId;
+        $ctId    = $request->query('cost_type_id');
+        $ctId    = ($ctId === '' || $ctId === null) ? null : (int) $ctId;
+
+        $sections = [];
+
+        if ($bucket === 'committed') {
+            // 1) Vendor commitments (POs) ----------------------------------
+            $coms = $project->commitments()
+                ->with(['vendor:id,name', 'costCode:id,code,name', 'costType:id,code,name'])
+                ->when($ccId !== null, fn ($q) => $q->where('cost_code_id', $ccId))
+                ->when($ctId !== null, fn ($q) => $q->where('cost_type_id', $ctId))
+                ->orderByDesc('created_at')
+                ->get();
+
+            if ($coms->isNotEmpty()) {
+                $sections[] = [
+                    'title'  => 'Purchase Orders / Commitments',
+                    'count'  => $coms->count(),
+                    'total'  => round((float) $coms->sum('amount'), 2),
+                    'rows'   => $coms->map(fn ($c) => [
+                        'date'        => optional($c->created_at)->format('Y-m-d'),
+                        'reference'   => $c->po_number ?? ('Commitment #' . $c->id),
+                        'description' => trim(($c->description ?? '') . ($c->vendor ? ' — ' . $c->vendor->name : '')) ?: '—',
+                        'cost_code'   => $c->costCode?->code,
+                        'cost_type'   => $c->costType?->code,
+                        'amount'      => round((float) $c->amount, 2),
+                        'link'        => route('purchase-orders.show', $c),
+                    ])->all(),
+                ];
+            }
+
+            // 2) Labor (timesheets, non-rejected) --------------------------
+            $tsQuery = Timesheet::query()
+                ->where('project_id', $project->id)
+                ->where('status', '!=', 'rejected')
+                ->with(['employee:id,first_name,last_name,employee_number', 'costCode:id,code,name', 'costType:id,code,name'])
+                ->when($ccId !== null, fn ($q) => $q->where('cost_code_id', $ccId))
+                ->when($ctId !== null, fn ($q) => $q->where('cost_type_id', $ctId))
+                ->orderByDesc('date');
+            $timesheets = $tsQuery->get();
+
+            if ($timesheets->isNotEmpty()) {
+                $sections[] = [
+                    'title' => 'Labor (Timesheets)',
+                    'count' => $timesheets->count(),
+                    'total' => round((float) $timesheets->sum('total_cost'), 2),
+                    'rows'  => $timesheets->map(fn ($t) => [
+                        'date'        => optional($t->date)->format('Y-m-d'),
+                        'reference'   => 'Timesheet #' . $t->id,
+                        'description' => $t->employee
+                            ? trim($t->employee->first_name . ' ' . $t->employee->last_name) . ' (' . $t->total_hours . ' hrs)'
+                            : '—',
+                        'cost_code'   => $t->costCode?->code,
+                        'cost_type'   => $t->costType?->code,
+                        'amount'      => round((float) $t->total_cost, 2),
+                        'link'        => route('timesheets.show', $t),
+                    ])->all(),
+                ];
+            }
+
+            // 3) Per Diem allocations --------------------------------------
+            $perDiems = \App\Models\TimesheetCostAllocation::query()
+                ->whereHas('timesheet', fn ($q) => $q->where('project_id', $project->id)->where('status', '!=', 'rejected'))
+                ->where('per_diem_amount', '>', 0)
+                ->when($ccId !== null, fn ($q) => $q->where('cost_code_id', $ccId))
+                ->with(['timesheet.employee:id,first_name,last_name', 'costCode:id,code,name'])
+                ->get();
+
+            if ($perDiems->isNotEmpty()) {
+                $sections[] = [
+                    'title' => 'Per Diem',
+                    'count' => $perDiems->count(),
+                    'total' => round((float) $perDiems->sum('per_diem_amount'), 2),
+                    'rows'  => $perDiems->map(fn ($p) => [
+                        'date'        => optional($p->timesheet?->date)->format('Y-m-d'),
+                        'reference'   => 'Timesheet #' . $p->timesheet_id,
+                        'description' => $p->timesheet?->employee
+                            ? trim($p->timesheet->employee->first_name . ' ' . $p->timesheet->employee->last_name)
+                            : '—',
+                        'cost_code'   => $p->costCode?->code,
+                        'cost_type'   => 'PER DIEM',
+                        'amount'      => round((float) $p->per_diem_amount, 2),
+                        'link'        => $p->timesheet_id ? route('timesheets.show', $p->timesheet_id) : null,
+                    ])->all(),
+                ];
+            }
+        } else {
+            // bucket=invoiced — vendor invoices
+            $invs = Invoice::query()
+                ->where('project_id', $project->id)
+                ->with(['vendor:id,name', 'costCode:id,code,name'])
+                ->when($ccId !== null, fn ($q) => $q->where('cost_code_id', $ccId))
+                ->orderByDesc('invoice_date')
+                ->get();
+
+            if ($invs->isNotEmpty()) {
+                $sections[] = [
+                    'title' => 'Vendor Invoices',
+                    'count' => $invs->count(),
+                    'total' => round((float) $invs->sum('amount'), 2),
+                    'rows'  => $invs->map(fn ($i) => [
+                        'date'        => optional($i->invoice_date)->format('Y-m-d'),
+                        'reference'   => $i->invoice_number ?? ('Invoice #' . $i->id),
+                        'description' => ($i->vendor?->name ?? '—') . ($i->description ? ' — ' . $i->description : ''),
+                        'cost_code'   => $i->costCode?->code,
+                        'cost_type'   => null,
+                        'amount'      => round((float) $i->amount, 2),
+                        'link'        => null,
+                    ])->all(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'project_id'    => $project->id,
+            'project_name'  => $project->name,
+            'bucket'        => $bucket,
+            'cost_code_id'  => $ccId,
+            'cost_type_id'  => $ctId,
+            'sections'      => $sections,
+            'grand_total'   => round(array_sum(array_column($sections, 'total')), 2),
+        ]);
+    }
 }
