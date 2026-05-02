@@ -194,6 +194,22 @@
                 <label>Total Hours:</label>
                 <input type="text" :value="totalHours.toFixed(2)" readonly class="field-disabled">
 
+                {{-- 2026-05-01 (Brenda): Per Diem and Gate Log are
+                     per-line data that only applies to certain jobs.
+                     Slotted right after the hours so the keyboard flow
+                     stays linear (ST → OT → PR → Total → Per Diem → Gate
+                     Log → Notes). Both default empty / 0 — the clerk
+                     just leaves them blank when the job doesn't carry. --}}
+                <label>Per Diem $:</label>
+                <input type="number" step="0.01" min="0" x-model="entry.per_diem_amount"
+                       placeholder="0.00 (leave blank if N/A)"
+                       @keydown.enter.prevent="saveRecord()">
+
+                <label>Gate Log Hrs:</label>
+                <input type="number" step="0.25" min="0" x-model="entry.gate_log_hours"
+                       placeholder="leave blank if N/A"
+                       @keydown.enter.prevent="saveRecord()">
+
                 <label>Notes:</label>
                 <input type="text" x-model="entry.notes" maxlength="500" placeholder="optional" style="grid-column: span 3;">
             </div>
@@ -230,12 +246,14 @@
                         <th class="text-right">OT</th>
                         <th class="text-right">PR</th>
                         <th class="text-right">Total</th>
+                        <th class="text-right">Per Diem</th>
+                        <th class="text-right">Gate Log</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="savedRecords.length === 0">
-                        <tr><td colspan="12" class="text-center text-gray-500 py-3">No records keyed yet — fill out the form above and click Save Record.</td></tr>
+                        <tr><td colspan="14" class="text-center text-gray-500 py-3">No records keyed yet — fill out the form above and click Save Record.</td></tr>
                     </template>
                     <template x-for="rec in savedRecords" :key="rec.id">
                         <tr>
@@ -250,6 +268,8 @@
                             <td class="text-right" x-text="Number(rec.overtime_hours).toFixed(2)"></td>
                             <td class="text-right" x-text="Number(rec.double_time_hours).toFixed(2)"></td>
                             <td class="text-right font-semibold" x-text="Number(rec.total_hours).toFixed(2)"></td>
+                            <td class="text-right" x-text="rec.per_diem_amount > 0 ? '$' + Number(rec.per_diem_amount).toFixed(2) : '—'"></td>
+                            <td class="text-right" x-text="rec.gate_log_hours > 0 ? Number(rec.gate_log_hours).toFixed(2) : '—'"></td>
                             <td>
                                 <button type="button" class="text-red-600 hover:text-red-900 text-xs underline" @click="deleteRecord(rec)">Delete</button>
                             </td>
@@ -263,6 +283,8 @@
                         <td class="text-right" x-text="totals.ot.toFixed(2)"></td>
                         <td class="text-right" x-text="totals.pr.toFixed(2)"></td>
                         <td class="text-right" x-text="totals.total.toFixed(2)"></td>
+                        <td class="text-right" x-text="totals.per_diem > 0 ? '$' + totals.per_diem.toFixed(2) : '—'"></td>
+                        <td class="text-right" x-text="totals.gate_log > 0 ? totals.gate_log.toFixed(2) : '—'"></td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -333,6 +355,8 @@
                 cost_code_id: '', cost_type_id: '', craft_id: '',
                 work_order_number: '', earnings_category: 'HE',
                 regular_hours: '', overtime_hours: '', double_time_hours: '',
+                // 2026-05-01 (Brenda): per-line per-diem + gate-log fields
+                per_diem_amount: '', gate_log_hours: '',
                 notes: '',
             },
             savedRecords: [],
@@ -376,6 +400,7 @@
                     cost_code_id: '', cost_type_id: '', craft_id: '',
                     work_order_number: '', earnings_category: 'HE',
                     regular_hours: '', overtime_hours: '', double_time_hours: '',
+                    per_diem_amount: '', gate_log_hours: '',
                     notes: '',
                 };
             },
@@ -390,13 +415,15 @@
             },
 
             get totals() {
-                let st = 0, ot = 0, pr = 0;
+                let st = 0, ot = 0, pr = 0, per_diem = 0, gate_log = 0;
                 this.savedRecords.forEach(r => {
                     st += parseFloat(r.regular_hours) || 0;
                     ot += parseFloat(r.overtime_hours) || 0;
                     pr += parseFloat(r.double_time_hours) || 0;
+                    per_diem += parseFloat(r.per_diem_amount) || 0;
+                    gate_log += parseFloat(r.gate_log_hours)  || 0;
                 });
-                return { st, ot, pr, total: st + ot + pr };
+                return { st, ot, pr, total: st + ot + pr, per_diem, gate_log };
             },
 
             recalcTotal() { /* getter recomputes via Alpine; no-op kept for @input clarity */ },
@@ -498,6 +525,12 @@
                     // triggered. The server takes our buckets as-is.
                     force_overtime: false,
                     earnings_category: this.entry.earnings_category,
+                    // 2026-05-01 (Brenda): per-line per-diem and gate-log
+                    // forwarded so they save on the underlying Timesheet.
+                    // Sent as null when blank — server validation accepts that.
+                    per_diem_amount: this.entry.per_diem_amount !== '' ? parseFloat(this.entry.per_diem_amount) : null,
+                    per_diem:        (this.entry.per_diem_amount !== '' && parseFloat(this.entry.per_diem_amount) > 0),
+                    gate_log_hours:  this.entry.gate_log_hours !== '' ? parseFloat(this.entry.gate_log_hours) : null,
                     notes: this.entry.notes || null,
                     status: 'submitted',
                 };
@@ -548,6 +581,8 @@
                         overtime_hours: payload.overtime_hours,
                         double_time_hours: payload.double_time_hours,
                         total_hours: this.totalHours,
+                        per_diem_amount: payload.per_diem_amount || 0,
+                        gate_log_hours:  payload.gate_log_hours  || 0,
                     });
 
                     this.flash('success', `Saved record #${ts.id} for ${empOpt ? empOpt.textContent.split('—')[0].trim() : ''}.`);
