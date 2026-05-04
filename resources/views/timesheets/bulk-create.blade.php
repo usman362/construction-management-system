@@ -587,16 +587,23 @@
 
                     this.flash('success', `Saved record #${ts.id} for ${empOpt ? empOpt.textContent.split('—')[0].trim() : ''}.`);
 
-                    // Carry-over fields per Brenda's flow (Job, Date, Shift,
-                    // Earnings Cat. stay; per-employee fields including #
-                    // and Craft clear so the next worker can be keyed in).
+                    // 2026-05-03 (Brenda): "make the employee number and
+                    // name stay in place until I change it." Now Employee
+                    // # / Employee record / Craft also carry over after a
+                    // Save Record so she can quickly key several lines for
+                    // the same person (e.g. ST + OT + per-diem on different
+                    // cost codes). Only the per-line numeric fields (hours,
+                    // per diem, gate log, notes) clear.
                     const keep = {
-                        project_id: this.entry.project_id,
-                        date: this.entry.date,
-                        shift_id: this.entry.shift_id || this.defaultShiftId || '',
+                        project_id:        this.entry.project_id,
+                        date:              this.entry.date,
+                        shift_id:          this.entry.shift_id || this.defaultShiftId || '',
                         earnings_category: this.entry.earnings_category,
-                        cost_code_id: this.entry.cost_code_id,
-                        cost_type_id: this.entry.cost_type_id,
+                        cost_code_id:      this.entry.cost_code_id,
+                        cost_type_id:      this.entry.cost_type_id,
+                        employee_id:       this.entry.employee_id,
+                        employee_number:   this.entry.employee_number,
+                        craft_id:          this.entry.craft_id,
                     };
                     this.entry = { ...this.blankEntry(), ...keep };
                 } catch (e) {

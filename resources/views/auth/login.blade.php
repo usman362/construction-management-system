@@ -55,9 +55,13 @@
                 <!-- Email -->
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-300 mb-1.5">Email Address</label>
+                    {{-- 2026-05-03 (Brenda): removed the "admin@cms.com"
+                         placeholder text and the default-credentials banner
+                         below — sensitive info shouldn't appear on a public
+                         login page. --}}
                     <input type="email" id="email" name="email" value="{{ old('email') }}" required autofocus
                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                           placeholder="admin@cms.com">
+                           placeholder="you@example.com">
                 </div>
 
                 <!-- Password -->
@@ -85,12 +89,8 @@
 
         </div>
 
-        <!-- Default Credentials Hint -->
-        <div class="mt-6 bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-            <p class="text-gray-500 text-xs text-center">
-                Default credentials: <span class="text-gray-400">admin@cms.com</span> / <span class="text-gray-400">password</span>
-            </p>
-        </div>
+        {{-- Default credentials hint removed 2026-05-03 — never expose
+             sample logins on a production login page. --}}
     </div>
 
 </body>
