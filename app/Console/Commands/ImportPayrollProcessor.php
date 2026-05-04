@@ -34,7 +34,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class ImportPayrollProcessor extends Command
 {
     protected $signature = 'timesheets:import-payroll
-                            {file : Path to the xlsx file}
+                            {file? : Path to the xlsx file (defaults to database/imports/payroll.xlsx)}
                             {--dry-run : Resolve and report only, do not insert}
                             {--limit=0 : Cap the number of rows imported (0 = all)}';
 
@@ -42,7 +42,10 @@ class ImportPayrollProcessor extends Command
 
     public function handle(): int
     {
-        $file = $this->argument('file');
+        // Default to the bundled file under database/imports/ — same location
+        // PayrollImportSeeder uses, so `php artisan db:seed` and the bare
+        // command both work without arguments.
+        $file = $this->argument('file') ?: database_path('imports/payroll.xlsx');
         if (! file_exists($file)) {
             $this->error("File not found: {$file}");
             return self::FAILURE;
