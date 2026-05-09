@@ -355,6 +355,11 @@ Route::middleware('auth')->group(function () {
 
     // Invoices — Admin, Accountant
     Route::middleware('role:admin,accountant')->group(function () {
+        // 2026-05-10 (Brenda): Snap-an-Invoice — AI OCR for vendor invoices.
+        // Registered BEFORE the resource so /invoices/scan-photo doesn't get
+        // matched as /invoices/{invoice}.
+        Route::post('invoices/scan-photo',  [InvoiceController::class, 'scanPhoto'])->name('invoices.scan-photo');
+        Route::post('invoices/scan-commit', [InvoiceController::class, 'scanCommit'])->name('invoices.scan-commit');
         Route::resource('invoices', InvoiceController::class);
         Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve'])->name('invoices.approve');
     });
@@ -407,10 +412,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,accountant')->group(function () {
         Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
         Route::post('billing', [BillingController::class, 'store'])->name('billing.store');
-        // 2026-05-10 (Brenda): Snap-an-Invoice — AI OCR for vendor invoices,
-        // mirrors the Snap-a-Timesheet flow on /timesheets.
-        Route::post('billing/scan-photo',  [BillingController::class, 'scanPhoto'])->name('billing.scan-photo');
-        Route::post('billing/scan-commit', [BillingController::class, 'scanCommit'])->name('billing.scan-commit');
         Route::get('billing/{billingInvoice}/edit', [BillingController::class, 'edit'])->name('billing.edit');
         Route::put('billing/{billingInvoice}', [BillingController::class, 'update'])->name('billing.update');
         Route::delete('billing/{billingInvoice}', [BillingController::class, 'destroy'])->name('billing.destroy');
