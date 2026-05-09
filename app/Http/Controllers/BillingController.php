@@ -307,4 +307,85 @@ class BillingController extends Controller
 
         return $pdf->download("invoice-{$billingInvoice->invoice_number}.pdf");
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  Snap-an-Invoice (AI OCR) — Brenda 2026-05-10
+    //  Same flow as Snap-a-Timesheet but for vendor invoices: upload
+    //  a photo of an invoice → AI extracts vendor, invoice #, date,
+    //  amount, PO ref → office reviews + saves.
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Accept an uploaded invoice image, send it to the OCR service, return
+     * the structured header + line items so the UI can pre-fill the form.
+     */
+    public function scanPhoto(Request $request, \App\Services\VendorInvoiceOcrService $ocr): JsonResponse
+    {
+        $request->validate([
+            'photo' => 'required|file|image|max:10240',
+        ]);
+
+        $file  = $request->file('photo');
+        $bytes = file_get_contents($file->getRealPath());
+        $b64   = base64_encode($bytes);
+        $mime  = $file->getMimeType() ?: 'image/jpeg';
+
+        try {
+            $result = $ocr->extractFromImage($b64, $mime);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'success'     => true,
+            'summary'     => $result['summary'],
+            'header'      => $result['header'],
+            'line_items'  => $result['line_items'],
+        ]);
+    }
+
+    /**
+     * Commit a previously-scanned vendor invoice as a real BillingInvoice.
+     * Re-uses the same store flow so all observers, project rollups, etc.
+     * stay consistent. Project must be picked by the user (can't extract
+     * from the invoice image — vendors don't print our internal job#s).
+     */
+    public function scanCommit(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'project_id'        => 'required|exists:projects,id',
+            'purchase_order_id' => 'nullable|exists:purchase_orders,id',
+            'po_reference'      => 'nullable|string|max:100',
+            'invoice_number'    => 'required|string|max:100',
+            'invoice_date'      => 'required|date',
+            'due_date'          => 'nullable|date',
+            'description'       => 'nullable|string|max:2000',
+            'total_amount'      => 'required|numeric|min:0',
+        ]);
+
+        $invoice = BillingInvoice::create([
+            'project_id'           => $data['project_id'],
+            'purchase_order_id'    => $data['purchase_order_id'] ?? null,
+            'po_reference'         => $data['po_reference'] ?? null,
+            'invoice_number'       => $data['invoice_number'],
+            'invoice_date'         => $data['invoice_date'],
+            'due_date'             => $data['due_date'] ?? null,
+            'description'          => trim(($data['description'] ?? '') . ' [via Snap-an-Invoice OCR]'),
+            'billing_period_start' => $data['invoice_date'],
+            'billing_period_end'   => $data['invoice_date'],
+            'subtotal'             => $data['total_amount'],
+            'total_amount'         => $data['total_amount'],
+            'status'               => 'draft',
+        ]);
+
+        return response()->json([
+            'success'    => true,
+            'message'    => 'Invoice saved.',
+            'invoice_id' => $invoice->id,
+            'url'        => route('billing.show', $invoice),
+        ]);
+    }
 }
