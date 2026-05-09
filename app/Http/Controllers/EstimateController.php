@@ -123,8 +123,13 @@ class EstimateController extends Controller
      */
     public function show(Project $project, Estimate $estimate)
     {
-        if ($estimate->project_id !== null && $estimate->project_id !== $project->id) {
-            $realProject = Project::find($estimate->project_id);
+        // CAST TO INT before comparing — Eloquent returns project_id as
+        // string in some configs, and strict !== against an int $project->id
+        // caused an infinite redirect loop here on 2026-05-10.
+        $estProjectId  = $estimate->project_id !== null ? (int) $estimate->project_id : null;
+        $urlProjectId  = (int) $project->id;
+        if ($estProjectId !== null && $estProjectId !== $urlProjectId) {
+            $realProject = Project::find($estProjectId);
             if ($realProject) {
                 return redirect()->route('projects.estimates.show', [$realProject->id, $estimate->id]);
             }
