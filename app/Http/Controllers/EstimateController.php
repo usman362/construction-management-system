@@ -114,9 +114,22 @@ class EstimateController extends Controller
         }
     }
 
-    public function show(Project $project, Estimate $estimate): View
+    /**
+     * 2026-05-10 (Brenda): show() was hard-404'ing when the URL's project
+     * didn't match the estimate's project_id — happens when an estimate
+     * gets moved between projects (or when an old bookmark/stale link is
+     * clicked). Instead of dead-ending the user, redirect to the
+     * estimate's actual project so they land on a working page.
+     */
+    public function show(Project $project, Estimate $estimate)
     {
-        $this->assertEstimateBelongsToProject($project, $estimate);
+        if ($estimate->project_id !== null && $estimate->project_id !== $project->id) {
+            $realProject = Project::find($estimate->project_id);
+            if ($realProject) {
+                return redirect()->route('projects.estimates.show', [$realProject->id, $estimate->id]);
+            }
+            abort(404, 'Estimate is linked to a project that no longer exists.');
+        }
         $estimate->load([
             'client',
             'sections.lines.costCode',
