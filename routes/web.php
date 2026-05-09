@@ -412,6 +412,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,accountant')->group(function () {
         Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
         Route::post('billing', [BillingController::class, 'store'])->name('billing.store');
+        // Snap-an-Invoice on client billing — same UX as /invoices version.
+        Route::post('billing/scan-photo',  [BillingController::class, 'scanPhoto'])->name('billing.scan-photo');
+        Route::post('billing/scan-commit', [BillingController::class, 'scanCommit'])->name('billing.scan-commit');
         Route::get('billing/{billingInvoice}/edit', [BillingController::class, 'edit'])->name('billing.edit');
         Route::put('billing/{billingInvoice}', [BillingController::class, 'update'])->name('billing.update');
         Route::delete('billing/{billingInvoice}', [BillingController::class, 'destroy'])->name('billing.destroy');

@@ -7,10 +7,19 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-900">Billing Invoices</h1>
-        <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-            Add Invoice
-        </button>
+        <div class="flex items-center gap-2">
+            {{-- 2026-05-10 (Brenda): Snap-an-Invoice on client billing —
+                 same UX as the version on /invoices. --}}
+            <button onclick="openInvoiceScanModal()" class="relative inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-purple-700 hover:via-fuchsia-700 hover:to-pink-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-md transition" title="Snap a photo of an invoice — AI fills it in for you">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                Scan Invoice
+                <span class="absolute -top-1 -right-1 bg-yellow-400 text-[9px] font-black text-purple-900 px-1.5 py-0.5 rounded-full shadow">AI</span>
+            </button>
+            <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Add Invoice
+            </button>
+        </div>
     </div>
 
     <!-- Billing Invoices Table -->
@@ -129,6 +138,129 @@
     </div>
 </div>
 
+{{-- ───── Snap-an-Invoice (AI OCR) modal ─────
+     Brenda 2026-05-10. 3 stages: upload → extracting → review.
+     POSTs to /billing/scan-photo then /billing/scan-commit. --}}
+<div id="invoiceScanModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay"
+     x-data="snapInvoice()" x-init="init()"
+     onclick="if(event.target===this)closeModal('invoiceScanModal')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white">
+            <div class="flex items-center gap-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                <div>
+                    <h3 class="text-lg font-bold">Snap-an-Invoice</h3>
+                    <p class="text-xs text-purple-100" x-text="stage === 'review' ? (summary || 'Review and save') : 'Photo of an invoice → AI fills in the form'"></p>
+                </div>
+            </div>
+            <button type="button" onclick="closeModal('invoiceScanModal')" class="text-purple-100 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div x-show="stage === 'upload'" class="p-6">
+            <label class="block">
+                <input type="file" accept="image/*" capture="environment" class="hidden" @change="onFileSelected($event)">
+                <div class="border-2 border-dashed border-purple-300 rounded-xl p-12 text-center hover:bg-purple-50 transition cursor-pointer"
+                     @dragover.prevent @drop.prevent="onFileDropped($event)">
+                    <svg class="w-16 h-16 mx-auto text-purple-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                    <p class="mt-4 text-base font-semibold text-gray-900">Drop an invoice here, or click to choose</p>
+                    <p class="mt-1 text-xs text-gray-500">JPG, PNG, HEIC up to 10 MB.</p>
+                </div>
+            </label>
+        </div>
+
+        <div x-show="stage === 'extracting'" class="p-12 text-center">
+            <div class="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 animate-pulse">
+                <svg class="w-10 h-10 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </div>
+            <p class="mt-6 text-lg font-bold text-gray-900" x-text="extractStatus"></p>
+            <p class="mt-2 text-sm text-gray-500">This usually takes 3–8 seconds.</p>
+        </div>
+
+        <div x-show="stage === 'review'" class="flex-1 overflow-hidden flex flex-col">
+            <div class="grid grid-cols-12 gap-4 p-6 overflow-y-auto" style="max-height: calc(92vh - 180px);">
+                <div class="col-span-5">
+                    <p class="text-xs font-semibold text-gray-700 uppercase mb-2">Original photo</p>
+                    <div class="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                        <img :src="photoPreview" alt="Uploaded invoice" class="w-full h-auto">
+                    </div>
+                    <div class="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <p class="text-xs font-semibold text-purple-900 mb-1">AI Summary</p>
+                        <p class="text-xs text-purple-800" x-text="summary || 'No summary'"></p>
+                    </div>
+                </div>
+                <div class="col-span-7 space-y-3">
+                    <p class="text-xs font-semibold text-gray-700 uppercase">Extracted invoice — review &amp; correct</p>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Project *</label>
+                        <select x-model="form.project_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <option value="">— pick a project —</option>
+                            @foreach($projects as $p)
+                                <option value="{{ $p->id }}">{{ $p->project_number ?? $p->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Vendor (from invoice)</label>
+                            <input type="text" x-model="form.vendor_name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="—">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Invoice # *</label>
+                            <input type="text" x-model="form.invoice_number" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Invoice Date *</label>
+                            <input type="date" x-model="form.invoice_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Due Date</label>
+                            <input type="date" x-model="form.due_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">PO Reference</label>
+                            <input type="text" x-model="form.po_reference" placeholder="—" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Total Amount $ *</label>
+                            <input type="number" step="0.01" min="0" x-model="form.total_amount" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-right">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Description / Notes</label>
+                        <textarea x-model="form.description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Optional"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-100 px-6 py-4 bg-gray-50 flex items-center justify-end gap-2">
+                <button type="button" @click="reset()" class="px-4 py-2 text-sm bg-white border border-gray-300 hover:bg-gray-50 rounded-lg">Start over</button>
+                <button type="button" @click="commit()" :disabled="!canCommit"
+                        class="px-5 py-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span x-show="!committing">✓ Save Invoice</span>
+                    <span x-show="committing">Saving…</span>
+                </button>
+            </div>
+        </div>
+
+        <div x-show="banner.text" x-transition class="px-6 py-3" :class="banner.kind === 'error' ? 'bg-red-50 text-red-800 border-t border-red-200' : 'bg-green-50 text-green-800 border-t border-green-200'">
+            <p class="text-sm font-semibold" x-text="banner.text"></p>
+        </div>
+    </div>
+</div>
+
 
 @push('scripts')
 <script>
@@ -192,6 +324,139 @@ function editBilling(id){
     });
 }
 
+// 2026-05-10 (Brenda): Snap-an-Invoice on /billing — opens AI capture modal.
+function openInvoiceScanModal(){
+    openModal('invoiceScanModal');
+    const modal = document.getElementById('invoiceScanModal');
+    if (modal && modal._x_dataStack) Alpine.$data(modal).reset();
+}
+
+function snapInvoice(){
+    return {
+        stage: 'upload',
+        photoFile: null, photoPreview: null, summary: null,
+        form: {
+            project_id: '', vendor_name: '', purchase_order_id: null,
+            invoice_number: '', invoice_date: '', due_date: '',
+            po_reference: '', total_amount: '', description: '',
+        },
+        committing: false,
+        banner: { kind: 'success', text: '' },
+        extractStatus: 'Reading your invoice…',
+        extractStatuses: [
+            'Reading your invoice…',
+            'Identifying the vendor…',
+            'Pulling out the total…',
+            'Almost done…',
+        ],
+        extractTimer: null,
+
+        init() {},
+
+        reset() {
+            if (this.extractTimer) { clearInterval(this.extractTimer); this.extractTimer = null; }
+            this.stage = 'upload';
+            this.photoFile = null; this.photoPreview = null; this.summary = null;
+            this.form = { project_id: '', vendor_name: '', purchase_order_id: null,
+                          invoice_number: '', invoice_date: '', due_date: '',
+                          po_reference: '', total_amount: '', description: '' };
+            this.banner = { kind: 'success', text: '' };
+            this.committing = false;
+        },
+
+        onFileSelected(e) { const f = e.target.files && e.target.files[0]; if (f) this.upload(f); },
+        onFileDropped(e)  { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) this.upload(f); },
+
+        async upload(file) {
+            this.photoFile = file;
+            this.photoPreview = URL.createObjectURL(file);
+            this.stage = 'extracting';
+            this.banner = { kind: 'success', text: '' };
+
+            let i = 0; this.extractStatus = this.extractStatuses[0];
+            this.extractTimer = setInterval(() => {
+                i = (i + 1) % this.extractStatuses.length;
+                this.extractStatus = this.extractStatuses[i];
+            }, 1800);
+
+            const fd = new FormData(); fd.append('photo', file);
+            try {
+                const r = await fetch('{{ route("billing.scan-photo") }}', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+                    body: fd,
+                });
+                const data = await r.json();
+                if (this.extractTimer) { clearInterval(this.extractTimer); this.extractTimer = null; }
+                if (!r.ok || !data.success) {
+                    this.banner = { kind: 'error', text: data.message || 'AI extraction failed.' };
+                    this.stage = 'upload';
+                    return;
+                }
+                const h = data.header || {};
+                this.summary = data.summary;
+                this.form.vendor_name        = h.vendor_name || '';
+                this.form.invoice_number     = h.invoice_number || '';
+                this.form.invoice_date       = h.invoice_date || '';
+                this.form.due_date           = h.due_date || '';
+                this.form.po_reference       = h.po_reference || '';
+                this.form.total_amount       = h.total_amount || '';
+                if (h.purchase_order_id) this.form.purchase_order_id = h.purchase_order_id;
+                this.stage = 'review';
+            } catch (err) {
+                if (this.extractTimer) { clearInterval(this.extractTimer); this.extractTimer = null; }
+                this.banner = { kind: 'error', text: 'Network error: ' + (err.message || err) };
+                this.stage = 'upload';
+            }
+        },
+
+        get canCommit() {
+            if (this.committing) return false;
+            return this.form.project_id && this.form.invoice_number
+                && this.form.invoice_date && this.form.total_amount;
+        },
+
+        async commit() {
+            if (!this.canCommit) return;
+            this.committing = true; this.banner = { kind: 'success', text: '' };
+            const payload = {
+                project_id:        parseInt(this.form.project_id, 10),
+                purchase_order_id: this.form.purchase_order_id || null,
+                po_reference:      this.form.po_reference || null,
+                invoice_number:    this.form.invoice_number,
+                invoice_date:      this.form.invoice_date,
+                due_date:          this.form.due_date || null,
+                description:       [this.form.vendor_name, this.form.description].filter(Boolean).join(' — ') || null,
+                total_amount:      parseFloat(this.form.total_amount),
+            };
+            try {
+                const r = await fetch('{{ route("billing.scan-commit") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await r.json();
+                if (!r.ok || !data.success) {
+                    this.banner = { kind: 'error', text: data.message || 'Save failed.' };
+                    this.committing = false; return;
+                }
+                this.banner = { kind: 'success', text: data.message };
+                setTimeout(() => {
+                    closeModal('invoiceScanModal');
+                    this.reset();
+                    if (typeof table !== 'undefined' && table.ajax) table.ajax.reload();
+                }, 1000);
+            } catch (err) {
+                this.banner = { kind: 'error', text: 'Network error: ' + (err.message || err) };
+                this.committing = false;
+            }
+        },
+    };
+}
 </script>
 @endpush
 
