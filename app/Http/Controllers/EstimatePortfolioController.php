@@ -201,20 +201,48 @@ class EstimatePortfolioController extends Controller
      */
     public function show(Estimate $estimate)
     {
-        // Already linked to a project → straight to the project-scoped editor.
+        // 2026-05-05 (Brenda): "still getting 404 not found when i click
+        // create and open". Root cause: portfolio.show was redirecting to
+        // /projects/{project_id}/estimates/{est_id} based purely on the
+        // estimate's project_id field — but if that project was deleted
+        // (or never existed properly), the redirect target 404s.
+        // Defense: validate the linked project actually exists; if not,
+        // null out the orphaned FK and fall through to auto-spawn so the
+        // user lands on a working editor either way.
         if ($estimate->project_id) {
-            return redirect()->route('projects.estimates.show', [
-                $estimate->project_id, $estimate->id,
-            ]);
+            $linkedProject = Project::find($estimate->project_id);
+            if ($linkedProject) {
+                return redirect()->route('projects.estimates.show', [
+                    $linkedProject->id, $estimate->id,
+                ]);
+            }
+            // Orphaned reference — clear it so spawn logic below runs.
+            $estimate->project_id = null;
+            $estimate->saveQuietly();
         }
 
         // No project yet → auto-spawn a draft project so KH gets a working
         // editor on first click, not a stub page. Wrapped in a transaction
         // so a failure mid-spawn doesn't leave a dangling project row.
+        //
+        // Edge case (2026-05-05): Project uses SoftDeletes and
+        // project_number is unique. If a previous DRAFT-XXXX was created
+        // for this same estimate id and then soft-deleted, Project::create
+        // here would hit a unique constraint and 500. Resolve by either
+        // restoring the trashed row or appending a uniquifier.
         $project = \DB::transaction(function () use ($estimate) {
-            $projNumber = 'DRAFT-' . str_pad((string) ($estimate->id), 4, '0', STR_PAD_LEFT);
+            $base = 'DRAFT-' . str_pad((string) ($estimate->id), 4, '0', STR_PAD_LEFT);
+
+            // Restore a previously soft-deleted draft if it exists
+            $trashed = Project::withTrashed()->where('project_number', $base)->first();
+            if ($trashed) {
+                $trashed->restore();
+                $estimate->update(['project_id' => $trashed->id]);
+                return $trashed;
+            }
+
             $project = Project::create([
-                'project_number'  => $projNumber,
+                'project_number'  => $base,
                 'name'            => $estimate->name ?: 'Bid #' . $estimate->id,
                 'client_id'       => $estimate->client_id,
                 'status'          => 'bidding',
