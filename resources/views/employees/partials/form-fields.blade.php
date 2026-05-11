@@ -214,6 +214,17 @@
     </div>
 </div>
 
+{{-- 2026-05-12 (Brenda): the entire Payroll & Rates section (pay cycle,
+     burden, hourly + OT + billable rates) is hidden from roles without
+     pay-rate visibility. Those users can still create / edit employees
+     and manage certifications — rates default to 0 on create and stay
+     untouched on edit. Server-side, EmployeeController drops these
+     fields from the request for non-rate users so they can't be set
+     via direct POST either. --}}
+@php
+    $showRates = auth()->user()?->canSeeEmployeeRates();
+@endphp
+@if ($showRates)
 <!-- ─── Payroll & Rates ────────────────────────────────────────────── -->
 <div class="bg-white rounded-lg shadow-md p-6 space-y-4">
     <h2 class="text-lg font-semibold text-gray-900 border-b pb-2">Payroll & Rates</h2>
@@ -272,6 +283,7 @@
         </div>
     </div>
 </div>
+@endif
 
 <!-- ─── Tax & Work Comp ────────────────────────────────────────────── -->
 <div class="bg-white rounded-lg shadow-md p-6 space-y-4">

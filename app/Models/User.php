@@ -112,6 +112,39 @@ class User extends Authenticatable
         return $this->hasRole([self::ROLE_ADMIN, self::ROLE_SITE_MANAGER]);
     }
 
+    /**
+     * Can this user see hourly / overtime rates on employees?
+     *
+     * Brenda's policy (2026-05-12): pay-rate visibility is restricted to
+     * payroll-handling roles. Site Managers and other operational roles can
+     * still open an employee record + manage certifications, but the
+     * rate columns / cards / form inputs are hidden from them.
+     *
+     * Anywhere a rate is displayed must be gated with this method, and the
+     * EmployeeController strips rate fields from incoming form data when
+     * this returns false (so a non-rate user can't sneak a rate change
+     * through curl). See EmployeeController::stripRateFieldsIfDisallowed().
+     */
+    public function canSeeEmployeeRates(): bool
+    {
+        return $this->hasRole([
+            self::ROLE_ADMIN,
+            self::ROLE_PROJECT_MANAGER,
+            self::ROLE_ACCOUNTANT,
+        ]);
+    }
+
+    /**
+     * Can this user open the employee record + add / edit certifications,
+     * but NOT see pay rates? Used by the views to render the cert section
+     * without leaking rate data. Anybody with employees access who isn't
+     * a rate-seeing role falls in this bucket.
+     */
+    public function canManageEmployeeCertifications(): bool
+    {
+        return $this->canAccess('employees') || $this->canAccess('certifications');
+    }
+
     public function isField(): bool
     {
         return $this->role === self::ROLE_FIELD;
@@ -163,7 +196,12 @@ class User extends Authenticatable
         $permissions = [
             'dashboard' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_FIELD, self::ROLE_VIEWER],
             'projects' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_FIELD, self::ROLE_VIEWER],
-            'employees' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT],
+            // 2026-05-12 (Brenda): Site Manager added so the on-site
+            // supervisor can open employee records to manage certifications.
+            // Rate fields are hidden via canSeeEmployeeRates() — pay info
+            // stays restricted to admin/PM/accountant.
+            'employees' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_SITE_MANAGER],
+            'certifications' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_SITE_MANAGER],
             'crafts' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER],
             'crews' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_FIELD],
             'shifts' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER],

@@ -48,9 +48,15 @@
 </div>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    {{-- 2026-05-12 (Brenda): rate column hidden from roles without pay-rate
+         visibility. Site Manager / Foreman / Field / Viewer get the same
+         table minus the Hourly Rate column. --}}
+    @php
+        $showRates = auth()->user()?->canSeeEmployeeRates();
+    @endphp
     <table id="dataTable" class="w-full">
         <thead><tr>
-            <th>ID</th><th>Legacy ID</th><th>Name</th><th>Email</th><th>Role</th><th>Craft</th><th>Hourly Rate</th><th>Status</th><th class="text-center" width="100">Actions</th>
+            <th>ID</th><th>Legacy ID</th><th>Name</th><th>Email</th><th>Role</th><th>Craft</th>@if($showRates)<th>Hourly Rate</th>@endif<th>Status</th><th class="text-center" width="100">Actions</th>
         </tr></thead>
     </table>
 </div>
@@ -126,7 +132,9 @@ var table = $('#dataTable').DataTable({
         {data:'email', render: d => d || '<span class="text-gray-400">—</span>'},
         {data:'role'},
         {data:'craft_name', render: d => d || '<span class="text-gray-400">—</span>'},
+        @if($showRates)
         {data:'hourly_rate', render: d=>'$'+parseFloat(d).toFixed(2)},
+        @endif
         {data:'status', className:'text-center', render: function(d) {
             const colors = {'active':'bg-green-100 text-green-700','inactive':'bg-gray-100 text-gray-700','terminated':'bg-red-100 text-red-700'};
             return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium '+(colors[d]||'bg-gray-100 text-gray-700')+'">'+d+'</span>';

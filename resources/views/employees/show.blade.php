@@ -81,6 +81,14 @@
         </div>
     </div>
 
+    {{-- 2026-05-12 (Brenda): Rates Card + Project-Specific Rates table are
+         hidden from roles without pay-rate visibility. Cert managers /
+         site managers see employee info + certifications but no $. --}}
+    @php
+        $showRates = auth()->user()?->canSeeEmployeeRates();
+    @endphp
+
+    @if ($showRates)
     <!-- Rates Card -->
     <div class="bg-white rounded-lg shadow-md p-6">
         <h2 class="text-lg font-semibold text-gray-900 border-b pb-4 mb-4">Rates</h2>
@@ -102,6 +110,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Summary Stats -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -322,6 +331,7 @@
     </script>
     @endpush
 
+    @if ($showRates)
     <!-- Project-Specific Pay Rates -->
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between border-b pb-4 mb-4">
@@ -443,6 +453,7 @@
     }
     </script>
     @endpush
+    @endif
 
     <!-- Recent Timesheets -->
     <div class="bg-white rounded-lg shadow-md p-6">
@@ -455,7 +466,7 @@
                         <th class="px-4 py-2 text-left font-semibold text-gray-700">Date</th>
                         <th class="px-4 py-2 text-left font-semibold text-gray-700">Project</th>
                         <th class="px-4 py-2 text-right font-semibold text-gray-700">Hours</th>
-                        <th class="px-4 py-2 text-right font-semibold text-gray-700">Cost</th>
+                        @if ($showRates)<th class="px-4 py-2 text-right font-semibold text-gray-700">Cost</th>@endif
                         <th class="px-4 py-2 text-left font-semibold text-gray-700">Status</th>
                     </tr>
                 </thead>
@@ -465,7 +476,7 @@
                             <td class="px-4 py-2 text-gray-900">{{ $timesheet->date?->format('M d, Y') ?? 'N/A' }}</td>
                             <td class="px-4 py-2 text-gray-900">{{ $timesheet->project?->name ?? 'N/A' }}</td>
                             <td class="px-4 py-2 text-right text-gray-900">{{ number_format($timesheet->total_hours ?? 0, 2) }}</td>
-                            <td class="px-4 py-2 text-right text-gray-900">${{ number_format($timesheet->total_cost ?? 0, 2) }}</td>
+                            @if ($showRates)<td class="px-4 py-2 text-right text-gray-900">${{ number_format($timesheet->total_cost ?? 0, 2) }}</td>@endif
                             <td class="px-4 py-2">
                                 <span class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
                                     {{ ucfirst($timesheet->status ?? 'submitted') }}
@@ -474,7 +485,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-4 text-center text-gray-500">No timesheets found.</td>
+                            <td colspan="{{ $showRates ? 5 : 4 }}" class="px-4 py-4 text-center text-gray-500">No timesheets found.</td>
                         </tr>
                     @endforelse
                 </tbody>

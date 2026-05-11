@@ -62,22 +62,30 @@ class EmployeeController extends Controller
         // Get records after filtering
         $recordsFiltered = $query->count();
 
-        // Apply sorting (indices match employees/index DataTable: id, name, email, role, craft, rate, status, actions)
+        // Apply sorting. Column indices must match what's rendered in the
+        // DataTable, which now shifts when the Hourly Rate column is hidden
+        // from non-rate-seeing users (2026-05-12). Build the map dynamically.
+        $showRates = auth()->user()?->canSeeEmployeeRates();
+        $columns = [
+            0 => 'employee_number',
+            1 => 'legacy_employee_id',
+            2 => 'first_name',
+            3 => 'email',
+            4 => 'role',
+            5 => 'craft_id',
+        ];
+        if ($showRates) {
+            $columns[6] = 'hourly_rate';
+            $columns[7] = 'status';
+        } else {
+            $columns[6] = 'status';
+        }
+
         if ($request->has('order') && is_array($request->input('order'))) {
             $order = $request->input('order')[0];
-            $columns = [
-                0 => 'employee_number',
-                1 => 'first_name',
-                2 => 'email',
-                3 => 'role',
-                4 => 'craft_id',
-                5 => 'hourly_rate',
-                6 => 'status',
-            ];
-
             if (isset($columns[$order['column']])) {
                 $dir = $order['dir'];
-                if ((int) $order['column'] === 1) {
+                if ((int) $order['column'] === 2) {
                     $query->orderBy('first_name', $dir)->orderBy('last_name', $dir);
                 } else {
                     $query->orderBy($columns[$order['column']], $dir);
@@ -134,9 +142,18 @@ class EmployeeController extends Controller
         // HTML <select> sends "" when the user leaves the dropdown on the
         // blank option, which breaks FK integer columns (SQLSTATE 1366).
         $this->normalizeNullableIds($request);
+        $this->stripRateFieldsIfDisallowed($request);
         $validated = $request->validate($this->employeeRules());
         $validated['is_supervisor'] = $request->boolean('is_supervisor');
         $validated['certified_pay'] = $request->boolean('certified_pay');
+
+        // Non-rate users never have the rate inputs on their form; default
+        // rates to 0 on create so the NOT NULL columns are satisfied.
+        if (!auth()->user()?->canSeeEmployeeRates()) {
+            $validated['hourly_rate']   = $validated['hourly_rate']   ?? 0;
+            $validated['overtime_rate'] = $validated['overtime_rate'] ?? 0;
+            $validated['billable_rate'] = $validated['billable_rate'] ?? 0;
+        }
 
         $employee = Employee::create($validated);
 
@@ -198,6 +215,7 @@ class EmployeeController extends Controller
     public function update(Request $request, Employee $employee): JsonResponse|RedirectResponse
     {
         $this->normalizeNullableIds($request);
+        $this->stripRateFieldsIfDisallowed($request);
         $validated = $request->validate($this->employeeRules($employee->id));
         $validated['is_supervisor'] = $request->boolean('is_supervisor');
         $validated['certified_pay'] = $request->boolean('certified_pay');
@@ -240,6 +258,26 @@ class EmployeeController extends Controller
     }
 
     /**
+     * 2026-05-12 (Brenda): if the current user can't see employee rates,
+     * strip every rate-related field from the incoming request before
+     * validation. The form doesn't show those inputs to non-rate users —
+     * this guard ensures a curl POST can't sneak in a rate change either.
+     */
+    private function stripRateFieldsIfDisallowed(Request $request): void
+    {
+        if (auth()->user()?->canSeeEmployeeRates()) {
+            return;
+        }
+        foreach ([
+            'hourly_rate', 'overtime_rate', 'billable_rate',
+            'st_burden_rate', 'ot_burden_rate',
+            'pay_cycle', 'pay_type',
+        ] as $k) {
+            $request->request->remove($k);
+        }
+    }
+
+    /**
      * Shared validation rules for store/update. Pass $id to ignore current record on unique checks.
      */
     private function employeeRules(?int $id = null): array
@@ -267,9 +305,13 @@ class EmployeeController extends Controller
             'personal_cell'       => 'nullable|string|max:30',
             'craft_id'            => 'nullable|exists:crafts,id',
             'role'                => 'required|in:field,foreman,superintendent,project_manager,admin,accounting',
-            'hourly_rate'         => 'required|numeric|min:0',
-            'overtime_rate'       => 'required|numeric|min:0',
-            'billable_rate'       => 'required|numeric|min:0',
+            // Rates: required only when the current user is allowed to see
+            // / set them (admin / PM / accountant). Non-rate users hit the
+            // create + edit flows for cert management — their rate fields
+            // are stripped from the request and defaulted to 0 on create.
+            'hourly_rate'         => (auth()->user()?->canSeeEmployeeRates() ? 'required' : 'nullable') . '|numeric|min:0',
+            'overtime_rate'       => (auth()->user()?->canSeeEmployeeRates() ? 'required' : 'nullable') . '|numeric|min:0',
+            'billable_rate'       => (auth()->user()?->canSeeEmployeeRates() ? 'required' : 'nullable') . '|numeric|min:0',
             'pay_cycle'           => 'nullable|in:weekly,bi_weekly,semi_monthly,monthly',
             'pay_type'            => 'nullable|in:hourly,salary',
             'union'               => 'nullable|string|max:100',

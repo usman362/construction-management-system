@@ -66,22 +66,31 @@ class ExportController extends Controller
         $query = Employee::with('craft');
         if ($status = $request->input('status')) $query->where('status', $status);
 
+        // Base columns everyone with employees access can export.
+        $columns = [
+            ['header' => 'Employee #', 'value' => 'employee_number',                  'width' => 14],
+            ['header' => 'First',      'value' => 'first_name',                       'width' => 18],
+            ['header' => 'Last',       'value' => 'last_name',                        'width' => 18],
+            ['header' => 'Craft',      'value' => fn ($e) => $e->craft?->name,        'width' => 22],
+            ['header' => 'Email',      'value' => 'email',                            'width' => 28],
+            ['header' => 'Phone',      'value' => 'phone',                            'width' => 16],
+            ['header' => 'Status',     'value' => fn ($e) => ucfirst($e->status ?? '—'), 'width' => 12],
+            ['header' => 'Hire Date',  'value' => fn ($e) => optional($e->hire_date)->format('Y-m-d'), 'format' => 'date', 'width' => 12],
+        ];
+
+        // 2026-05-12 (Brenda): rate column only included for roles allowed
+        // to see pay rates. Cert managers / site managers get the employee
+        // export without $ leaking out.
+        if (auth()->user()?->canSeeEmployeeRates()) {
+            $columns[] = ['header' => 'Base Rate', 'value' => fn ($e) => (float) ($e->base_hourly_rate ?? 0), 'format' => 'currency', 'width' => 12];
+        }
+
         return $this->streamExcel(
             filename:  'employees-' . $this->stamp() . '.xlsx',
             sheetName: 'Employees',
             rows:      $query->orderBy('last_name')->orderBy('first_name')->get(),
-            columns: [
-                ['header' => 'Employee #', 'value' => 'employee_number',                  'width' => 14],
-                ['header' => 'First',      'value' => 'first_name',                       'width' => 18],
-                ['header' => 'Last',       'value' => 'last_name',                        'width' => 18],
-                ['header' => 'Craft',      'value' => fn ($e) => $e->craft?->name,        'width' => 22],
-                ['header' => 'Email',      'value' => 'email',                            'width' => 28],
-                ['header' => 'Phone',      'value' => 'phone',                            'width' => 16],
-                ['header' => 'Status',     'value' => fn ($e) => ucfirst($e->status ?? '—'), 'width' => 12],
-                ['header' => 'Hire Date',  'value' => fn ($e) => optional($e->hire_date)->format('Y-m-d'), 'format' => 'date', 'width' => 12],
-                ['header' => 'Base Rate',  'value' => fn ($e) => (float) ($e->base_hourly_rate ?? 0), 'format' => 'currency', 'width' => 12],
-            ],
-            title: 'Employees — exported ' . now()->format('M j, Y g:i A'),
+            columns:   $columns,
+            title:     'Employees — exported ' . now()->format('M j, Y g:i A'),
         );
     }
 
