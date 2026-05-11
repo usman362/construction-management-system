@@ -532,7 +532,15 @@
                 if (!this.entry.date) return 'Work Date is required.';
                 if (!this.entry.employee_id) return 'Employee # is required.';
                 if (!this.entry.shift_id) return 'Shift is required.';
-                if (this.totalHours <= 0) return 'Enter at least one hour (ST, OT, or PR).';
+                // 2026-05-11 (Brenda): hours are no longer required when the
+                // line is just a per-diem or gate-log entry — clerks were
+                // being blocked from saving stand-alone per-diem rows.
+                // Require at least ONE of: hours, per-diem $, or gate-log hrs.
+                const perDiem = parseFloat(this.entry.per_diem_amount) || 0;
+                const gateLog = parseFloat(this.entry.gate_log_hours)  || 0;
+                if (this.totalHours <= 0 && perDiem <= 0 && gateLog <= 0) {
+                    return 'Enter hours, a per-diem amount, or gate-log hours before saving.';
+                }
                 return null;
             },
 
