@@ -100,7 +100,7 @@
             {{-- LEFT: data entry fields --}}
             <div class="legacy-fieldgrid">
                 <label>Job No.:</label>
-                <select x-model="entry.project_id">
+                <select x-model="entry.project_id" @change="onProjectChange()">
                     <option value="">— Select Job —</option>
                     @foreach ($projects as $project)
                         <option value="{{ $project->id }}">{{ $project->project_number ?? '—' }} — {{ $project->name }}</option>
@@ -168,8 +168,22 @@
                     @endforeach
                 </select>
 
+                {{-- 2026-05-11 (Brenda): "change orders are not updating
+                     into the dropdown of the bulk entry tab" — Work Order #
+                     is now a dropdown of Change Orders filtered by the
+                     selected Job. Picks the CO# (e.g. "001") as the saved
+                     work_order_number so it lines up with reporting + the
+                     legacy payroll CSV's WorkOrder column. --}}
                 <label>Work Order #:</label>
-                <input type="text" x-model="entry.work_order_number" maxlength="100" placeholder="optional">
+                <select x-model="entry.work_order_number" :disabled="!entry.project_id"
+                        :class="!entry.project_id ? 'field-disabled' : ''">
+                    <option value="">— None —</option>
+                    <template x-for="co in changeOrdersForProject" :key="co.id">
+                        <option :value="co.co_number"
+                                x-text="co.co_number + ' — ' + (co.title || '(no title)') + (co.status === 'pending' ? '  [pending]' : '')">
+                        </option>
+                    </template>
+                </select>
 
                 {{-- Earnings Category drives whether OT/PR are enabled.
                      HE = Hourly Earnings → all three buckets allowed
@@ -371,6 +385,11 @@
             // empty string if no Day-shift record exists in the DB.
             defaultShiftId: @json($defaultShiftId ?? ''),
 
+            // 2026-05-11 (Brenda): full change-order catalog. The Work Order #
+            // dropdown filters this list down to the picked Job (project_id)
+            // reactively via the changeOrdersForProject getter below.
+            changeOrders: @json($changeOrders ?? []),
+
             init() {
                 // Default the W/E and period to the current Mon–Sun week.
                 const t = new Date();
@@ -406,6 +425,15 @@
             },
 
             get lockOTPR() { return this.entry.earnings_category !== 'HE'; },
+
+            // 2026-05-11 (Brenda): filter change orders down to the picked
+            // job. Compares as strings so "1" (Alpine select value) matches
+            // 1 (numeric project_id from the catalog) without surprises.
+            get changeOrdersForProject() {
+                const pid = String(this.entry.project_id || '');
+                if (!pid) return [];
+                return this.changeOrders.filter(co => String(co.project_id) === pid);
+            },
 
             get totalHours() {
                 const r = parseFloat(this.entry.regular_hours) || 0;
@@ -473,6 +501,17 @@
                 if (this.lockOTPR) {
                     this.entry.overtime_hours = '';
                     this.entry.double_time_hours = '';
+                }
+            },
+
+            // 2026-05-11 (Brenda): clear any stale Work Order # when the
+            // user switches jobs — otherwise the dropdown would keep a CO#
+            // from the previous job's catalog while the new job's options
+            // re-render, and that orphan value would silently save.
+            onProjectChange() {
+                const cos = this.changeOrdersForProject;
+                if (this.entry.work_order_number && !cos.some(co => co.co_number === this.entry.work_order_number)) {
+                    this.entry.work_order_number = '';
                 }
             },
 

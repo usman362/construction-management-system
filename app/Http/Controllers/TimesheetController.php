@@ -7,6 +7,7 @@ use App\Models\TimesheetCostAllocation;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectBillableRate;
+use App\Models\ChangeOrder;
 use App\Models\Crew;
 use App\Models\Shift;
 use App\Models\CostCode;
@@ -831,6 +832,15 @@ class TimesheetController extends Controller
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
 
+        // 2026-05-11 (Brenda): Work Order # dropdown on bulk entry needs to
+        // reflect the change orders for the picked job. Pass the whole CO
+        // catalog (sans voided) — Alpine filters by entry.project_id on the
+        // client. Keeping it in one payload avoids an extra fetch per row.
+        $changeOrders = ChangeOrder::whereIn('status', ['approved', 'pending'])
+            ->orderBy('project_id')
+            ->orderBy('co_number')
+            ->get(['id', 'project_id', 'co_number', 'title', 'status']);
+
         $crewMembers = collect();
         if ($request->filled('crew_id')) {
             $crew = Crew::find($request->crew_id);
@@ -849,6 +859,7 @@ class TimesheetController extends Controller
             'costTypes'      => $costTypes,
             'employees'      => $employees,
             'crafts'         => $crafts,
+            'changeOrders'   => $changeOrders,
         ]);
     }
 
