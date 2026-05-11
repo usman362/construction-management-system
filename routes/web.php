@@ -292,8 +292,9 @@ Route::middleware('auth')->group(function () {
         // Bulk approve/reject — must come BEFORE the resource so "bulk-approve"
         // isn't matched as a {timesheet} parameter on the (PUT/PATCH/DELETE)
         // resource routes. Brenda asked for these 04.25.2026.
-        Route::post('timesheets/bulk-approve', [TimesheetController::class, 'bulkApprove'])->name('timesheets.bulk-approve');
-        Route::post('timesheets/bulk-reject',  [TimesheetController::class, 'bulkReject'])->name('timesheets.bulk-reject');
+        Route::post('timesheets/bulk-approve',       [TimesheetController::class, 'bulkApprove'])->name('timesheets.bulk-approve');
+        Route::post('timesheets/bulk-approve-range', [TimesheetController::class, 'bulkApproveRange'])->name('timesheets.bulk-approve-range');
+        Route::post('timesheets/bulk-reject',        [TimesheetController::class, 'bulkReject'])->name('timesheets.bulk-reject');
         Route::resource('timesheets', TimesheetController::class);
         Route::post('timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])->name('timesheets.approve');
         Route::post('timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])->name('timesheets.reject');

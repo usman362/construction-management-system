@@ -739,6 +739,64 @@ class TimesheetController extends Controller
         return response()->json(['success' => true, 'message' => $msg, 'approved' => $count, 'skipped' => $skipped]);
     }
 
+    /**
+     * Bulk approve every Submitted timesheet within a date range (Brenda
+     * 2026-05-12: "maybe with a date range ie 05/04/2026 - 05/10/2026").
+     *
+     * Optional `project_id` / `employee_id` filters narrow the sweep. Only
+     * rows currently in 'submitted' status are touched — already-approved
+     * or rejected rows are left alone and counted as "skipped".
+     */
+    public function bulkApproveRange(Request $request): JsonResponse
+    {
+        abort_unless(auth()->user()?->canApproveTimesheets(), 403,
+            'Only an Admin or Site Manager may approve timesheets.');
+
+        $data = $request->validate([
+            'date_from'   => 'required|date',
+            'date_to'     => 'required|date|after_or_equal:date_from',
+            'project_id'  => 'nullable|integer|exists:projects,id',
+            'employee_id' => 'nullable|integer|exists:employees,id',
+        ]);
+
+        $base = Timesheet::query()
+            ->whereDate('date', '>=', $data['date_from'])
+            ->whereDate('date', '<=', $data['date_to']);
+
+        if (!empty($data['project_id']))  $base->where('project_id',  $data['project_id']);
+        if (!empty($data['employee_id'])) $base->where('employee_id', $data['employee_id']);
+
+        // Snapshot eligible + total counts BEFORE the update so the message
+        // can report both "X approved" and "Y skipped (already processed)".
+        $eligible = (clone $base)->where('status', 'submitted')->count();
+        $total    = (clone $base)->count();
+
+        $count = 0;
+        \DB::transaction(function () use ($base, &$count) {
+            $count = (clone $base)
+                ->where('status', 'submitted')
+                ->update([
+                    'status'      => 'approved',
+                    'approved_by' => auth()->id(),
+                    'approved_at' => now(),
+                ]);
+        });
+
+        $skipped = $total - $count;
+        $msg = $count === 0
+            ? "No submitted timesheets found in {$data['date_from']} – {$data['date_to']}."
+            : "{$count} timesheet(s) approved." . ($skipped > 0
+                ? " {$skipped} already approved or rejected — left alone." : '');
+
+        return response()->json([
+            'success'  => true,
+            'message'  => $msg,
+            'approved' => $count,
+            'skipped'  => $skipped,
+            'total'    => $total,
+        ]);
+    }
+
     public function bulkReject(Request $request): JsonResponse
     {
         abort_unless(auth()->user()?->canApproveTimesheets(), 403,

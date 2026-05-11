@@ -20,6 +20,17 @@
             Bulk Entry
         </a>
 
+        {{-- 2026-05-12 (Brenda): Bulk Approval by date range. Approves every
+             timesheet still in "Submitted" status for the picked week (or
+             range) in one shot — faster than ticking each row. Only visible
+             to Admin + Site Manager (same gate as the inline bulk bar). --}}
+        @if (auth()->user()?->canApproveTimesheets())
+        <button onclick="openBulkApproveModal()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition" title="Approve every submitted timesheet in a date range">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Bulk Approval
+        </button>
+        @endif
+
         {{-- 2026-04-29 — "Snap-a-Timesheet" AI OCR. The standout button on
              this page: gradient + sparkle icon + "AI" pill so it visually
              pops. Click → modal where the user uploads a photo of a paper
@@ -126,6 +137,43 @@
         </div>
     </div>
 </div>
+
+{{-- Bulk Approval by date range modal (Brenda 2026-05-12).
+     Default range = this Mon–Sun week so the common "approve last
+     week's payroll" flow is one click + Enter. --}}
+@if (auth()->user()?->canApproveTimesheets())
+<div id="bulkApproveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('bulkApproveModal')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-t-xl">
+            <h3 class="text-lg font-bold">Bulk Approval — by Date Range</h3>
+            <button onclick="closeModal('bulkApproveModal')" class="text-emerald-100 hover:text-white"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <form id="bulkApproveForm" class="p-6 space-y-4">
+            <p class="text-xs text-gray-600">Approves every timesheet still in <strong>Submitted</strong> status within this date range. Already-approved or rejected rows are left alone.</p>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">From</label>
+                    <input type="date" name="date_from" id="bulkApprove_from" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">To</label>
+                    <input type="date" name="date_to" id="bulkApprove_to" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+            </div>
+            <div class="text-xs text-gray-500">Tip: defaults to this Mon–Sun week. Use the prior-week shortcut to approve last week's payroll in one click.</div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" onclick="bulkApproveSetRange('this-week')"   class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">This week (Mon–Sun)</button>
+                <button type="button" onclick="bulkApproveSetRange('last-week')"   class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">Last week</button>
+                <button type="button" onclick="bulkApproveSetRange('this-month')"  class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">This month</button>
+            </div>
+        </form>
+        <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100 rounded-b-xl">
+            <button onclick="closeModal('bulkApproveModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button type="button" id="bulkApproveSubmitBtn" onclick="submitBulkApproveRange()" class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Approve All in Range</button>
+        </div>
+    </div>
+</div>
+@endif
 
 {{-- Bulk action bar — appears the moment any row is checked. Brenda asked
      for bulk approve 04.25.2026. Approve/Reject only act on rows whose
@@ -632,6 +680,74 @@ function bulkRejectSelected() {
 
 // Reset master checkbox + selection state on every DataTable redraw (page change, filter, etc.)
 table.on('draw', () => { document.getElementById('bulkSelectAll').checked = false; });
+
+// ─── Bulk Approval by date range (Brenda 2026-05-12) ─────────────
+function _ymd(d) {
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), da = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${da}`;
+}
+function bulkApproveSetRange(which) {
+    const t = new Date();
+    const dow = (t.getDay() + 6) % 7; // 0 = Mon
+    const mon = new Date(t); mon.setDate(t.getDate() - dow);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    let from = mon, to = sun;
+    if (which === 'last-week') {
+        from = new Date(mon); from.setDate(mon.getDate() - 7);
+        to   = new Date(sun); to.setDate(sun.getDate() - 7);
+    } else if (which === 'this-month') {
+        from = new Date(t.getFullYear(), t.getMonth(), 1);
+        to   = new Date(t.getFullYear(), t.getMonth() + 1, 0);
+    }
+    document.getElementById('bulkApprove_from').value = _ymd(from);
+    document.getElementById('bulkApprove_to').value   = _ymd(to);
+}
+function openBulkApproveModal() {
+    // Pre-fill last week — that's the typical payroll-approval flow.
+    bulkApproveSetRange('last-week');
+    openModal('bulkApproveModal');
+}
+function submitBulkApproveRange() {
+    const from = document.getElementById('bulkApprove_from').value;
+    const to   = document.getElementById('bulkApprove_to').value;
+    if (!from || !to) {
+        Toast.fire({ icon: 'error', title: 'Please pick a From and To date.' });
+        return;
+    }
+    if (from > to) {
+        Toast.fire({ icon: 'error', title: 'From date must be on or before To date.' });
+        return;
+    }
+    Swal.fire({
+        title: 'Approve all submitted timesheets?',
+        html: 'Range: <strong>' + from + '</strong> &nbsp;to&nbsp; <strong>' + to + '</strong><br><span class="text-xs text-gray-500">Only rows still in "Submitted" status will be approved.</span>',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#16a34a',
+        confirmButtonText: 'Approve all',
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        const btn = document.getElementById('bulkApproveSubmitBtn');
+        btn.disabled = true; btn.textContent = 'Approving…';
+        $.ajax({
+            url: '{{ route("timesheets.bulk-approve-range") }}',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ date_from: from, date_to: to }),
+            success: function (res) {
+                Toast.fire({ icon: res.approved > 0 ? 'success' : 'info', title: res.message });
+                closeModal('bulkApproveModal');
+                table.ajax.reload(null, false);
+            },
+            error: function (xhr) {
+                Toast.fire({ icon: 'error', title: xhr.responseJSON?.message || 'Bulk approval failed' });
+            },
+            complete: function () {
+                btn.disabled = false; btn.textContent = 'Approve All in Range';
+            },
+        });
+    });
+}
 
 function openCreateModal(){
     document.getElementById('createForm').reset();
