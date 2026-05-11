@@ -343,6 +343,22 @@ class EstimateController extends Controller
         $data = $this->validateLine($request);
         $data['estimate_id'] = $estimate->id;
 
+        // 2026-05-11 (Brenda): map legacy modal fields onto the new schema.
+        //   - Default line_type to 'other' (modal doesn't expose it)
+        //   - `labor_hours` (legacy) → `hours` (new column EstimateLine reads)
+        //   - `amount` alone (no qty/unit_cost) → treat as quantity=1 × unit_cost=amount
+        //     so EstimateLine::recalculate() produces the right cost_amount.
+        $data['line_type'] = $data['line_type'] ?? 'other';
+        if (! empty($data['labor_hours']) && empty($data['hours'])) {
+            $data['hours'] = $data['labor_hours'];
+        }
+        unset($data['labor_hours']);
+        if (! empty($data['amount']) && empty($data['quantity']) && empty($data['unit_cost'])) {
+            $data['quantity']  = 1;
+            $data['unit_cost'] = $data['amount'];
+        }
+        unset($data['amount']);
+
         // If the user didn't pick a markup_percent, fall back to the client's
         // default for this line type (set in ClientDefaultMarkup).
         $data['markup_percent'] = $this->resolveMarkup($data, $estimate);
@@ -382,15 +398,20 @@ class EstimateController extends Controller
      */
     private function validateLine(Request $request): array
     {
+        // 2026-05-11 BUG FIX (Brenda): legacy "Add Line Item" modal sends
+        // `amount` + `labor_hours` and does NOT send `line_type`. Validation
+        // was rejecting because line_type was required. Made line_type
+        // nullable (defaults to 'other' in addLine), and accept the legacy
+        // field names so they don't get silently dropped from validated().
         $rules = [
-            'line_type'      => 'required|in:' . implode(',', array_keys(EstimateLine::TYPES)),
+            'line_type'      => 'nullable|in:' . implode(',', array_keys(EstimateLine::TYPES)),
             'section_id'     => 'nullable|exists:estimate_sections,id',
             'sort_order'     => 'nullable|integer',
             'description'    => 'required|string|max:500',
             'cost_code_id'   => 'nullable|exists:cost_codes,id',
             'cost_type_id'   => 'nullable|exists:cost_types,id',
 
-            // Labor fields
+            // Labor fields (new schema)
             'craft_id'             => 'nullable|exists:crafts,id',
             'hours'                => 'nullable|numeric|min:0',
             'hourly_cost_rate'     => 'nullable|numeric|min:0',
@@ -400,13 +421,18 @@ class EstimateController extends Controller
             'material_id'  => 'nullable|exists:materials,id',
             'equipment_id' => 'nullable|exists:equipment,id',
 
-            // Generic qty/unit-cost (materials, equipment, sub, other)
+            // Generic qty/unit-cost
             'quantity'  => 'nullable|numeric|min:0',
             'unit'      => 'nullable|string|max:50',
             'unit_cost' => 'nullable|numeric|min:0',
 
+            // Legacy fields that the simple "Add Line Item" modal sends.
+            // Mapped onto the new schema inside addLine() below.
+            'amount'      => 'nullable|numeric|min:0',
+            'labor_hours' => 'nullable|numeric|min:0',
+
             // Pricing
-            'markup_percent' => 'nullable|numeric|min:0|max:10',  // 10 = 1000% just in case
+            'markup_percent' => 'nullable|numeric|min:0|max:10',
             'notes'          => 'nullable|string|max:1000',
         ];
 
