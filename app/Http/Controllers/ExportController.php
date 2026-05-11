@@ -242,32 +242,35 @@ class ExportController extends Controller
     }
 
     /**
-     * Legacy Payroll Import CSV (Brenda 2026-05-11).
+     * Legacy Payroll Import CSV (Brenda 2026-05-12 — updated from her
+     * filled-out example "Payroll Import Sheet.csv").
      *
-     * Brenda's legacy payroll system imports a CSV with this specific 23-
-     * column header. Each timesheet emits up to THREE rows — one each for
-     * Regular, Overtime, and Double-time hours — because the legacy system
-     * keys hour-type as a separate record (matches how the Payroll
-     * Pre-processor xlsx we imported earlier was structured).
+     * Format follows Brenda's example: ONE row per keyed timesheet (total
+     * hours — no ST/OT/DT split, the legacy system handles OT itself), and
+     * Rate / Amount / Class deliberately left BLANK because Brenda's quote
+     * was: "The information it needs is mostly the legacy stuff and the
+     * hours I keyed." Her payroll system fills rate/amount on import.
+     *
+     * Header is 24 columns (Position was added between GLAccount and Class
+     * in her updated example).
      *
      * Columns we map from existing data:
      *   EmpID         → employee_number
-     *   WorkDate      → date (MM/DD/YYYY for legacy compatibility)
+     *   WorkDate      → date (M/D/YYYY — no leading zeros, matches example)
      *   CraftCode     → employee.craft.code
-     *   Shift         → shift.name
-     *   Hours         → the row's hour bucket (reg / ot / dt)
+     *   Hours         → regular + overtime + double-time (her keyed total)
      *   WTL           → work_through_lunch (1 / blank)
-     *   Rate          → regular_rate / overtime_rate / (2x regular_rate for DT)
-     *   Amount        → Hours * Rate
      *   JobNumber     → project.project_number
-     *   JobLineItem   → cost_code.code
+     *   JobLineItem   → cost_code.code  (blank in her example — emit if known)
      *   WorkOrder     → work_order_number
-     *   Class         → earnings_category (HE / HO / VA)
      *   Comments      → notes
      *
-     * Columns the legacy system expects but we don't track yet — emit blank:
-     *   Union, CraftModifier, StartTime, EndTime, UnitCode, Activity,
-     *   Department, WorkerCompensation, Burden, GLAccount
+     * Columns the legacy system expects but we don't track per-employee yet:
+     *   Union, CraftModifier, Shift, StartTime, EndTime, UnitCode, Activity,
+     *   Department, WorkerCompensation, Burden, GLAccount, Position, Class,
+     *   Rate, Amount — all emit blank. Brenda's payroll team fills the rest
+     *   on import, OR will send a per-employee Department/Position mapping
+     *   we'll layer on later.
      */
     public function payrollLegacyCsv(Request $request)
     {
@@ -276,7 +279,6 @@ class ExportController extends Controller
             'employee.craft:id,code,name',
             'project:id,project_number,name',
             'costCode:id,code,name',
-            'shift:id,name',
         ]);
 
         if ($status     = $request->input('status'))      $query->where('status', $status);
@@ -287,68 +289,63 @@ class ExportController extends Controller
 
         $timesheets = $query->orderBy('date')->orderBy('employee_id')->get();
 
-        // Exact header order matches "Payroll Import Template.csv"
+        // Exact header order matches "Payroll Import Sheet.csv" (Brenda's
+        // filled-out example, 2026-05-12). 24 columns — Position added.
         $header = [
             'EmpID', 'WorkDate', 'Union', 'CraftCode', 'CraftModifier', 'Shift',
             'Hours', 'WTL', 'Rate', 'Amount', 'StartTime', 'EndTime',
             'JobNumber', 'JobLineItem', 'WorkOrder', 'UnitCode', 'Activity',
-            'Department', 'WorkerCompensation', 'Burden', 'GLAccount', 'Class',
-            'Comments',
+            'Department', 'WorkerCompensation', 'Burden', 'GLAccount',
+            'Position', 'Class', 'Comments',
         ];
 
         $rows = [];
         foreach ($timesheets as $t) {
             $empNum   = $t->employee?->employee_number ?? '';
-            $workDate = optional($t->date)->format('m/d/Y') ?? '';
+            // M/D/YYYY (no leading zeros) to match her example exactly
+            // (e.g. "2/23/2026", not "02/23/2026").
+            $workDate = $t->date ? $t->date->format('n/j/Y') : '';
             $craft    = $t->employee?->craft?->code ?? '';
-            $shift    = $t->shift?->name ?? '';
             $wtl      = $t->work_through_lunch ? '1' : '';
             $job      = $t->project?->project_number ?? '';
             $phase    = $t->costCode?->code ?? '';
             $wo       = $t->work_order_number ?? '';
-            $class    = $t->earnings_category ?? 'HE';
             $notes    = $t->notes ?? '';
 
-            $regRate = (float) ($t->regular_rate ?? 0);
-            $otRate  = (float) ($t->overtime_rate ?? ($regRate * 1.5));
-            $dtRate  = $regRate * 2;
+            // Total hours = keyed buckets summed. Drop trailing zeros so 8.00
+            // renders as "8" (matches her example), but preserves 8.5 etc.
+            $totalHours = (float) $t->regular_hours
+                        + (float) $t->overtime_hours
+                        + (float) $t->double_time_hours;
+            $hoursStr   = rtrim(rtrim(number_format($totalHours, 2, '.', ''), '0'), '.');
+            if ($hoursStr === '' || $hoursStr === '-') $hoursStr = '0';
 
-            // Emit one CSV row per non-zero hour bucket. Legacy systems
-            // typically expect ST / OT / DT as separate import lines.
-            $buckets = [
-                ['hours' => (float) $t->regular_hours,     'rate' => $regRate],
-                ['hours' => (float) $t->overtime_hours,    'rate' => $otRate],
-                ['hours' => (float) $t->double_time_hours, 'rate' => $dtRate],
+            $rows[] = [
+                $empNum,    // EmpID
+                $workDate,  // WorkDate
+                '',         // Union
+                $craft,     // CraftCode
+                '',         // CraftModifier
+                '',         // Shift  (blank in her example)
+                $hoursStr,  // Hours
+                $wtl,       // WTL
+                '',         // Rate   (legacy system fills on import)
+                '',         // Amount (legacy system fills on import)
+                '',         // StartTime
+                '',         // EndTime
+                $job,       // JobNumber
+                $phase,     // JobLineItem
+                $wo,        // WorkOrder
+                '',         // UnitCode
+                '',         // Activity
+                '',         // Department (per-employee mapping — pending from Brenda)
+                '',         // WorkerCompensation
+                '',         // Burden
+                '',         // GLAccount
+                '',         // Position   (per-employee mapping — pending from Brenda)
+                '',         // Class
+                $notes,     // Comments
             ];
-
-            foreach ($buckets as $b) {
-                if ($b['hours'] <= 0) continue;
-                $rows[] = [
-                    $empNum,                                // EmpID
-                    $workDate,                              // WorkDate
-                    '',                                     // Union
-                    $craft,                                 // CraftCode
-                    '',                                     // CraftModifier
-                    $shift,                                 // Shift
-                    number_format($b['hours'], 2, '.', ''), // Hours
-                    $wtl,                                   // WTL
-                    number_format($b['rate'], 2, '.', ''),  // Rate
-                    number_format($b['hours'] * $b['rate'], 2, '.', ''), // Amount
-                    '',                                     // StartTime
-                    '',                                     // EndTime
-                    $job,                                   // JobNumber
-                    $phase,                                 // JobLineItem
-                    $wo,                                    // WorkOrder
-                    '',                                     // UnitCode
-                    '',                                     // Activity
-                    '',                                     // Department
-                    '',                                     // WorkerCompensation
-                    '',                                     // Burden
-                    '',                                     // GLAccount
-                    $class,                                 // Class
-                    $notes,                                 // Comments
-                ];
-            }
         }
 
         $filename = 'payroll-import-' . now()->format('Ymd-His') . '.csv';
