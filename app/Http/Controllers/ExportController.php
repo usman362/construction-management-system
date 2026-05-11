@@ -240,4 +240,127 @@ class ExportController extends Controller
             title: 'RFIs — exported ' . now()->format('M j, Y g:i A'),
         );
     }
+
+    /**
+     * Legacy Payroll Import CSV (Brenda 2026-05-11).
+     *
+     * Brenda's legacy payroll system imports a CSV with this specific 23-
+     * column header. Each timesheet emits up to THREE rows — one each for
+     * Regular, Overtime, and Double-time hours — because the legacy system
+     * keys hour-type as a separate record (matches how the Payroll
+     * Pre-processor xlsx we imported earlier was structured).
+     *
+     * Columns we map from existing data:
+     *   EmpID         → employee_number
+     *   WorkDate      → date (MM/DD/YYYY for legacy compatibility)
+     *   CraftCode     → employee.craft.code
+     *   Shift         → shift.name
+     *   Hours         → the row's hour bucket (reg / ot / dt)
+     *   WTL           → work_through_lunch (1 / blank)
+     *   Rate          → regular_rate / overtime_rate / (2x regular_rate for DT)
+     *   Amount        → Hours * Rate
+     *   JobNumber     → project.project_number
+     *   JobLineItem   → cost_code.code
+     *   WorkOrder     → work_order_number
+     *   Class         → earnings_category (HE / HO / VA)
+     *   Comments      → notes
+     *
+     * Columns the legacy system expects but we don't track yet — emit blank:
+     *   Union, CraftModifier, StartTime, EndTime, UnitCode, Activity,
+     *   Department, WorkerCompensation, Burden, GLAccount
+     */
+    public function payrollLegacyCsv(Request $request)
+    {
+        $query = Timesheet::with([
+            'employee:id,first_name,last_name,employee_number,craft_id',
+            'employee.craft:id,code,name',
+            'project:id,project_number,name',
+            'costCode:id,code,name',
+            'shift:id,name',
+        ]);
+
+        if ($status     = $request->input('status'))      $query->where('status', $status);
+        if ($projectId  = $request->input('project_id'))  $query->where('project_id', $projectId);
+        if ($employeeId = $request->input('employee_id')) $query->where('employee_id', $employeeId);
+        if ($from       = $request->input('date_from'))   $query->whereDate('date', '>=', $from);
+        if ($to         = $request->input('date_to'))     $query->whereDate('date', '<=', $to);
+
+        $timesheets = $query->orderBy('date')->orderBy('employee_id')->get();
+
+        // Exact header order matches "Payroll Import Template.csv"
+        $header = [
+            'EmpID', 'WorkDate', 'Union', 'CraftCode', 'CraftModifier', 'Shift',
+            'Hours', 'WTL', 'Rate', 'Amount', 'StartTime', 'EndTime',
+            'JobNumber', 'JobLineItem', 'WorkOrder', 'UnitCode', 'Activity',
+            'Department', 'WorkerCompensation', 'Burden', 'GLAccount', 'Class',
+            'Comments',
+        ];
+
+        $rows = [];
+        foreach ($timesheets as $t) {
+            $empNum   = $t->employee?->employee_number ?? '';
+            $workDate = optional($t->date)->format('m/d/Y') ?? '';
+            $craft    = $t->employee?->craft?->code ?? '';
+            $shift    = $t->shift?->name ?? '';
+            $wtl      = $t->work_through_lunch ? '1' : '';
+            $job      = $t->project?->project_number ?? '';
+            $phase    = $t->costCode?->code ?? '';
+            $wo       = $t->work_order_number ?? '';
+            $class    = $t->earnings_category ?? 'HE';
+            $notes    = $t->notes ?? '';
+
+            $regRate = (float) ($t->regular_rate ?? 0);
+            $otRate  = (float) ($t->overtime_rate ?? ($regRate * 1.5));
+            $dtRate  = $regRate * 2;
+
+            // Emit one CSV row per non-zero hour bucket. Legacy systems
+            // typically expect ST / OT / DT as separate import lines.
+            $buckets = [
+                ['hours' => (float) $t->regular_hours,     'rate' => $regRate],
+                ['hours' => (float) $t->overtime_hours,    'rate' => $otRate],
+                ['hours' => (float) $t->double_time_hours, 'rate' => $dtRate],
+            ];
+
+            foreach ($buckets as $b) {
+                if ($b['hours'] <= 0) continue;
+                $rows[] = [
+                    $empNum,                                // EmpID
+                    $workDate,                              // WorkDate
+                    '',                                     // Union
+                    $craft,                                 // CraftCode
+                    '',                                     // CraftModifier
+                    $shift,                                 // Shift
+                    number_format($b['hours'], 2, '.', ''), // Hours
+                    $wtl,                                   // WTL
+                    number_format($b['rate'], 2, '.', ''),  // Rate
+                    number_format($b['hours'] * $b['rate'], 2, '.', ''), // Amount
+                    '',                                     // StartTime
+                    '',                                     // EndTime
+                    $job,                                   // JobNumber
+                    $phase,                                 // JobLineItem
+                    $wo,                                    // WorkOrder
+                    '',                                     // UnitCode
+                    '',                                     // Activity
+                    '',                                     // Department
+                    '',                                     // WorkerCompensation
+                    '',                                     // Burden
+                    '',                                     // GLAccount
+                    $class,                                 // Class
+                    $notes,                                 // Comments
+                ];
+            }
+        }
+
+        $filename = 'payroll-import-' . now()->format('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($header, $rows) {
+            $handle = fopen('php://output', 'w');
+            // Pass all 4 args explicitly to silence PHP 8.4 fputcsv() deprecation.
+            fputcsv($handle, $header, ',', '"', '\\');
+            foreach ($rows as $r) fputcsv($handle, $r, ',', '"', '\\');
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
 }

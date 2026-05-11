@@ -74,6 +74,7 @@ Route::middleware('auth')->group(function () {
         Route::get('purchase-orders', [\App\Http\Controllers\ExportController::class, 'purchaseOrders'])->name('purchase-orders');
         Route::get('change-orders',   [\App\Http\Controllers\ExportController::class, 'changeOrders'])->name('change-orders');
         Route::get('rfis',            [\App\Http\Controllers\ExportController::class, 'rfis'])->name('rfis');
+        Route::get('payroll-import',  [\App\Http\Controllers\ExportController::class, 'payrollLegacyCsv'])->name('payroll-import');
     });
 
     // Profile — every logged-in user

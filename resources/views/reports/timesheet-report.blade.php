@@ -338,6 +338,9 @@
             <a href="{{ route('reports.timesheets.pdf', request()->query()) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded">
                 Download PDF
             </a>
+            <a href="{{ route('exports.payroll-import', request()->query()) }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded" title="Export in legacy payroll system import format">
+                Download Payroll CSV
+            </a>
             <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded">
                 Print
             </button>
