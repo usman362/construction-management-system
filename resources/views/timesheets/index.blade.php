@@ -703,8 +703,10 @@ function bulkApproveSetRange(which) {
     document.getElementById('bulkApprove_to').value   = _ymd(to);
 }
 function openBulkApproveModal() {
-    // Pre-fill last week — that's the typical payroll-approval flow.
-    bulkApproveSetRange('last-week');
+    // 2026-05-12 (Brenda): default to THIS week so timesheets keyed today
+    // are immediately in range. She tried it after keying today's entries
+    // and the old default (last week) returned nothing.
+    bulkApproveSetRange('this-week');
     openModal('bulkApproveModal');
 }
 function submitBulkApproveRange() {

@@ -188,6 +188,11 @@ class TimesheetController extends Controller
             'client_signature_name' => 'nullable|string|max:150',
             // 2026-04-28: Earnings category (HE/HO/VA). Default 'HE' = worked hours.
             'earnings_category' => 'nullable|in:HE,HO,VA',
+            // 2026-05-12 (Brenda): bulk-entry form sends status='submitted'
+            // so the row is ready for approval. Without this rule the value
+            // was being silently dropped and every keyed timesheet stayed
+            // 'draft' — which is why Bulk Approval found "no timesheets".
+            'status' => 'nullable|in:draft,submitted,approved,rejected',
             'notes' => 'nullable|string',
         ]);
 
@@ -236,7 +241,10 @@ class TimesheetController extends Controller
             'rate_type' => $totals['rate_type'],
             'earnings_category' => $validated['earnings_category'] ?? 'HE',
             'project_billable_rate_id' => $totals['project_billable_rate_id'],
-            'status' => 'draft',
+            // Honor the status from the request (bulk entry sends
+            // 'submitted'); fall back to 'draft' for the legacy single-add
+            // flow where the field isn't passed.
+            'status' => $validated['status'] ?? 'draft',
             'notes' => $validated['notes'] ?? null,
         ]);
 

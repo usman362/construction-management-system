@@ -25,11 +25,18 @@ class User extends Authenticatable
     const ROLE_FIELD = 'field';
     const ROLE_FOREMAN = 'foreman';
     const ROLE_VIEWER = 'viewer';
+    // 2026-05-12 (Brenda): HR role for the person who manages employee
+    // records + certifications but must NOT see pay rates. Same access
+    // surface as Site Manager for employees/certs, minus timesheet
+    // approval (HR doesn't sign off labor). Pay-rate gate explicitly
+    // omits this role — see canSeeEmployeeRates().
+    const ROLE_HR = 'hr';
 
     const ROLES = [
         self::ROLE_ADMIN => 'Admin',
         self::ROLE_PROJECT_MANAGER => 'Project Manager',
         self::ROLE_SITE_MANAGER => 'Site Manager',
+        self::ROLE_HR => 'HR',
         self::ROLE_ACCOUNTANT => 'Accountant',
         self::ROLE_FOREMAN => 'Foreman',
         self::ROLE_FIELD => 'Field Staff',
@@ -98,6 +105,11 @@ class User extends Authenticatable
     public function isAccountant(): bool
     {
         return $this->role === self::ROLE_ACCOUNTANT;
+    }
+
+    public function isHr(): bool
+    {
+        return $this->role === self::ROLE_HR;
     }
 
     /**
@@ -196,12 +208,13 @@ class User extends Authenticatable
         $permissions = [
             'dashboard' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_FIELD, self::ROLE_VIEWER],
             'projects' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_FIELD, self::ROLE_VIEWER],
-            // 2026-05-12 (Brenda): Site Manager added so the on-site
-            // supervisor can open employee records to manage certifications.
-            // Rate fields are hidden via canSeeEmployeeRates() — pay info
-            // stays restricted to admin/PM/accountant.
-            'employees' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_SITE_MANAGER],
-            'certifications' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_SITE_MANAGER],
+            // 2026-05-12 (Brenda): Site Manager + HR added so the on-site
+            // supervisor / HR coordinator can open employee records to
+            // manage certifications. Rate fields are hidden via
+            // canSeeEmployeeRates() — pay info stays restricted to
+            // admin / PM / accountant.
+            'employees' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_SITE_MANAGER, self::ROLE_HR],
+            'certifications' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_ACCOUNTANT, self::ROLE_SITE_MANAGER, self::ROLE_HR],
             'crafts' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER],
             'crews' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER, self::ROLE_FIELD],
             'shifts' => [self::ROLE_ADMIN, self::ROLE_PROJECT_MANAGER],
