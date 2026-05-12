@@ -284,7 +284,11 @@ class ExportController extends Controller
     public function payrollLegacyCsv(Request $request)
     {
         $query = Timesheet::with([
-            'employee:id,first_name,last_name,employee_number,craft_id',
+            // legacy_craft + legacy_position pulled so the CSV's CraftCode +
+            // Position columns can map straight to her legacy payroll system
+            // (Brenda 2026-05-12: "change the craft to the legacy craft in
+            // the employee file ... just for now").
+            'employee:id,first_name,last_name,employee_number,craft_id,legacy_craft,legacy_position',
             'employee.craft:id,code,name',
             'project:id,project_number,name',
             'costCode:id,code,name',
@@ -314,7 +318,13 @@ class ExportController extends Controller
             // M/D/YYYY (no leading zeros) to match her example exactly
             // (e.g. "2/23/2026", not "02/23/2026").
             $workDate = $t->date ? $t->date->format('n/j/Y') : '';
-            $craft    = $t->employee?->craft?->code ?? '';
+            // 2026-05-12 (Brenda): CraftCode now sources from the employee's
+            // legacy_craft field (the code used in her legacy payroll
+            // system), falling back to the in-app craft.code only if
+            // legacy_craft hasn't been filled in. Same idea for Position.
+            $legacyCraft = trim((string) ($t->employee?->legacy_craft ?? ''));
+            $craft    = $legacyCraft !== '' ? $legacyCraft : ($t->employee?->craft?->code ?? '');
+            $position = trim((string) ($t->employee?->legacy_position ?? ''));
             $wtl      = $t->work_through_lunch ? '1' : '';
             $job      = $t->project?->project_number ?? '';
             $phase    = $t->costCode?->code ?? '';
@@ -351,7 +361,7 @@ class ExportController extends Controller
                 '',         // WorkerCompensation
                 '',         // Burden
                 '',         // GLAccount
-                '',         // Position   (per-employee mapping — pending from Brenda)
+                $position,  // Position   (employee.legacy_position)
                 '',         // Class
                 $notes,     // Comments
             ];
