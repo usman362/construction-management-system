@@ -256,11 +256,17 @@ Route::middleware('auth')->group(function () {
     });
 
     // ─── Workforce Management ────────────────────────────────────
+    // 2026-05-12 (Brenda): site_manager + hr added so the on-site supervisor /
+    // HR coordinator can open employee records (rates are still hidden via
+    // canSeeEmployeeRates()). Import endpoints stay restricted to the original
+    // payroll-handling roles to avoid mass-create from a non-rate user.
     Route::middleware('role:admin,project_manager,accountant')->group(function () {
         // Import routes must be registered BEFORE resource routes so they don't
         // get captured by the {employee} parameter.
         Route::get('employees/import/template', [ImportController::class, 'employeeTemplate'])->name('employees.import.template');
         Route::post('employees/import', [ImportController::class, 'employeeImport'])->name('employees.import');
+    });
+    Route::middleware('role:admin,project_manager,accountant,site_manager,hr')->group(function () {
         Route::resource('employees', EmployeeController::class);
     });
 

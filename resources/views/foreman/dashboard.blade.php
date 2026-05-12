@@ -29,6 +29,17 @@
     @endif
 
     @foreach($crews as $crew)
+        {{-- 2026-05-12: skip orphan crews (no project linked). Every action
+             button below uses route('projects.*', $crew->project) which
+             throws a "Missing required parameter" 500 if the project is
+             null — that error page is what Brenda was seeing as "raw code".
+             A safer fail-soft: render a small placeholder and move on. --}}
+        @if(! $crew->project)
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+                Crew <strong>{{ $crew->name }}</strong> isn't linked to a project — skipping. An admin can fix this by editing the crew and picking a project.
+            </div>
+            @continue
+        @endif
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 
             {{-- Crew header --}}
