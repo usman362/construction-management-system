@@ -223,6 +223,10 @@ Route::middleware('auth')->group(function () {
             // Mobile-first daily log creator — registered BEFORE the resource
             // so /daily-logs/mobile-create isn't matched as {dailyLog}.
             Route::get('daily-logs/mobile-create', [DailyLogController::class, 'mobileCreate'])->name('daily-logs.mobile-create');
+            // 2026-05-12 (Brenda — Phase 2): AI Daily Log Generator endpoint.
+            // Browser SpeechRecognition transcribes locally → POSTs here → Groq
+            // returns a structured field set the mobile UI auto-fills.
+            Route::post('daily-logs/voice-parse', [DailyLogController::class, 'voiceParse'])->name('daily-logs.voice-parse');
             Route::resource('daily-logs', DailyLogController::class);
         });
 

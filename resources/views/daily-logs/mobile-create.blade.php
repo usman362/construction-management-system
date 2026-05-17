@@ -29,6 +29,34 @@
 
     <div id="qcStatus" class="hidden rounded-lg p-3 text-sm"></div>
 
+    {{-- 2026-05-12 (Brenda — Phase 2): AI Daily Log Generator.
+         Big "speak it" button at the top of the page so the foreman never
+         has to type on a phone keyboard. SpeechRecognition transcribes in
+         the browser; the transcript is POSTed to /daily-logs/voice-parse;
+         Groq Llama returns structured fields; we auto-fill every form
+         input and surface a green banner with the summary. The form
+         stays editable so the foreman can adjust before saving. --}}
+    <div id="aiDictateCard" class="bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-600 text-white rounded-xl shadow-md p-5">
+        <div class="flex items-start gap-3 mb-3">
+            <div class="flex-1">
+                <h3 class="text-base font-bold flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+                    AI Dictation
+                    <span class="bg-yellow-400 text-purple-900 text-[10px] font-black px-1.5 py-0.5 rounded-full shadow">AI</span>
+                </h3>
+                <p class="text-xs text-purple-100 mt-0.5">Tap mic, say what happened today, AI fills the form.</p>
+            </div>
+        </div>
+        <button type="button" id="aiDictateBtn" class="w-full bg-white text-purple-700 font-bold text-base py-4 rounded-lg shadow flex items-center justify-center gap-2 active:bg-purple-50 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+            <span id="aiDictateLabel">Tap to start dictation</span>
+        </button>
+        <p id="aiDictateHint" class="text-[11px] text-purple-100 mt-2 leading-relaxed">
+            Example: "Sunny day, around 80 degrees. Crew of 5 finished welding the tank skirt. Inspector from OSHA came by around 2. One near-miss when a hose snapped, no injuries. Sherwin delivery showed up at 10."
+        </p>
+        <div id="aiDictateTranscript" class="hidden mt-3 bg-white/10 backdrop-blur rounded-lg p-3 text-xs leading-relaxed"></div>
+    </div>
+
     <form id="quickLogForm" class="space-y-4 bg-white rounded-xl shadow-sm border border-gray-200 p-5"
           enctype="multipart/form-data">
         @csrf
@@ -143,6 +171,7 @@ const QC_WEATHER_API_KEY = @json(\App\Models\Setting::get('weather_api_key', '')
 const QC_STORE_URL  = '{{ route("projects.daily-logs.store", $project) }}';
 const QC_DOCS_URL   = '{{ route("documents.store") }}';
 const QC_INDEX_URL  = '{{ route("projects.daily-logs.index", $project) }}';
+const QC_AI_PARSE_URL = '{{ route("projects.daily-logs.voice-parse", $project) }}';
 
 function showQc(kind, msg) {
     const el = document.getElementById('qcStatus');
@@ -210,7 +239,7 @@ document.getElementById('autoWeatherBtn').addEventListener('click', async () => 
     }
 });
 
-// ─── Voice-to-text notes ───────────────────────────────────────────
+// ─── Voice-to-text notes (legacy — appends raw transcript to Notes only) ──
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const voiceBtn   = document.getElementById('voiceBtn');
 const voiceLabel = document.getElementById('voiceLabel');
@@ -239,6 +268,129 @@ if (!SR) {
         rec.onend   = () => { listening = false; voiceLabel.textContent = 'Voice'; voiceBtn.classList.remove('text-red-600'); };
         rec.onerror = (e) => { showQc('warn', 'Voice recognition error: ' + e.error); };
         rec.start();
+    });
+}
+
+// ─── AI Dictation (Brenda — Phase 2, 2026-05-12) ──────────────────────
+// Foreman taps mic, talks freely, taps again to stop. The transcript
+// gets POSTed to /daily-logs/voice-parse → Groq → structured fields.
+// Every form input is then auto-filled. Foreman reviews + saves.
+const aiBtn        = document.getElementById('aiDictateBtn');
+const aiLabel      = document.getElementById('aiDictateLabel');
+const aiHint       = document.getElementById('aiDictateHint');
+const aiTranscript = document.getElementById('aiDictateTranscript');
+
+if (!SR) {
+    aiBtn.disabled = true;
+    aiBtn.classList.add('opacity-60');
+    aiLabel.textContent = 'Voice not supported on this browser';
+} else {
+    let rec = null, listening = false, transcript = '';
+
+    const setFieldIfPresent = (id, value) => {
+        const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
+        if (!el) return;
+        if (value === null || value === undefined || value === '') return;
+        // For <select>, only set if the option exists
+        if (el.tagName === 'SELECT') {
+            const opt = Array.from(el.options).find(o => o.value === String(value));
+            if (opt) el.value = String(value);
+        } else {
+            el.value = value;
+        }
+    };
+
+    const fillFromAi = (fields) => {
+        setFieldIfPresent('weather', fields.weather);
+        setFieldIfPresent('temperature', fields.temperature);
+        setFieldIfPresent('temperature_high', fields.temperature_high);
+        setFieldIfPresent('temperature_low', fields.temperature_low);
+        setFieldIfPresent('precipitation', fields.precipitation);
+        setFieldIfPresent('wind_speed', fields.wind_speed);
+        if (fields.notes)         setFieldIfPresent('notes', fields.notes);
+        setFieldIfPresent('visitors',          fields.visitors);
+        setFieldIfPresent('safety_issues',     fields.safety_issues);
+        setFieldIfPresent('incidents_count',   fields.incidents_count);
+        setFieldIfPresent('near_misses_count', fields.near_misses_count);
+        setFieldIfPresent('delays',            fields.delays);
+    };
+
+    const startDictation = () => {
+        transcript = '';
+        aiTranscript.textContent = '';
+        aiTranscript.classList.add('hidden');
+        rec = new SR();
+        rec.lang = 'en-US';
+        rec.interimResults = true;
+        rec.continuous = true;
+        rec.onresult = (e) => {
+            let interim = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const piece = e.results[i][0].transcript;
+                if (e.results[i].isFinal) {
+                    transcript += (transcript ? ' ' : '') + piece;
+                } else {
+                    interim += piece;
+                }
+            }
+            aiTranscript.classList.remove('hidden');
+            aiTranscript.textContent = transcript + (interim ? ' ' + interim : '');
+        };
+        rec.onstart = () => {
+            listening = true;
+            aiLabel.textContent = '🔴 Listening… tap to stop';
+            aiBtn.classList.add('bg-red-50');
+            aiHint.textContent = 'Talking… tap the button again when you\'re done.';
+        };
+        rec.onend = async () => {
+            listening = false;
+            aiBtn.classList.remove('bg-red-50');
+            const text = transcript.trim();
+            if (!text) {
+                aiLabel.textContent = 'Tap to start dictation';
+                aiHint.textContent = 'Didn\'t catch anything — try again, speak a little louder.';
+                return;
+            }
+            aiLabel.textContent = 'AI is filling the form…';
+            aiBtn.disabled = true;
+            try {
+                const r = await fetch(QC_AI_PARSE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ transcript: text }),
+                });
+                const data = await r.json();
+                if (!r.ok || !data.success) {
+                    throw new Error(data.message || 'AI service unavailable');
+                }
+                fillFromAi(data.fields || {});
+                aiLabel.textContent = '✓ Filled — review & save';
+                aiHint.textContent = data.summary || 'Review the form below and tap Save Log.';
+                showQc('ok', 'AI filled the form from your dictation. Review and adjust before saving.');
+            } catch (err) {
+                aiLabel.textContent = 'AI failed — tap to retry';
+                aiHint.textContent = err.message;
+                showQc('warn', 'AI parse failed: ' + err.message);
+            } finally {
+                aiBtn.disabled = false;
+            }
+        };
+        rec.onerror = (e) => {
+            listening = false;
+            aiBtn.classList.remove('bg-red-50');
+            aiLabel.textContent = 'Tap to start dictation';
+            aiHint.textContent = 'Voice error: ' + e.error + '. Tap to try again.';
+        };
+        rec.start();
+    };
+
+    aiBtn.addEventListener('click', () => {
+        if (listening) { rec?.stop(); return; }
+        startDictation();
     });
 }
 

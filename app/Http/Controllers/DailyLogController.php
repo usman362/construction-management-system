@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\DailyLog;
+use App\Services\DailyLogAiService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -109,6 +110,40 @@ class DailyLogController extends Controller
     {
         $dailyLog->delete();
         return response()->json(['message' => 'Daily log deleted successfully']);
+    }
+
+    /**
+     * 2026-05-12 (Brenda — Phase 2): AI Daily Log Generator.
+     *
+     * Foreman dictates a voice note on the mobile-create page; browser
+     * SpeechRecognition transcribes it locally; we POST the transcript
+     * here and Groq Llama 4 Scout returns structured fields (weather,
+     * temperature, notes, visitors, incidents, etc.). The mobile UI
+     * pre-fills the form with the result so the foreman just reviews +
+     * hits Save instead of typing on a phone keyboard.
+     *
+     * Returns the same shape as the AI service's normalize output.
+     */
+    public function voiceParse(Request $request, Project $project, DailyLogAiService $ai): JsonResponse
+    {
+        $data = $request->validate([
+            'transcript' => 'required|string|min:5|max:8000',
+        ]);
+
+        try {
+            $result = $ai->extractFromTranscript($data['transcript']);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI parse failed: ' . $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'summary' => $result['summary'],
+            'fields'  => $result['fields'],
+        ]);
     }
 
     /**
