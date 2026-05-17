@@ -20,13 +20,40 @@ class EmployeeCertification extends Model
         'file_size',
         'notes',
         'uploaded_by',
+        // 2026-05-12: per-milestone notice tracking (Phase 1 / Cert Expiry Alerts)
+        'notice_60_sent_at',
+        'notice_30_sent_at',
+        'notice_7_sent_at',
+        'notice_expired_sent_at',
     ];
 
     protected $casts = [
         'issue_date' => 'date',
         'expiry_date' => 'date',
         'file_size' => 'integer',
+        'notice_60_sent_at'      => 'datetime',
+        'notice_30_sent_at'      => 'datetime',
+        'notice_7_sent_at'       => 'datetime',
+        'notice_expired_sent_at' => 'datetime',
     ];
+
+    /**
+     * 2026-05-12 (Brenda — Phase 1): when a cert is renewed (its expiry_date
+     * changes), wipe the per-milestone notice flags so the new expiry cycle
+     * gets its own round of notifications. Without this, a cert renewed
+     * from 2025 to 2027 would never trigger a 60d / 30d / 7d email again.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (EmployeeCertification $cert) {
+            if ($cert->isDirty('expiry_date')) {
+                $cert->notice_60_sent_at      = null;
+                $cert->notice_30_sent_at      = null;
+                $cert->notice_7_sent_at       = null;
+                $cert->notice_expired_sent_at = null;
+            }
+        });
+    }
 
     public function employee(): BelongsTo
     {

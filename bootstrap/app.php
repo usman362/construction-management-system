@@ -23,10 +23,14 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->onOneServer();
 
-        // Cert expiry digest — sent twice a week (Mon + Thu at 8am) so HR has
-        // a steady reminder loop without the noise of a daily email.
+        // Cert expiry — now runs every weekday morning at 8am (was twice
+        // weekly). Per-employee milestone notices need daily cadence to
+        // catch the 7-day mark accurately; the per-cert notice flags
+        // prevent re-sending the same milestone, so the digest still
+        // reads "weekly-ish" in spirit (one email per cert per milestone).
+        // Brenda — Phase 1, 2026-05-12.
         $schedule->command('certs:notify-expiring')
-            ->days([1, 4])     // Monday (1), Thursday (4)
+            ->weekdays()
             ->at('08:00')
             ->timezone(config('app.timezone'))
             ->withoutOverlapping()
