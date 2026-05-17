@@ -49,6 +49,13 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard — everyone
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    // 2026-05-12 (Brenda — Phase 3): "Monday Morning" weekly-rhythm
+    // dashboard. Last week's labor cost vs budget per project,
+    // pending approvals, anomalies, equipment overdue, projected
+    // payroll, open RFIs/COs.
+    Route::get('/monday', [\App\Http\Controllers\MondayDashboardController::class, 'index'])
+        ->middleware('role:admin,project_manager,accountant,site_manager')
+        ->name('monday.dashboard');
 
     // ─── Global Search — Phase 7D ────────────────────────────────
     // Single endpoint that searches across projects, employees, POs, invoices,
