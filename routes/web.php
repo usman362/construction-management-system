@@ -44,6 +44,14 @@ Route::middleware('guest')->group(function () {
 
 Route::post('logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 
+// ─── Twilio WhatsApp/SMS Webhook (Brenda Phase 5, 2026-05-12) ────────
+// Public endpoint Twilio hits with every inbound message. Signature
+// verified inside the controller. CSRF-exempt via withoutMiddleware
+// because Twilio doesn't send a CSRF token.
+Route::post('webhooks/twilio', [\App\Http\Controllers\TwilioWebhookController::class, 'incoming'])
+    ->name('webhooks.twilio')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+
 // ─── Authenticated Routes ────────────────────────────────────────────
 Route::middleware('auth')->group(function () {
 
