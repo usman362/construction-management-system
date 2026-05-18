@@ -167,6 +167,9 @@ Route::middleware('auth')->group(function () {
             Route::post('estimates/{estimate}/lines', [EstimateController::class, 'addLine'])->name('estimates.add-line');
             Route::put('estimates/lines/{estimateLine}', [EstimateController::class, 'updateLine'])->name('estimates.update-line');
             Route::delete('estimates/lines/{estimateLine}', [EstimateController::class, 'removeLine'])->name('estimates.remove-line');
+            // 2026-05-12 (Brenda — Phase 6 / AI Estimate Builder): paste a
+            // scope of work, get back AI-suggested sections + lines.
+            Route::post('estimates/{estimate}/ai-suggest', [EstimateController::class, 'aiSuggest'])->name('estimates.ai-suggest');
             // Estimating Phase 1 — section CRUD
             Route::post('estimates/{estimate}/sections', [EstimateController::class, 'storeSection'])->name('estimates.sections.store');
             Route::put('estimates/{estimate}/sections/{section}', [EstimateController::class, 'updateSection'])->name('estimates.sections.update');

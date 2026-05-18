@@ -11,6 +11,7 @@ use App\Models\EstimateLine;
 use App\Models\EstimateSection;
 use App\Models\Material;
 use App\Models\Project;
+use App\Services\EstimateAiService;
 use App\Services\EstimateConversionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -389,6 +390,39 @@ class EstimateController extends Controller
         return response()->json([
             'message' => 'Line removed.',
             'totals'  => $this->totalsFor($estimate),
+        ]);
+    }
+
+    /**
+     * 2026-05-12 (Brenda — Phase 6 recommendation): AI Estimate Builder.
+     *
+     * POST { scope: string } → AI returns suggested sections + line items.
+     * Nothing is committed to the estimate — UI shows the suggestions with
+     * checkboxes so Brenda can selectively add lines.
+     */
+    public function aiSuggest(Request $request, Project $project, Estimate $estimate, EstimateAiService $ai): JsonResponse
+    {
+        $this->assertEstimateBelongsToProject($project, $estimate);
+        $data = $request->validate([
+            'scope' => 'required|string|min:20|max:20000',
+        ]);
+
+        try {
+            $result = $ai->suggestFromScope($data['scope'], [
+                'project_name' => $project->name,
+                'client_name'  => $project->client?->name,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI suggest failed: ' . $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success'  => true,
+            'summary'  => $result['summary'],
+            'sections' => $result['sections'],
         ]);
     }
 

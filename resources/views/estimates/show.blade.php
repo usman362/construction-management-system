@@ -130,11 +130,136 @@
         {{-- ── Add Section bar ── --}}
         <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
             <h2 class="text-xl font-bold text-gray-900">Sections & Lines</h2>
-            <button type="button" @click="newSectionName = ''; openSectionModal = true"
-                    class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                Add Section
-            </button>
+            <div class="flex items-center gap-2">
+                {{-- 2026-05-12 (Brenda — Phase 6): AI Estimate Builder.
+                     Paste a scope of work, AI returns suggested sections +
+                     line items grounded in the catalog + past pricing. --}}
+                <button type="button" onclick="document.getElementById('aiSuggestModal').classList.remove('hidden')"
+                        class="relative inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-purple-700 hover:via-fuchsia-700 hover:to-pink-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow"
+                        title="Paste a scope of work — AI suggests sections + line items.">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                    AI Suggest from Scope
+                    <span class="absolute -top-1 -right-1 bg-yellow-400 text-[9px] font-black text-purple-900 px-1.5 py-0.5 rounded-full shadow">AI</span>
+                </button>
+                <button type="button" @click="newSectionName = ''; openSectionModal = true"
+                        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    Add Section
+                </button>
+            </div>
+        </div>
+
+        {{-- ───── AI Estimate Builder modal ─────
+             3 stages: scope (paste textarea) → working (spinner) → review
+             (sections + line items with checkboxes). User checks the lines
+             they want, picks a target section (existing or new), commits.
+        --}}
+        <div id="aiSuggestModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay"
+             x-data="aiEstimateBuilder()" x-init="init()"
+             onclick="if(event.target===this) this.classList.add('hidden')">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                        <div>
+                            <h3 class="text-lg font-bold">AI Estimate Builder</h3>
+                            <p class="text-xs text-purple-100" x-text="stage === 'review' ? summary : 'Paste a scope of work — AI returns sections + line items.'"></p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="document.getElementById('aiSuggestModal').classList.add('hidden')" class="text-purple-100 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                {{-- STAGE 1: paste scope --}}
+                <div x-show="stage === 'scope'" class="p-6 flex-1 overflow-y-auto">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Paste the scope of work / RFP excerpt</label>
+                    <textarea x-model="scope" rows="12"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                              placeholder="Example: Replace 200 LF of 8-inch carbon steel pipe between Tank 4 and the cooling tower. Includes demolition of existing pipe, new pipe supply &amp; install, x-ray of 12 welds, hydrostatic test. Crew of 3 fitters + 1 welder. Standard scaffold rental for 1 week. PPE included."></textarea>
+                    <p class="text-xs text-gray-500 mt-1">The more specific the scope, the better the suggestions. Include quantities, materials, and crew counts where you can.</p>
+                    <div class="mt-4 flex items-center justify-between gap-2">
+                        <span x-show="error" class="text-sm text-rose-700" x-text="error"></span>
+                        <button type="button" @click="run()" :disabled="working || !scope || scope.length < 20"
+                                class="ml-auto bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                            <span x-show="!working">✨ Suggest line items</span>
+                            <span x-show="working">Thinking…</span>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- STAGE 2: review + selectively commit --}}
+                <div x-show="stage === 'review'" class="p-6 flex-1 overflow-y-auto">
+                    <p class="text-sm text-gray-600 mb-4" x-text="'AI suggested ' + totalLines + ' line(s) across ' + sections.length + ' section(s). Check the ones you want to add, then pick a target section per group below.'"></p>
+
+                    <template x-for="(sec, si) in sections" :key="si">
+                        <div class="mb-5 border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                <div>
+                                    <strong class="text-sm" x-text="sec.name"></strong>
+                                    <span class="text-xs text-gray-500" x-text="'(' + sec.lines.length + ' lines)'"></span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <label>Add to:</label>
+                                    <select x-model="sec.target_section_id" class="border border-gray-300 rounded px-2 py-1 text-xs">
+                                        <option value="">— New section: <span x-text="sec.name"></span> —</option>
+                                        @foreach($estimate->sections as $existing)
+                                            <option value="{{ $existing->id }}">{{ $existing->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <table class="w-full text-xs">
+                                <thead class="text-gray-500 border-b">
+                                    <tr>
+                                        <th class="px-2 py-1 w-8"><input type="checkbox" @change="toggleAllInSection(si, $event.target.checked)"></th>
+                                        <th class="text-left px-2">Description</th>
+                                        <th class="text-left px-2">Cost Code</th>
+                                        <th class="text-right px-2">Qty</th>
+                                        <th class="text-left px-2">Unit</th>
+                                        <th class="text-right px-2">Unit $</th>
+                                        <th class="text-right px-2">Hrs</th>
+                                        <th class="text-right px-2">Total</th>
+                                        <th class="text-center px-2">Conf.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(l, li) in sec.lines" :key="li">
+                                        <tr class="border-b border-gray-100">
+                                            <td class="px-2 py-1"><input type="checkbox" x-model="l._sel"></td>
+                                            <td class="px-2"><input type="text" x-model="l.description" class="w-full border-0 bg-transparent text-xs"></td>
+                                            <td class="px-2 text-gray-500" x-text="l.cost_code || '—'"></td>
+                                            <td class="px-2 text-right"><input type="number" step="0.01" x-model.number="l.quantity" class="w-16 border-0 bg-transparent text-xs text-right"></td>
+                                            <td class="px-2" x-text="l.unit"></td>
+                                            <td class="px-2 text-right"><input type="number" step="0.01" x-model.number="l.unit_cost" class="w-20 border-0 bg-transparent text-xs text-right"></td>
+                                            <td class="px-2 text-right"><input type="number" step="0.01" x-model.number="l.hours" class="w-14 border-0 bg-transparent text-xs text-right"></td>
+                                            <td class="px-2 text-right font-semibold" x-text="'$' + ((l.quantity || 0) * (l.unit_cost || 0)).toFixed(2)"></td>
+                                            <td class="px-2 text-center">
+                                                <span class="inline-block w-2 h-2 rounded-full"
+                                                      :class="l.confidence >= 0.8 ? 'bg-emerald-500' : (l.confidence >= 0.5 ? 'bg-amber-500' : 'bg-rose-500')"></span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+                </div>
+
+                {{-- Footer actions --}}
+                <div class="flex items-center justify-between gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+                    <span class="text-xs text-gray-500" x-show="stage === 'review'" x-text="selectedCount + ' of ' + totalLines + ' lines selected · $' + selectedTotal.toFixed(0) + ' total'"></span>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button type="button" x-show="stage === 'review'" @click="stage = 'scope'" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg">Back</button>
+                        <button type="button" onclick="document.getElementById('aiSuggestModal').classList.add('hidden')" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg">Cancel</button>
+                        <button type="button" x-show="stage === 'review'" @click="commit()" :disabled="committing || selectedCount === 0"
+                                class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg">
+                            <span x-show="!committing">Add <span x-text="selectedCount"></span> line(s) to estimate</span>
+                            <span x-show="committing">Adding…</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         {{-- ── Sections list ── --}}
@@ -826,6 +951,124 @@ function confirmDeleteLine(lineId) {
                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
         }).then(() => location.reload());
     });
+}
+
+// ─── AI Estimate Builder (Brenda — Phase 6, 2026-05-12) ──────────────
+// Paste scope → POST /projects/{p}/estimates/{e}/ai-suggest → render
+// sections/lines with checkboxes. Each checked line commits via the
+// existing addLine endpoint, optionally creating a new section first.
+function aiEstimateBuilder() {
+    return {
+        stage: 'scope',
+        scope: '',
+        error: '',
+        working: false,
+        committing: false,
+        summary: '',
+        sections: [],
+
+        init() {},
+
+        get totalLines() {
+            return this.sections.reduce((sum, s) => sum + s.lines.length, 0);
+        },
+        get selectedCount() {
+            return this.sections.reduce((sum, s) => sum + s.lines.filter(l => l._sel).length, 0);
+        },
+        get selectedTotal() {
+            return this.sections.reduce((sum, s) =>
+                sum + s.lines.filter(l => l._sel).reduce((ls, l) => ls + (l.quantity || 0) * (l.unit_cost || 0), 0)
+            , 0);
+        },
+        toggleAllInSection(si, val) {
+            this.sections[si].lines.forEach(l => l._sel = val);
+        },
+
+        async run() {
+            this.error = ''; this.working = true;
+            try {
+                const r = await fetch('{{ route("projects.estimates.ai-suggest", [$project, $estimate]) }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ scope: this.scope }),
+                });
+                const data = await r.json();
+                if (!r.ok || !data.success) throw new Error(data.message || 'AI request failed');
+                this.summary = data.summary || '';
+                this.sections = (data.sections || []).map(sec => ({
+                    name: sec.name,
+                    target_section_id: '',
+                    lines: sec.lines.map(l => ({ ...l, _sel: l.confidence >= 0.7 })),
+                }));
+                this.stage = 'review';
+            } catch (e) {
+                this.error = e.message;
+            } finally {
+                this.working = false;
+            }
+        },
+
+        async commit() {
+            this.committing = true;
+            const csrf = document.querySelector('meta[name=csrf-token]').content;
+            const projectId  = {{ $project->id }};
+            const estimateId = {{ $estimate->id }};
+            const addLineUrl = window.BASE_URL + '/projects/' + projectId + '/estimates/' + estimateId + '/lines';
+            const addSectionUrl = window.BASE_URL + '/projects/' + projectId + '/estimates/' + estimateId + '/sections';
+
+            try {
+                for (const sec of this.sections) {
+                    const lines = sec.lines.filter(l => l._sel);
+                    if (lines.length === 0) continue;
+
+                    // Create a new section if the user didn't pick an existing one
+                    let sectionId = sec.target_section_id || null;
+                    if (!sectionId) {
+                        const sr = await fetch(addSectionUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json' },
+                            body: JSON.stringify({ name: sec.name }),
+                        });
+                        if (!sr.ok) throw new Error('Could not create section: ' + sec.name);
+                        const sj = await sr.json();
+                        sectionId = sj.section?.id || sj.id;
+                    }
+
+                    for (const l of lines) {
+                        const payload = {
+                            section_id:   sectionId,
+                            description:  l.description,
+                            cost_code_id: l.cost_code_id || null,
+                            quantity:     l.quantity || 1,
+                            unit:         l.unit || 'EA',
+                            unit_cost:    l.unit_cost || 0,
+                            hours:        l.hours || 0,
+                            notes:        l.notes || null,
+                            line_type:    l.hours > 0 ? 'labor' : 'other',
+                        };
+                        const lr = await fetch(addLineUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json' },
+                            body: JSON.stringify(payload),
+                        });
+                        if (!lr.ok) {
+                            const t = await lr.text();
+                            throw new Error('Add line failed: ' + t.substring(0,200));
+                        }
+                    }
+                }
+                Toast.fire({ icon: 'success', title: this.selectedCount + ' line(s) added.' });
+                setTimeout(() => location.reload(), 600);
+            } catch (e) {
+                Toast.fire({ icon: 'error', title: e.message });
+                this.committing = false;
+            }
+        },
+    };
 }
 </script>
 @endpush
