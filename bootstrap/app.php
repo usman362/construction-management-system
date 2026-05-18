@@ -45,6 +45,17 @@ return Application::configure(basePath: dirname(__DIR__))
             ->timezone(config('app.timezone'))
             ->withoutOverlapping()
             ->onOneServer();
+
+        // Daily project-by-project end-of-day digest (Brenda — Phase 4 of
+        // recommendations, 2026-05-12). 5pm weekdays. One email per PM /
+        // Admin recipient bundling every active project's today rollup
+        // so they don't have to chase per-project emails.
+        $schedule->command('projects:daily-summary')
+            ->weekdays()
+            ->at('17:00')
+            ->timezone(config('app.timezone'))
+            ->withoutOverlapping()
+            ->onOneServer();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
