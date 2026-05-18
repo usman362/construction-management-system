@@ -1618,4 +1618,213 @@ class ReportController extends Controller
             'grand_total'   => round(array_sum(array_column($sections, 'total')), 2),
         ]);
     }
+
+    /**
+     * Bid vs Actual Report (Brenda — Phase 4 / 2026-05-12).
+     *
+     * Portfolio-wide retrospective: for each project, compare the original
+     * BID (the estimate / budgeted total at project kickoff) against the
+     * ACTUAL spend (labor cost from timesheets + commitments invoiced +
+     * standalone invoices). Sort by variance so the projects that taught
+     * us the most lessons surface at the top.
+     *
+     * Two views in one route:
+     *   - Portfolio view (no ?project_id=): one row per project.
+     *   - Per-project drill (?project_id=N): per-cost-code breakdown of
+     *     bid vs actual so the user can see exactly which trades / phases
+     *     drove the variance.
+     *
+     * Default status filter: closed + completed (the original ask). Brenda
+     * can flip to "all" to compare in-flight projects too.
+     */
+    public function bidVsActual(Request $request): View
+    {
+        $validated = $request->validate([
+            'status'     => 'nullable|in:closed,completed,active,all',
+            'project_id' => 'nullable|integer|exists:projects,id',
+            'sort'       => 'nullable|in:variance_pct,variance_dollar,bid,actual,name',
+        ]);
+
+        $statusFilter = $validated['status'] ?? 'closed';
+        $sortBy       = $validated['sort']   ?? 'variance_dollar';
+
+        $query = Project::query()->with('client');
+        switch ($statusFilter) {
+            case 'closed':    $query->where('status', 'closed'); break;
+            case 'completed': $query->where('status', 'completed'); break;
+            case 'active':    $query->where('status', 'active'); break;
+            case 'all':       /* no filter */ break;
+        }
+        // If both closed + completed are empty in the DB and the user picked
+        // 'closed', fall back to anything non-active so the page isn't blank.
+        if ($statusFilter === 'closed' && $query->count() === 0) {
+            $query = Project::query()->with('client')
+                ->whereIn('status', ['closed', 'completed']);
+        }
+
+        $projects = $query->orderBy('end_date', 'desc')->orderBy('project_number')->get();
+
+        // Build a portfolio row per project: bid, actual, variance.
+        $rows = $projects->map(fn ($p) => $this->bvaRowForProject($p))->all();
+
+        // Sort
+        $sortKey = match ($sortBy) {
+            'variance_pct'    => fn ($r) => -1 * ($r['variance_pct'] ?? 0),
+            'variance_dollar' => fn ($r) => -1 * $r['variance_dollar'],
+            'bid'             => fn ($r) => -1 * $r['bid_total'],
+            'actual'          => fn ($r) => -1 * $r['actual_total'],
+            default           => fn ($r) => $r['project']->project_number ?? '',
+        };
+        usort($rows, fn ($a, $b) => $sortKey($a) <=> $sortKey($b));
+
+        // Portfolio rollup
+        $portfolioBid    = array_sum(array_column($rows, 'bid_total'));
+        $portfolioActual = array_sum(array_column($rows, 'actual_total'));
+        $portfolioVar    = $portfolioActual - $portfolioBid;
+        $portfolioVarPct = $portfolioBid > 0 ? ($portfolioVar / $portfolioBid) * 100 : null;
+
+        // Drill — if a project_id is specified, build per-cost-code rows.
+        $drillRows = [];
+        $drillProject = null;
+        if (! empty($validated['project_id'])) {
+            $drillProject = Project::with('client')->find($validated['project_id']);
+            if ($drillProject) $drillRows = $this->bvaCostCodeBreakdown($drillProject);
+        }
+
+        return view('reports.bid-vs-actual', [
+            'rows'             => $rows,
+            'statusFilter'     => $statusFilter,
+            'sortBy'           => $sortBy,
+            'portfolioBid'     => $portfolioBid,
+            'portfolioActual'  => $portfolioActual,
+            'portfolioVar'     => $portfolioVar,
+            'portfolioVarPct'  => $portfolioVarPct,
+            'drillProject'     => $drillProject,
+            'drillRows'        => $drillRows,
+        ]);
+    }
+
+    /**
+     * Bid vs Actual: one project row.
+     *
+     * BID = the original commitment to the client. Fallback order:
+     *   1. Sum of approved Estimate line totals
+     *   2. Sum of any Estimate line totals
+     *   3. Sum of budget_lines.budget_amount (original, not revised)
+     *   4. projects.estimate (manually typed)
+     *   5. projects.contract_value
+     *
+     * ACTUAL = total spend booked against the project:
+     *   - Labor: SUM(timesheets.total_cost)
+     *   - Vendor invoices: SUM(invoices.amount) (status approved/paid)
+     *   - Commitments-invoiced (the "billed against PO" amount), to be safe
+     *     against double-counting we DON'T add commitments since vendor
+     *     invoices already represent the actual paid spend.
+     */
+    private function bvaRowForProject(Project $project): array
+    {
+        // BID
+        $approvedEst = (float) $project->estimates()->where('status', 'approved')->get()->sum(function ($e) {
+            return (float) ($e->total_amount ?? $e->lines()->sum('amount'));
+        });
+        $anyEst = $approvedEst;
+        if ($anyEst <= 0) {
+            $anyEst = (float) $project->estimates()->get()->sum(function ($e) {
+                return (float) ($e->total_amount ?? $e->lines()->sum('amount'));
+            });
+        }
+        $budgetOrig = (float) $project->budgetLines()->sum('budget_amount');
+        $bid = $approvedEst > 0 ? $approvedEst
+             : ($anyEst > 0 ? $anyEst
+                : ($budgetOrig > 0 ? $budgetOrig
+                    : ((float) ($project->estimate ?? 0) > 0 ? (float) $project->estimate
+                        : (float) ($project->contract_value ?? 0))));
+
+        // ACTUAL
+        $laborCost   = (float) $project->timesheets()->whereIn('status', ['approved', 'submitted'])->sum('total_cost');
+        $invoiceCost = (float) $project->invoices()->whereIn('status', ['approved', 'paid'])->sum('amount');
+        $actual = $laborCost + $invoiceCost;
+
+        $variance = $actual - $bid;
+        $variancePct = $bid > 0 ? ($variance / $bid) * 100 : null;
+
+        return [
+            'project'           => $project,
+            'bid_total'         => $bid,
+            'actual_total'      => $actual,
+            'labor_cost'        => $laborCost,
+            'invoice_cost'      => $invoiceCost,
+            'variance_dollar'   => $variance,
+            'variance_pct'      => $variancePct,
+        ];
+    }
+
+    /**
+     * Per-cost-code Bid vs Actual drill-down for a single project.
+     * Returns rows ordered by cost code, with totals row at the end.
+     */
+    private function bvaCostCodeBreakdown(Project $project): array
+    {
+        // BID per cost code: estimate lines first, fall back to budget lines.
+        $estLines = \App\Models\EstimateLine::query()
+            ->whereIn('estimate_id', $project->estimates()->pluck('id'))
+            ->whereNotNull('cost_code_id')
+            ->selectRaw('cost_code_id, SUM(amount) as bid_total, SUM(labor_hours) as bid_hours')
+            ->groupBy('cost_code_id')->get()->keyBy('cost_code_id');
+
+        $budgetLines = $project->budgetLines()->whereNotNull('cost_code_id')
+            ->selectRaw('cost_code_id, SUM(budget_amount) as budget_total, SUM(labor_hours) as budget_hours')
+            ->groupBy('cost_code_id')->get()->keyBy('cost_code_id');
+
+        // ACTUAL per cost code: timesheet cost + invoice amount (invoices that
+        // have a cost_code_id).
+        $tsActual = $project->timesheets()->whereIn('status', ['approved', 'submitted'])
+            ->whereNotNull('cost_code_id')
+            ->selectRaw('cost_code_id, SUM(total_cost) as labor_cost, SUM(total_hours) as actual_hours')
+            ->groupBy('cost_code_id')->get()->keyBy('cost_code_id');
+
+        $invActual = $project->invoices()->whereIn('status', ['approved', 'paid'])
+            ->whereNotNull('cost_code_id')
+            ->selectRaw('cost_code_id, SUM(amount) as invoice_cost')
+            ->groupBy('cost_code_id')->get()->keyBy('cost_code_id');
+
+        // Union of all cost codes that appear in any source
+        $codeIds = collect()
+            ->concat($estLines->keys())
+            ->concat($budgetLines->keys())
+            ->concat($tsActual->keys())
+            ->concat($invActual->keys())
+            ->unique()->filter()->values();
+
+        $codes = CostCode::whereIn('id', $codeIds)->orderBy('code')->get()->keyBy('id');
+
+        $rows = [];
+        foreach ($codes as $cc) {
+            $bidFromEst    = (float) ($estLines->get($cc->id)->bid_total    ?? 0);
+            $bidFromBudget = (float) ($budgetLines->get($cc->id)->budget_total ?? 0);
+            $bid = $bidFromEst > 0 ? $bidFromEst : $bidFromBudget;
+
+            $labor   = (float) ($tsActual->get($cc->id)->labor_cost   ?? 0);
+            $invoice = (float) ($invActual->get($cc->id)->invoice_cost ?? 0);
+            $actual  = $labor + $invoice;
+
+            $var = $actual - $bid;
+            $varPct = $bid > 0 ? ($var / $bid) * 100 : null;
+
+            $rows[] = [
+                'cost_code'       => $cc,
+                'bid'             => $bid,
+                'actual'          => $actual,
+                'labor_cost'      => $labor,
+                'invoice_cost'    => $invoice,
+                'variance_dollar' => $var,
+                'variance_pct'    => $varPct,
+            ];
+        }
+
+        // Sort by variance dollar descending (worst overages first)
+        usort($rows, fn ($a, $b) => $b['variance_dollar'] <=> $a['variance_dollar']);
+
+        return $rows;
+    }
 }

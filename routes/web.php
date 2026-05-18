@@ -495,5 +495,8 @@ Route::middleware('auth')->group(function () {
         Route::get('reports/timesheets/pdf', [ReportController::class, 'timesheetReportPdf'])->name('reports.timesheets.pdf');
         // Phase 7+ — Work-in-Progress (WIP) report (banks/bonding requirement)
         Route::get('reports/wip', [\App\Http\Controllers\WipReportController::class, 'index'])->name('reports.wip');
+        // 2026-05-12 (Brenda — Phase 4 of recommendations): Bid vs Actual.
+        // Portfolio view by default; ?project_id=N opens per-cost-code drill.
+        Route::get('reports/bid-vs-actual', [ReportController::class, 'bidVsActual'])->name('reports.bid-vs-actual');
     });
 });
