@@ -120,7 +120,19 @@
                             </td>
                             <td class="px-3 py-2 text-right font-medium">{{ $e->hours !== null ? number_format((float)$e->hours, 2) : '—' }}</td>
                             <td class="px-3 py-2">
-                                @if(in_array($e->status, ['closed', 'open']))
+                                @php $hasAllocs = $e->allocations->isNotEmpty(); @endphp
+                                @if($hasAllocs)
+                                    {{-- 2026-05-12 (Brenda — shop crew multi-job): when a
+                                         punch has been split across multiple jobs, the
+                                         single cost-code dropdown is replaced with a
+                                         summary of the splits. --}}
+                                    <div class="text-[11px] text-blue-800 font-semibold">{{ $e->allocations->count() }} job split{{ $e->allocations->count() === 1 ? '' : 's' }}</div>
+                                    <ul class="text-[10px] text-gray-600 mt-0.5 space-y-0.5">
+                                        @foreach($e->allocations as $a)
+                                            <li class="truncate"><span class="font-mono">{{ $a->project->project_number ?? '—' }}</span>{{ $a->costCode ? ' · ' . $a->costCode->code : '' }} — {{ number_format((float)$a->hours, 2) }}h</li>
+                                        @endforeach
+                                    </ul>
+                                @elseif(in_array($e->status, ['closed', 'open']))
                                     <select class="tc-code w-full border border-gray-300 rounded px-2 py-1 text-xs"
                                             data-entry-id="{{ $e->id }}"
                                             onchange="updateCostCode(this)">
@@ -139,6 +151,32 @@
                                     <div class="text-[10px] text-gray-500">{{ $e->costCode->name }}</div>
                                 @else
                                     <span class="text-xs text-gray-400">—</span>
+                                @endif
+                                {{-- "Split across jobs" toggle. Only available while
+                                     punch is still editable (closed but not yet
+                                     converted). JSON built in a PHP block above
+                                     so Blade's parser doesn't choke on the multi-
+                                     line array inside an attribute. --}}
+                                @if($e->status === 'closed')
+                                    @php
+                                        $splitPayload = json_encode([
+                                            'id'                   => $e->id,
+                                            'hours'                => (float) $e->hours,
+                                            'default_project_id'   => $e->project_id,
+                                            'default_cost_code_id' => $e->cost_code_id,
+                                            'allocations'          => $e->allocations->map(fn ($a) => [
+                                                'project_id'   => $a->project_id,
+                                                'cost_code_id' => $a->cost_code_id,
+                                                'hours'        => (float) $a->hours,
+                                                'notes'        => $a->notes,
+                                            ])->values(),
+                                        ], JSON_HEX_APOS | JSON_HEX_QUOT);
+                                    @endphp
+                                    <button type="button"
+                                            onclick="openSplitModal({{ $splitPayload }})"
+                                            class="mt-1 text-[10px] text-blue-700 hover:text-blue-900 underline">
+                                        {{ $hasAllocs ? 'Edit split' : 'Split across jobs' }}
+                                    </button>
                                 @endif
                             </td>
                             <td class="px-3 py-2 text-xs">
@@ -242,7 +280,177 @@ async function voidEntry(id) {
     showTcStatus('ok', body.message);
     setTimeout(() => location.reload(), 600);
 }
+
+// ─── 2026-05-12 (Brenda — shop-crew multi-job split) ─────────────
+// Opens a modal anchored to a specific punch. The foreman builds a
+// list of (Project, Cost Code, Hours) rows summing to the punch's
+// total. Save persists allocations via the API; convertToTimesheet
+// then emits one timesheet per allocation.
+const TC_PROJECTS = @json($projects->map(fn($p) => ['id' => $p->id, 'project_number' => $p->project_number, 'name' => $p->name])->values());
+const TC_COST_CODES = @json($costCodes->map(fn($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name])->values());
+
+let splitEntry = null;       // {id, hours, default_project_id, default_cost_code_id}
+let splitRows  = [];         // [{project_id, cost_code_id, hours, notes}]
+
+function openSplitModal(entry) {
+    splitEntry = entry;
+    splitRows = entry.allocations && entry.allocations.length
+        ? entry.allocations.map(a => ({ project_id: a.project_id || '', cost_code_id: a.cost_code_id || '', hours: a.hours || 0, notes: a.notes || '' }))
+        : [{ project_id: entry.default_project_id || '', cost_code_id: entry.default_cost_code_id || '', hours: entry.hours || 0, notes: '' }];
+    renderSplitRows();
+    document.getElementById('splitModal').classList.remove('hidden');
+}
+
+function closeSplitModal() {
+    document.getElementById('splitModal').classList.add('hidden');
+    splitEntry = null; splitRows = [];
+}
+
+function renderSplitRows() {
+    const tbody = document.getElementById('splitRows');
+    const optsP = ['<option value="">— pick job —</option>'].concat(
+        TC_PROJECTS.map(p => `<option value="${p.id}">${p.project_number} — ${escapeHtml(p.name)}</option>`)
+    ).join('');
+    const optsC = ['<option value="">— none —</option>'].concat(
+        TC_COST_CODES.map(c => `<option value="${c.id}">${c.code} — ${escapeHtml(c.name)}</option>`)
+    ).join('');
+
+    tbody.innerHTML = splitRows.map((r, i) => `
+        <tr>
+            <td class="px-1 py-1">
+                <select onchange="updateSplitRow(${i}, 'project_id', this.value)" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">${optsP}</select>
+            </td>
+            <td class="px-1 py-1">
+                <select onchange="updateSplitRow(${i}, 'cost_code_id', this.value)" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">${optsC}</select>
+            </td>
+            <td class="px-1 py-1">
+                <input type="number" step="0.25" min="0" value="${r.hours}" onchange="updateSplitRow(${i}, 'hours', this.value)" class="w-20 border border-gray-300 rounded px-2 py-1 text-xs text-right">
+            </td>
+            <td class="px-1 py-1">
+                <input type="text" placeholder="notes (optional)" value="${escapeHtml(r.notes || '')}" onchange="updateSplitRow(${i}, 'notes', this.value)" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">
+            </td>
+            <td class="px-1 py-1 text-center">
+                <button type="button" onclick="removeSplitRow(${i})" class="text-red-600 hover:text-red-800 text-xs">✕</button>
+            </td>
+        </tr>
+    `).join('');
+
+    // Pre-select existing values (innerHTML re-render resets selects)
+    splitRows.forEach((r, i) => {
+        const row = tbody.children[i];
+        if (row) {
+            if (r.project_id)   row.querySelector('select:nth-of-type(1)').value = String(r.project_id);
+            if (r.cost_code_id) row.querySelector('select:nth-of-type(2)').value = String(r.cost_code_id);
+        }
+    });
+
+    // Footer totals
+    const sum = splitRows.reduce((s, r) => s + (parseFloat(r.hours) || 0), 0);
+    const target = parseFloat(splitEntry?.hours || 0);
+    const diff = sum - target;
+    const sumEl = document.getElementById('splitSum');
+    sumEl.textContent = `Total: ${sum.toFixed(2)} hrs (punch was ${target.toFixed(2)} hrs)`;
+    sumEl.className = 'text-xs ' + (Math.abs(diff) > 0.05 ? 'text-amber-700 font-semibold' : 'text-emerald-700');
+}
+
+function updateSplitRow(i, field, value) {
+    if (field === 'hours') value = value === '' ? 0 : parseFloat(value);
+    if (field === 'project_id' || field === 'cost_code_id') value = value ? parseInt(value) : null;
+    splitRows[i][field] = value;
+    renderSplitRows();
+}
+function removeSplitRow(i) { splitRows.splice(i, 1); renderSplitRows(); }
+function addSplitRow()     { splitRows.push({ project_id: '', cost_code_id: '', hours: 0, notes: '' }); renderSplitRows(); }
+
+async function saveSplit() {
+    const allocations = splitRows.filter(r => r.project_id && r.hours > 0).map(r => ({
+        project_id:   parseInt(r.project_id),
+        cost_code_id: r.cost_code_id ? parseInt(r.cost_code_id) : null,
+        hours:        parseFloat(r.hours),
+        notes:        r.notes || null,
+    }));
+    if (!allocations.length) { showTcStatus('error', 'Add at least one allocation row with a project + hours.'); return; }
+
+    const r = await fetch(window.BASE_URL + '/admin/time-clock/' + splitEntry.id + '/allocations', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+        body: JSON.stringify({ allocations }),
+    });
+    const body = await r.json();
+    if (!r.ok) { showTcStatus('error', body.message || 'Save failed.'); return; }
+    let msg = body.message;
+    if (body.mismatch) msg += ' ' + body.mismatch;
+    showTcStatus('ok', msg);
+    closeSplitModal();
+    setTimeout(() => location.reload(), 800);
+}
+
+async function clearSplit() {
+    if (!confirm('Remove all job splits from this punch? It will revert to single-job mode.')) return;
+    const r = await fetch(window.BASE_URL + '/admin/time-clock/' + splitEntry.id + '/allocations', {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+    });
+    const body = await r.json();
+    if (!r.ok) { showTcStatus('error', body.message || 'Clear failed.'); return; }
+    showTcStatus('ok', body.message);
+    closeSplitModal();
+    setTimeout(() => location.reload(), 600);
+}
+
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
 </script>
 @endpush
+
+{{-- ───── Split Across Jobs modal ─────
+     Brenda 2026-05-12 — shop crew works multiple jobs in a day without
+     re-badging. Foreman uses this to split the single punch across
+     however many job/cost-code slices the day actually held. --}}
+<div id="splitModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this) closeSplitModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl">
+            <div>
+                <h3 class="text-lg font-bold">Split Punch Across Jobs</h3>
+                <p class="text-xs text-blue-100 mt-0.5">For shop crew or anyone who rotated across multiple jobs without re-badging.</p>
+            </div>
+            <button onclick="closeSplitModal()" class="text-blue-100 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="p-5 overflow-y-auto flex-1">
+            <p class="text-sm text-gray-600 mb-3">Add a row for every job the worker touched today. Hours can be in quarter-hour steps (0.25, 0.5, etc.). Each row will become its own timesheet when you convert this punch.</p>
+
+            <table class="w-full text-xs">
+                <thead class="text-gray-500 border-b">
+                    <tr>
+                        <th class="text-left px-1 py-1 w-2/5">Job</th>
+                        <th class="text-left px-1 py-1 w-1/4">Cost Code</th>
+                        <th class="text-right px-1 py-1 w-20">Hours</th>
+                        <th class="text-left px-1 py-1">Notes</th>
+                        <th class="px-1 py-1 w-8"></th>
+                    </tr>
+                </thead>
+                <tbody id="splitRows"></tbody>
+            </table>
+
+            <button type="button" onclick="addSplitRow()" class="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Add another job
+            </button>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+            <span id="splitSum" class="text-xs text-gray-500"></span>
+            <div class="flex gap-2 ml-auto">
+                <button type="button" onclick="clearSplit()" class="px-3 py-2 text-sm bg-white border border-gray-300 text-red-700 hover:bg-red-50 rounded-lg">Remove all splits</button>
+                <button type="button" onclick="closeSplitModal()" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg">Cancel</button>
+                <button type="button" onclick="saveSplit()" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Save splits</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @endsection

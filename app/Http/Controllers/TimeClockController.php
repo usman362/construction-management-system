@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CostCode;
 use App\Models\Employee;
 use App\Models\Project;
+use App\Models\TimeClockAllocation;
 use App\Models\TimeClockEntry;
 use App\Models\Timesheet;
 use Illuminate\Http\JsonResponse;
@@ -281,7 +282,7 @@ class TimeClockController extends Controller
      */
     public function adminIndex(Request $request): View
     {
-        $query = TimeClockEntry::with(['user', 'employee', 'project', 'costCode', 'timesheet']);
+        $query = TimeClockEntry::with(['user', 'employee', 'project', 'costCode', 'timesheet', 'allocations.project:id,project_number,name', 'allocations.costCode:id,code,name']);
 
         if ($projectId = $request->input('project_id')) $query->where('project_id', $projectId);
         if ($userId    = $request->input('user_id'))    $query->where('user_id', $userId);
@@ -344,7 +345,8 @@ class TimeClockController extends Controller
             'entry_ids.*' => 'integer|exists:time_clock_entries,id',
         ]);
 
-        $entries = TimeClockEntry::whereIn('id', $data['entry_ids'])
+        $entries = TimeClockEntry::with('allocations')
+            ->whereIn('id', $data['entry_ids'])
             ->where('status', 'closed')
             ->whereNotNull('employee_id')
             ->get();
@@ -356,37 +358,37 @@ class TimeClockController extends Controller
             ], 422);
         }
 
-        // Guard: block conversion when any selected punch is missing a cost code.
-        $uncoded = $entries->whereNull('cost_code_id');
+        // Split entries into "single-job" (no allocations) and "multi-job"
+        // (allocations present). Each path has its own grouping logic.
+        $multiJob  = $entries->filter(fn ($e) => $e->allocations->isNotEmpty());
+        $singleJob = $entries->reject(fn ($e) => $e->allocations->isNotEmpty());
+
+        // Single-job path still requires a cost code (existing rule).
+        $uncoded = $singleJob->whereNull('cost_code_id');
         if ($uncoded->isNotEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Assign a cost code to every selected punch before converting. Missing on: '
+                'message' => 'Assign a cost code (or split across jobs) on every selected punch before converting. Missing on: '
                     . $uncoded->pluck('id')->implode(', '),
             ], 422);
         }
 
         // 2026-04-25: timesheets unique relaxed to (emp, project, date, cost_code).
-        // We now group by all four — punches with the SAME cost code on the
-        // same day roll into one timesheet, punches with DIFFERENT cost codes
-        // on the same day produce separate timesheets (the worker split hours
-        // across phase codes, which is normal in construction).
-        $groups = $entries->groupBy(fn ($e) =>
+        // Single-job punches with the SAME cost code on the same day roll into
+        // one timesheet, different cost codes produce separate timesheets.
+        $groups = $singleJob->groupBy(fn ($e) =>
             $e->employee_id . '|' . $e->project_id . '|' . $e->clock_in_at->toDateString() . '|' . $e->cost_code_id
         );
 
         $created = 0;
-        DB::transaction(function () use ($groups, &$created) {
+        DB::transaction(function () use ($groups, $multiJob, &$created) {
+            // ── Single-job path (existing behavior) ───────────────
             foreach ($groups as $group) {
                 $first = $group->first();
                 $totalHours = (float) $group->sum('hours');
                 $regular    = min(8, $totalHours);
                 $overtime   = max(0, $totalHours - 8);
 
-                // 2026-04-25: timesheets unique was relaxed to include
-                // cost_code_id so a worker can split hours across phase codes
-                // on the same day. Match on the full 4-tuple so the upsert
-                // creates a separate row per cost code instead of clobbering.
                 $timesheet = Timesheet::updateOrCreate(
                     [
                         'employee_id'  => $first->employee_id,
@@ -410,12 +412,111 @@ class TimeClockController extends Controller
 
                 $created++;
             }
+
+            // ── Multi-job path (Brenda 2026-05-12 — shop crew rotation) ──
+            // For each entry with allocations: emit one timesheet per
+            // allocation row, ST/OT split per allocation hours (8-hr cap
+            // per slice). The entry itself is linked to the FIRST
+            // generated timesheet (for traceability — the others can be
+            // found via Timesheet::where(employee, date, cost_code)).
+            foreach ($multiJob as $entry) {
+                $firstTimesheetId = null;
+                foreach ($entry->allocations as $alloc) {
+                    $h = (float) $alloc->hours;
+                    $reg = min(8, $h);
+                    $ot  = max(0, $h - 8);
+                    $ts = Timesheet::updateOrCreate(
+                        [
+                            'employee_id'  => $entry->employee_id,
+                            'project_id'   => $alloc->project_id,
+                            'date'         => $entry->clock_in_at->toDateString(),
+                            'cost_code_id' => $alloc->cost_code_id,
+                        ],
+                        [
+                            'regular_hours'  => $reg,
+                            'overtime_hours' => $ot,
+                            'total_hours'    => $h,
+                            'status'         => 'submitted',
+                            'notes'          => trim('Auto-generated from shop-crew clock punch (multi-job split). ' . ($alloc->notes ?? '')),
+                        ]
+                    );
+                    $firstTimesheetId = $firstTimesheetId ?? $ts->id;
+                    $created++;
+                }
+                $entry->update([
+                    'timesheet_id' => $firstTimesheetId,
+                    'status'       => 'converted',
+                ]);
+            }
         });
 
         return response()->json([
             'success' => true,
             'message' => "{$created} timesheet(s) created / updated from " . $entries->count() . ' punch(es).',
         ]);
+    }
+
+    /**
+     * 2026-05-12 (Brenda): shop-crew multi-job split. Replace the punch's
+     * allocations with a fresh array of (project_id, cost_code_id, hours).
+     * Replacing is simpler than diffing — the modal always submits the
+     * full set the foreman wants to keep.
+     *
+     * Soft-check: warn if the allocation sum doesn't match the punch's
+     * total hours, but don't block (sometimes hours need to round).
+     */
+    public function saveAllocations(Request $request, TimeClockEntry $entry): JsonResponse
+    {
+        if ($entry->status === 'converted') {
+            return response()->json(['success' => false, 'message' => 'Cannot edit a converted punch. Edit the linked timesheet(s) instead.'], 422);
+        }
+
+        $data = $request->validate([
+            'allocations'                => 'required|array|min:1',
+            'allocations.*.project_id'   => 'required|integer|exists:projects,id',
+            'allocations.*.cost_code_id' => 'nullable|integer|exists:cost_codes,id',
+            'allocations.*.hours'        => 'required|numeric|min:0.01|max:24',
+            'allocations.*.notes'        => 'nullable|string|max:500',
+        ]);
+
+        DB::transaction(function () use ($entry, $data) {
+            $entry->allocations()->delete();
+            foreach (array_values($data['allocations']) as $i => $row) {
+                TimeClockAllocation::create([
+                    'time_clock_entry_id' => $entry->id,
+                    'project_id'          => $row['project_id'],
+                    'cost_code_id'        => $row['cost_code_id'] ?? null,
+                    'hours'               => $row['hours'],
+                    'sort_order'          => $i,
+                    'notes'               => $row['notes'] ?? null,
+                ]);
+            }
+        });
+
+        $sum = (float) collect($data['allocations'])->sum('hours');
+        $entryHours = (float) $entry->hours;
+        $mismatch = ($entryHours > 0 && abs($sum - $entryHours) > 0.05)
+            ? "Allocations total {$sum} hrs but the punch is {$entryHours} hrs — that's OK, but worth a double-check before converting."
+            : null;
+
+        return response()->json([
+            'success'      => true,
+            'message'      => count($data['allocations']) . ' job split(s) saved.',
+            'mismatch'     => $mismatch,
+            'allocations'  => $entry->load('allocations.project:id,project_number,name', 'allocations.costCode:id,code,name')->allocations,
+        ]);
+    }
+
+    /**
+     * Remove all allocations from a punch (revert to single-job mode).
+     */
+    public function clearAllocations(TimeClockEntry $entry): JsonResponse
+    {
+        if ($entry->status === 'converted') {
+            return response()->json(['success' => false, 'message' => 'Cannot clear a converted punch.'], 422);
+        }
+        $entry->allocations()->delete();
+        return response()->json(['success' => true, 'message' => 'Allocations cleared.']);
     }
 
     /**

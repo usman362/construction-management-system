@@ -501,6 +501,11 @@ Route::middleware('auth')->group(function () {
         Route::post('admin/time-clock/convert', [\App\Http\Controllers\TimeClockController::class, 'convertToTimesheet'])->name('time-clock.convert');
         Route::post('admin/time-clock/{entry}', [\App\Http\Controllers\TimeClockController::class, 'updateEntry'])->name('time-clock.update');
         Route::post('admin/time-clock/{entry}/void', [\App\Http\Controllers\TimeClockController::class, 'void'])->name('time-clock.void');
+        // 2026-05-12 (Brenda — shop crew multi-job): split a single punch
+        // across multiple jobs so the crew doesn't have to badge in/out
+        // every time they switch tasks during the day.
+        Route::post('admin/time-clock/{entry}/allocations',   [\App\Http\Controllers\TimeClockController::class, 'saveAllocations'])->name('time-clock.allocations.save');
+        Route::delete('admin/time-clock/{entry}/allocations', [\App\Http\Controllers\TimeClockController::class, 'clearAllocations'])->name('time-clock.allocations.clear');
     });
 
     // ─── Global Reports ──────────────────────────────────────────

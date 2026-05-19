@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TimeClockEntry extends Model
 {
@@ -72,6 +73,17 @@ class TimeClockEntry extends Model
     public function timesheet(): BelongsTo
     {
         return $this->belongsTo(Timesheet::class);
+    }
+
+    /**
+     * 2026-05-12: per-job slices when the worker did multiple jobs in one
+     * day without re-badging. If empty, the punch converts to one timesheet
+     * on the entry's primary project (current behavior). If populated,
+     * convertToTimesheet emits one timesheet per allocation.
+     */
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(TimeClockAllocation::class)->orderBy('sort_order');
     }
 
     /**
