@@ -1204,6 +1204,19 @@ class ReportController extends Controller
         return $pdf->download("productivity-{$project->project_number}.pdf");
     }
 
+    /**
+     * 2026-05-12 (Brenda bug report): Download PDF on Timesheet Reports was
+     * broken because the controller produced a FLAT collection while the
+     * pdf.timesheet-report view expects NESTED groups with each one's
+     * `name`, `type`, `total_hours`, `total_cost`, `entries[]` keys. With
+     * no filter, the no-filter path also tried to render every timesheet
+     * in the DB and ran dompdf out of memory.
+     *
+     * Two fixes:
+     *   1. Build nested groups matching the view's contract.
+     *   2. Require at least one filter (date range, project, or employee)
+     *      so we never PDF more than a focused report's worth of rows.
+     */
     public function timesheetReportPdf(Request $request)
     {
         $validated = $request->validate([
@@ -1231,60 +1244,70 @@ class ReportController extends Controller
             return $pdf->download("weekly-timesheet-{$suffix}.pdf");
         }
 
+        // Guard: require at least one filter so we don't try to render the
+        // entire timesheet history in one PDF (dompdf OOMs at ~3500+ rows).
+        $hasAnyFilter = ($validated['employee_id'] ?? null)
+                     || ($validated['project_id']  ?? null)
+                     || ($validated['start_date']  ?? null)
+                     || ($validated['end_date']    ?? null);
+        if (! $hasAnyFilter) {
+            return back()->with('error', 'Pick at least one filter (date range, project, or employee) before downloading a PDF.');
+        }
+
         $query = Timesheet::with(['employee', 'project']);
-
         if ($validated['employee_id'] ?? null) $query->where('employee_id', $validated['employee_id']);
-        if ($validated['project_id'] ?? null) $query->where('project_id', $validated['project_id']);
-        if ($validated['start_date'] ?? null) $query->where('date', '>=', $validated['start_date']);
-        if ($validated['end_date'] ?? null) $query->where('date', '<=', $validated['end_date']);
+        if ($validated['project_id']  ?? null) $query->where('project_id',  $validated['project_id']);
+        if ($validated['start_date']  ?? null) $query->where('date', '>=', $validated['start_date']);
+        if ($validated['end_date']    ?? null) $query->where('date', '<=', $validated['end_date']);
 
-        $timesheets = $query->get();
+        $timesheets = $query->orderBy('date')->get();
+
+        // Build nested groups in the shape pdf.timesheet-report expects:
+        //   [ { name, type, total_hours, total_cost, entries: [...] }, ... ]
+        // Each entry: { date, employee, project, hours, cost }
         $groupedData = collect();
 
+        $emitGroup = function (string $name, string $type, $rows) use ($groupedData, $groupBy) {
+            $entries = $rows->map(fn ($t) => [
+                'date'     => $t->date?->toDateString() ?? '',
+                'employee' => optional($t->employee)->first_name . ' ' . optional($t->employee)->last_name,
+                'project'  => $t->project->name ?? '—',
+                'hours'    => (float) $t->total_hours,
+                'cost'     => (float) $t->total_cost,
+            ])->values();
+
+            $groupedData->push([
+                'name'         => $name,
+                'type'         => $type,
+                'total_hours'  => (float) $rows->sum('total_hours'),
+                'total_cost'   => (float) $rows->sum('total_cost'),
+                'entries'      => $entries,
+            ]);
+        };
+
         if ($groupBy === 'employee') {
-            foreach ($timesheets->groupBy('employee_id') as $group) {
-                $emp = $group->first()->employee;
-                $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
-                foreach ($group as $t) {
-                    $groupedData->push([
-                        'group_name' => $empName,
-                        'detail' => ($t->project->name ?? 'N/A') . ' — ' . ($t->date?->format('M j, Y') ?? ''),
-                        'hours' => $t->total_hours,
-                        'labor_cost' => $t->total_cost,
-                        'billable_amount' => (float) ($t->billable_amount ?? 0),
-                    ]);
-                }
+            foreach ($timesheets->groupBy('employee_id') as $rows) {
+                $emp = $rows->first()->employee;
+                $name = $emp ? trim($emp->first_name . ' ' . $emp->last_name) : 'Unknown employee';
+                $emitGroup($name, 'Employee', $rows);
             }
         } elseif ($groupBy === 'project') {
-            foreach ($timesheets->groupBy('project_id') as $group) {
-                $projName = $group->first()->project->name ?? 'Unknown';
-                foreach ($group as $t) {
-                    $emp = $t->employee;
-                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
-                    $groupedData->push([
-                        'group_name' => $projName,
-                        'detail' => $empName . ' — ' . ($t->date?->format('M j, Y') ?? ''),
-                        'hours' => $t->total_hours,
-                        'labor_cost' => $t->total_cost,
-                        'billable_amount' => (float) ($t->billable_amount ?? 0),
-                    ]);
-                }
+            foreach ($timesheets->groupBy('project_id') as $rows) {
+                $proj = $rows->first()->project;
+                $name = $proj ? ($proj->project_number . ' — ' . $proj->name) : 'Unknown project';
+                $emitGroup($name, 'Project', $rows);
             }
-        } else {
-            foreach ($timesheets->sortBy('date')->groupBy(fn ($t) => $t->date?->format('Y-m-d')) as $dateStr => $group) {
-                foreach ($group as $t) {
-                    $emp = $t->employee;
-                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
-                    $groupedData->push([
-                        'group_name' => \Carbon\Carbon::parse($dateStr)->format('M j, Y'),
-                        'detail' => $empName . ' — ' . ($t->project->name ?? 'N/A'),
-                        'hours' => $t->total_hours,
-                        'labor_cost' => $t->total_cost,
-                        'billable_amount' => (float) ($t->billable_amount ?? 0),
-                    ]);
-                }
+        } else { // date
+            foreach ($timesheets->groupBy(fn ($t) => $t->date?->toDateString()) as $dateStr => $rows) {
+                $name = $dateStr ? \Carbon\Carbon::parse($dateStr)->format('M j, Y') : 'No date';
+                $emitGroup($name, 'Date', $rows);
             }
         }
+
+        // Bump memory: dompdf is heavy when rendering many rows / loading
+        // fonts. Production PHP usually has 512M+ but local dev defaults
+        // to 128M, which OOMs on a few hundred rows.
+        ini_set('memory_limit', '512M');
 
         $pdf = Pdf::loadView('pdf.timesheet-report', compact('groupedData', 'groupBy'));
         $pdf->setPaper('a4', 'landscape');

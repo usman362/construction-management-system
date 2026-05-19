@@ -9,12 +9,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Tool extends Model
 {
     protected $fillable = [
-        'name', 'asset_tag', 'category', 'serial_number',
-        'qr_token', 'replacement_cost', 'status', 'notes',
+        'name', 'asset_tag', 'category', 'location', 'serial_number',
+        'qr_token', 'replacement_cost', 'purchase_date',
+        'purchase_ticket_path', 'purchase_ticket_name',
+        'status', 'notes',
     ];
 
     protected $casts = [
         'replacement_cost' => 'decimal:2',
+        'purchase_date'    => 'date',
     ];
 
     protected static function booted(): void

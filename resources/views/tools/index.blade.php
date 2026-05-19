@@ -16,8 +16,8 @@
 
     {{-- Filters --}}
     <form method="GET" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input type="text" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Search name / asset tag / serial"
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Search name / tag / serial / location"
                    class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <select name="status" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 <option value="">Any status</option>
@@ -29,6 +29,12 @@
                 <option value="">Any category</option>
                 @foreach($categories as $c)
                     <option value="{{ $c }}" @selected(($filters['category'] ?? '') === $c)>{{ $c }}</option>
+                @endforeach
+            </select>
+            <select name="location" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">Any location</option>
+                @foreach($locations as $l)
+                    <option value="{{ $l }}" @selected(($filters['location'] ?? '') === $l)>{{ $l }}</option>
                 @endforeach
             </select>
             <div class="flex gap-2">
@@ -49,8 +55,10 @@
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Tool</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Asset Tag</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Category</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-600">Location</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Status</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-600">Currently With</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-600">Receipt</th>
                         <th class="px-3 py-2 text-right font-medium text-gray-600">Actions</th>
                     </tr>
                 </thead>
@@ -60,6 +68,7 @@
                             <td class="px-3 py-2 text-gray-900 font-medium">{{ $tool->name }}</td>
                             <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ $tool->asset_tag ?? '—' }}</td>
                             <td class="px-3 py-2 text-gray-600 text-xs">{{ $tool->category ?? '—' }}</td>
+                            <td class="px-3 py-2 text-gray-700 text-xs">{{ $tool->location ?? '—' }}</td>
                             <td class="px-3 py-2">
                                 <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded
                                     @switch($tool->status)
@@ -84,12 +93,23 @@
                                     <span class="text-gray-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-3 py-2 text-right text-xs">
+                            <td class="px-3 py-2 text-center text-xs">
+                                @if($tool->purchase_ticket_path)
+                                    <a href="{{ route('tools.purchase-ticket', $tool) }}" target="_blank" class="inline-flex items-center gap-1 text-blue-700 hover:text-blue-900" title="{{ $tool->purchase_ticket_name }}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+                                        View
+                                    </a>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-3 py-2 text-right text-xs whitespace-nowrap">
                                 @if($tool->currentAssignment)
                                     <button onclick="returnTool({{ $tool->id }})" class="text-blue-600 hover:text-blue-800">Return</button>
                                 @elseif($tool->status === 'available')
                                     <button onclick="openIssueModal({{ $tool->id }})" class="text-emerald-600 hover:text-emerald-800">Issue</button>
                                 @endif
+                                <button onclick='openEditModal(@json($tool))' class="text-gray-600 hover:text-gray-800 ml-2">Edit</button>
                                 <button onclick="confirmDelete(`{{ url('/tools/' . $tool->id) }}`, null, '{{ route('tools.index') }}')" class="text-red-600 hover:text-red-800 ml-2">×</button>
                             </td>
                         </tr>
@@ -103,20 +123,78 @@
 
 {{-- Add tool modal --}}
 <div id="addToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('addToolModal')">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[92vh] overflow-y-auto">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Add Tool</h3>
-        <form id="addToolForm" class="space-y-3">
+        <form id="addToolForm" class="space-y-3" enctype="multipart/form-data">
             @csrf
             <input type="text" name="name" required placeholder="Tool name (e.g. DeWalt 60V drill)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <input type="text" name="asset_tag" placeholder="Asset tag (optional)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <input type="text" name="category" placeholder="Category (e.g. Power, Hand, Ladder)" list="catList" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" name="asset_tag" placeholder="Asset tag (optional)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <input type="text" name="serial_number" placeholder="Serial #" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" name="category" placeholder="Category (e.g. Power, Hand)" list="catList" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <input type="text" name="location" placeholder="Location (e.g. Yard, Truck 5, Shop)" list="locList" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
             <datalist id="catList">@foreach($categories as $c)<option value="{{ $c }}">@endforeach</datalist>
-            <input type="text" name="serial_number" placeholder="Serial #" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <input type="number" step="0.01" name="replacement_cost" placeholder="Replacement cost ($)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <datalist id="locList">@foreach($locations as $l)<option value="{{ $l }}">@endforeach</datalist>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="number" step="0.01" name="replacement_cost" placeholder="Replacement cost ($)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <input type="date" name="purchase_date" placeholder="Purchase date" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Purchase ticket / receipt (PDF or photo)</label>
+                <input type="file" name="purchase_ticket" accept=".pdf,image/*" class="w-full text-sm">
+            </div>
             <textarea name="notes" rows="2" placeholder="Notes" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" onclick="closeModal('addToolModal')" class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
                 <button type="button" onclick="saveTool()" class="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Edit tool modal --}}
+<div id="editToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editToolModal')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[92vh] overflow-y-auto">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Edit Tool</h3>
+        <form id="editToolForm" class="space-y-3" enctype="multipart/form-data">
+            @csrf
+            <input type="hidden" name="_method" value="PUT">
+            <input type="hidden" id="editToolId">
+            <input type="text" id="edit_name" name="name" required placeholder="Tool name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" id="edit_asset_tag" name="asset_tag" placeholder="Asset tag" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <input type="text" id="edit_serial_number" name="serial_number" placeholder="Serial #" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" id="edit_category" name="category" placeholder="Category" list="catList" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <input type="text" id="edit_location" name="location" placeholder="Location" list="locList" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="number" step="0.01" id="edit_replacement_cost" name="replacement_cost" placeholder="Replacement cost ($)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <input type="date" id="edit_purchase_date" name="purchase_date" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Purchase ticket / receipt</label>
+                <div id="editTicketCurrent" class="hidden mb-1 text-xs text-gray-600 flex items-center gap-2">
+                    <span>Current:</span>
+                    <a id="editTicketLink" href="#" target="_blank" class="text-blue-700 hover:underline"></a>
+                    <button type="button" onclick="removeTicket()" class="text-red-600 hover:text-red-800 text-xs">remove</button>
+                </div>
+                <input type="file" name="purchase_ticket" accept=".pdf,image/*" class="w-full text-sm">
+                <p class="text-[11px] text-gray-500 mt-1">Uploading a new file replaces the old one.</p>
+            </div>
+            <select id="edit_status" name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                @foreach(['available', 'issued', 'lost', 'retired'] as $s)
+                    <option value="{{ $s }}">{{ ucfirst($s) }}</option>
+                @endforeach
+            </select>
+            <textarea id="edit_notes" name="notes" rows="2" placeholder="Notes" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModal('editToolModal')" class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
+                <button type="button" onclick="updateTool()" class="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">Save changes</button>
             </div>
         </form>
     </div>
@@ -166,6 +244,66 @@ async function saveTool() {
     if (!r.ok) { Toast.fire({icon:'error', title: b.message || 'Save failed'}); return; }
     Toast.fire({icon:'success', title: b.message});
     location.reload();
+}
+
+// 2026-05-12 (Brenda): edit-tool flow with location + receipt upload.
+let editingToolId = null;
+function openEditModal(tool) {
+    editingToolId = tool.id;
+    document.getElementById('editToolId').value = tool.id;
+    document.getElementById('edit_name').value             = tool.name || '';
+    document.getElementById('edit_asset_tag').value        = tool.asset_tag || '';
+    document.getElementById('edit_serial_number').value    = tool.serial_number || '';
+    document.getElementById('edit_category').value         = tool.category || '';
+    document.getElementById('edit_location').value         = tool.location || '';
+    document.getElementById('edit_replacement_cost').value = tool.replacement_cost || '';
+    document.getElementById('edit_purchase_date').value    = tool.purchase_date ? String(tool.purchase_date).substring(0,10) : '';
+    document.getElementById('edit_status').value           = tool.status || 'available';
+    document.getElementById('edit_notes').value            = tool.notes || '';
+    // Reset file input
+    const fileInput = document.querySelector('#editToolForm input[type=file]');
+    if (fileInput) fileInput.value = '';
+    // Current ticket link
+    const cur = document.getElementById('editTicketCurrent');
+    const link = document.getElementById('editTicketLink');
+    if (tool.purchase_ticket_path) {
+        cur.classList.remove('hidden');
+        link.href = window.BASE_URL + '/tools/' + tool.id + '/purchase-ticket';
+        link.textContent = tool.purchase_ticket_name || 'View attached file';
+    } else {
+        cur.classList.add('hidden');
+    }
+    openModal('editToolModal');
+}
+
+async function updateTool() {
+    const form = document.getElementById('editToolForm');
+    if (!form.reportValidity()) return;
+    const fd = new FormData(form);
+    // Laravel reads `_method=PUT` POST body as a PUT — saves us from
+    // having to multipart-PUT manually (browsers don't support that).
+    const r = await fetch(window.BASE_URL + '/tools/' + editingToolId, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+        body: fd,
+    });
+    const b = await r.json();
+    if (!r.ok) { Toast.fire({icon:'error', title: b.message || 'Update failed'}); return; }
+    Toast.fire({icon:'success', title: b.message});
+    location.reload();
+}
+
+async function removeTicket() {
+    if (!editingToolId) return;
+    if (!confirm('Remove the attached receipt from this tool?')) return;
+    const r = await fetch(window.BASE_URL + '/tools/' + editingToolId + '/purchase-ticket', {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+    });
+    const b = await r.json();
+    if (!r.ok) { Toast.fire({icon:'error', title: b.message || 'Remove failed'}); return; }
+    Toast.fire({icon:'success', title: b.message});
+    document.getElementById('editTicketCurrent').classList.add('hidden');
 }
 
 function openIssueModal(toolId) {

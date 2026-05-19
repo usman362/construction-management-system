@@ -429,6 +429,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('tools/{tool}',             [\App\Http\Controllers\ToolController::class, 'destroy'])->name('tools.destroy');
         Route::post('tools/{tool}/issue',         [\App\Http\Controllers\ToolController::class, 'issue'])->name('tools.issue');
         Route::post('tools/{tool}/return',        [\App\Http\Controllers\ToolController::class, 'return_'])->name('tools.return');
+        // 2026-05-12 (Brenda): purchase-ticket file attached to a tool.
+        Route::get('tools/{tool}/purchase-ticket',    [\App\Http\Controllers\ToolController::class, 'downloadPurchaseTicket'])->name('tools.purchase-ticket');
+        Route::delete('tools/{tool}/purchase-ticket', [\App\Http\Controllers\ToolController::class, 'removePurchaseTicket'])->name('tools.purchase-ticket.destroy');
     });
 
     // ─── Fuel Logs (Field Pack) ──────────────────────────────────
