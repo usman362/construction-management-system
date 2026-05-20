@@ -205,6 +205,16 @@ class TimesheetController extends Controller
             $forceOT,
             null
         );
+
+        // 2026-05-20 (Brenda): 16-hour daily cap per employee.
+        // Prevents accidental double-entry from rolling a worker past
+        // realistic limits. Sums hours across every existing timesheet
+        // row for the same employee+date plus this new one's total.
+        $newTotal = (float) ($split['regular_hours'] + $split['overtime_hours'] + $split['double_time_hours']);
+        if (($err = $this->assertDailyHoursWithinCap($validated['employee_id'], $validated['date'], $newTotal)) !== null) {
+            return response()->json(['success' => false, 'message' => $err], 422);
+        }
+
         $reg = $split['regular_hours'];
         $ot  = $split['overtime_hours'];
         $dt  = $split['double_time_hours'];
@@ -578,6 +588,15 @@ class TimesheetController extends Controller
             $forceOT,
             $timesheet->id
         );
+
+        // 2026-05-20 (Brenda): 16-hour daily cap. Exclude the row we're
+        // about to overwrite from the daily total so editing the same
+        // row doesn't trip its own old hours.
+        $newTotal = (float) ($split['regular_hours'] + $split['overtime_hours'] + $split['double_time_hours']);
+        if (($err = $this->assertDailyHoursWithinCap($validated['employee_id'], $validated['date'], $newTotal, $timesheet->id)) !== null) {
+            return response()->json(['success' => false, 'message' => $err], 422);
+        }
+
         $reg = $split['regular_hours'];
         $ot  = $split['overtime_hours'];
         $dt  = $split['double_time_hours'];
@@ -985,6 +1004,10 @@ class TimesheetController extends Controller
         $projectPerDiem = (float) ($project->default_per_diem_rate ?? 0);
 
         $skipped = 0;
+        // 2026-05-20 (Brenda): track per-employee daily totals across THIS
+        // bulk POST so two rows for the same person (rare but possible) get
+        // combined when checking the 16-hour cap.
+        $addedTodayByEmp = [];
         foreach ($validated['entries'] as $entry) {
             // Skip absent employees — the "Present" checkbox on the bulk form
             // defaults ON, so unchecked rows mean the foreman marked them absent.
@@ -1005,6 +1028,18 @@ class TimesheetController extends Controller
             $reg = $split['regular_hours'];
             $ot  = $split['overtime_hours'];
             $dt  = $split['double_time_hours'];
+
+            // 16-hour cap: combine existing-day total + everything we've
+            // queued for this employee in this same bulk submit.
+            $rowTotal = (float) ($reg + $ot + $dt);
+            $extra = (float) ($addedTodayByEmp[$entry['employee_id']] ?? 0);
+            if (($err = $this->assertDailyHoursWithinCap($entry['employee_id'], $validated['date'], $rowTotal + $extra)) !== null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "{$employee->first_name} {$employee->last_name}: {$err}",
+                ], 422);
+            }
+            $addedTodayByEmp[$entry['employee_id']] = $extra + $rowTotal;
 
             $totals = $this->computeLaborTotals($employee, $reg, $ot, $dt, (int) $validated['project_id'], $validated['date']);
 
@@ -1230,6 +1265,44 @@ class TimesheetController extends Controller
      * @param  array<string, mixed>  $source
      * @return array{regular_hours: float, overtime_hours: float, double_time_hours: float}
      */
+    /**
+     * 2026-05-20 (Brenda): hard daily cap to keep a worker from ever rolling
+     * past 16 hours on a single date. Sums every other timesheet row this
+     * employee has on the same date (excluding the row being edited, if any)
+     * and rejects the new/updated row if the new combined total would blow
+     * past the cap.
+     *
+     * Returns null if OK, or a friendly error message string to surface in
+     * the API response. Cap configurable via env if Brenda ever needs to
+     * raise it (TIMESHEET_DAILY_CAP_HOURS).
+     */
+    private function assertDailyHoursWithinCap(
+        int $employeeId,
+        string $date,
+        float $newRowHours,
+        ?int $excludeTimesheetId = null
+    ): ?string {
+        $cap = (float) env('TIMESHEET_DAILY_CAP_HOURS', 16);
+        if ($cap <= 0) return null;   // disable cap by setting env to 0
+
+        $existing = Timesheet::query()
+            ->where('employee_id', $employeeId)
+            ->whereDate('date', $date)
+            ->when($excludeTimesheetId, fn ($q) => $q->where('id', '!=', $excludeTimesheetId))
+            ->sum('total_hours');
+
+        $combined = (float) $existing + $newRowHours;
+        if ($combined > $cap + 0.001) {       // tiny epsilon for float jitter
+            $existingFmt = rtrim(rtrim(number_format($existing, 2), '0'), '.');
+            $newFmt      = rtrim(rtrim(number_format($newRowHours, 2), '0'), '.');
+            $combinedFmt = rtrim(rtrim(number_format($combined, 2), '0'), '.');
+            return "Daily cap of {$cap} hours exceeded for {$date}. "
+                . "Already on file: {$existingFmt} hrs; this entry would add {$newFmt} hrs (total {$combinedFmt}). "
+                . "Adjust the hours, or edit one of the existing rows for this day.";
+        }
+        return null;
+    }
+
     private function resolveHourSplit(
         Employee $employee,
         string $date,

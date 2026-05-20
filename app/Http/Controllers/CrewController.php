@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Crew;
+use App\Models\CrewMember;
 use App\Models\Project;
 use App\Models\Employee;
 use App\Models\Shift;
@@ -135,11 +136,14 @@ class CrewController extends Controller
             'project',
             'foreman',
             'shift',
+            // 2026-05-20: only show ACTIVE members on the crew page.
+            // Soft-removed members (removed_date set) stay in the DB for
+            // history but disappear from the roster table.
             'members' => function ($q) {
-                $q->with(['employee.craft']);
+                $q->whereNull('removed_date')->with(['employee.craft']);
             },
         ]);
-        $crew->loadCount('members');
+        $crew->loadCount(['members as members_count' => fn ($q) => $q->whereNull('removed_date')]);
 
         return view('crews.show', [
             'crew' => $crew,
@@ -218,9 +222,39 @@ class CrewController extends Controller
         ]);
     }
 
-    public function removeMember(Request $request, Crew $crew, $crewMemberId): JsonResponse
+    /**
+     * 2026-05-20 (Brenda bug report): "I am trying to update my crews and
+     * it will not let me remove employees."
+     *
+     * The old implementation called $crew->employees()->detach($id) — but
+     * the route binds `{crewMember}` as the CrewMember pivot-row id, not
+     * the employee_id. detach() expected the related-key id, so it never
+     * matched anything and the click silently no-op'd.
+     *
+     * Fix: route-model-bind the CrewMember directly, soft-remove by
+     * stamping `removed_date = today` (the schema's intended pattern —
+     * the foreman dashboard already filters with whereNull('removed_date')
+     * so the row disappears from the active roster but the audit trail
+     * stays intact).
+     */
+    public function removeMember(Request $request, Crew $crew, CrewMember $crewMember): JsonResponse
     {
-        $crew->employees()->detach($crewMemberId);
+        // Guard against cross-crew tampering.
+        if ($crewMember->crew_id !== $crew->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That member doesn\'t belong to this crew.',
+            ], 422);
+        }
+
+        if ($crewMember->removed_date) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Employee was already removed.',
+            ]);
+        }
+
+        $crewMember->update(['removed_date' => now()->toDateString()]);
 
         return response()->json([
             'success' => true,
