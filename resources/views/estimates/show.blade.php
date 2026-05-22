@@ -670,9 +670,14 @@
                 <input type="text" name="description" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Amount *</label>
-                <input type="number" name="amount" step="0.01" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
-                <p class="text-[11px] text-gray-500 mt-1">Enter the estimated dollar amount for this line.</p>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                <input type="number" name="amount" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
+                {{-- 2026-05-23 (KH bug report — "Error adding line item"): Amount
+                     used to be required, but pure-labor lines only need Labor
+                     Hours. Now Amount is optional — provide either a dollar
+                     amount OR a Qty × Unit Cost OR Labor Hours, and at least
+                     one of those must be > 0 (validated below before submit). --}}
+                <p class="text-[11px] text-gray-500 mt-1">Optional. Skip if this is a labor-only line — fill Labor Hours below instead.</p>
             </div>
             <details class="mb-4">
                 <summary class="text-sm font-medium text-blue-700 cursor-pointer">Advanced: break down by Qty × Unit Cost</summary>
@@ -729,7 +734,26 @@ function submitAddLine() {
     var form = document.getElementById('addLineForm');
     var formData = new FormData(form);
     var data = {};
-    formData.forEach(function(v, k) { data[k] = v; });
+    formData.forEach(function(v, k) { if (v !== '') data[k] = v; });
+
+    // 2026-05-23 (KH bug report — "Error adding line item"): client-side
+    // sanity check so the user gets a clear message instead of a generic
+    // server-side fail when they fill no money / qty / hours at all.
+    var amt   = parseFloat(data.amount       || 0);
+    var qty   = parseFloat(data.quantity     || 0);
+    var unit  = parseFloat(data.unit_cost    || 0);
+    var hrs   = parseFloat(data.labor_hours  || 0);
+    if (amt <= 0 && (qty <= 0 || unit <= 0) && hrs <= 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Add at least one of: Amount, Qty × Unit Cost, or Labor Hours.',
+            text: 'A line item needs a value somewhere — either a dollar amount, a quantity-times-cost, or labor hours for a craft.',
+        });
+        return;
+    }
+    var btn = form.querySelector('button[onclick="submitAddLine()"]');
+    var origLabel = btn ? btn.textContent : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
 
     $.ajax({
         url: '{{ route("projects.estimates.add-line", [$project, $estimate]) }}',
@@ -740,12 +764,17 @@ function submitAddLine() {
             window.location.reload();
         },
         error: function(xhr) {
+            if (btn) { btn.disabled = false; btn.textContent = origLabel; }
             var errors = xhr.responseJSON?.errors;
             if (errors) {
-                var msg = Object.values(errors).flat().join('<br>');
-                Swal.fire({icon: 'error', title: 'Validation Error', html: msg});
+                var msg = Object.values(errors).flat().map(function(e){
+                    return '<li>'+ e.replace(/[<>&"']/g, '') +'</li>';
+                }).join('');
+                Swal.fire({icon: 'error', title: 'Please fix these fields',
+                           html: '<ul style="text-align:left;margin:0 auto;display:inline-block;">' + msg + '</ul>'});
             } else {
-                Swal.fire({icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'Error adding line item'});
+                Swal.fire({icon: 'error', title: 'Could not save line',
+                           text: xhr.responseJSON?.message || ('HTTP ' + xhr.status + ' — check the server logs.')});
             }
         }
     });

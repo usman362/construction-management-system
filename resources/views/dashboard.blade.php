@@ -139,9 +139,17 @@
 
     <!-- Recent Projects Table -->
     <div id="projects-section" class="bg-white rounded-lg shadow mb-8">
-        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-wrap gap-3">
             <h3 class="text-lg font-bold text-gray-900">Projects</h3>
-            <span class="text-xs text-gray-500">{{ count($recentProjects ?? []) }} active</span>
+            <div class="flex items-center gap-3">
+                {{-- 2026-05-23 (KH ask): Project search on the dashboard. Filters
+                     the project rows below in real time as the user types,
+                     across project #, name, client, and status. --}}
+                <input type="search" id="dashProjectSearch" placeholder="Search projects…"
+                       class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64"
+                       oninput="filterDashboardProjects(this.value)">
+                <span class="text-xs text-gray-500"><span id="dashProjectCount">{{ count($recentProjects ?? []) }}</span> active</span>
+            </div>
         </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table id="dashboardProjectsTable" class="w-full">
@@ -425,6 +433,25 @@
     @include('partials.change-orders.quick-create-modal')
 
     <script>
+    // ─── 2026-05-23 (KH): Project search on dashboard ─────────────
+    // Filters the Projects table client-side (rows already in DOM).
+    // Matches across project #, name, client, status. Case-insensitive,
+    // multi-word AND (so "5413 atlantic" finds Atlantic projects with
+    // "5413" in the number).
+    function filterDashboardProjects(q) {
+        const terms = (q || '').toLowerCase().split(/\s+/).filter(Boolean);
+        const rows = document.querySelectorAll('#dashboardProjectsTable tbody tr');
+        let shown = 0;
+        rows.forEach(r => {
+            const haystack = r.textContent.toLowerCase();
+            const match = terms.every(t => haystack.includes(t));
+            r.style.display = match ? '' : 'none';
+            if (match) shown++;
+        });
+        const counter = document.getElementById('dashProjectCount');
+        if (counter) counter.textContent = terms.length === 0 ? rows.length : shown;
+    }
+
     // ─── Project modal helpers ─────────────────────────────────────
     // Pre-fill the client dropdown when the Project modal opens — the
     // partial's <select name="client_id"> is empty by default so it can be

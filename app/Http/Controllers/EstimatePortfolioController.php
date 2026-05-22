@@ -263,6 +263,30 @@ class EstimatePortfolioController extends Controller
     }
 
     /**
+     * 2026-05-23 (KH): "Need option to Delete Estimates on Estimates Tab
+     * (Especially while we are testing)." Allow destroy from the portfolio.
+     * Safety: refuse if the estimate has been converted to a project (the
+     * audit trail there matters more than the estimate row). Cascading
+     * delete on sections + lines is handled by the existing model's
+     * onDelete cascade in the migrations.
+     */
+    public function destroy(Estimate $estimate): \Illuminate\Http\JsonResponse
+    {
+        if ($estimate->status === 'converted_to_project') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Can\'t delete an estimate that\'s already been converted to a project. Edit or void it from the project instead.',
+            ], 422);
+        }
+        $number = $estimate->estimate_number ?? ('#' . $estimate->id);
+        $estimate->delete();
+        return response()->json([
+            'success' => true,
+            'message' => "Estimate {$number} deleted.",
+        ]);
+    }
+
+    /**
      * Legacy "show" placeholder — kept reachable in case any old links
      * point here, but no longer the default. Prefer show() above.
      */

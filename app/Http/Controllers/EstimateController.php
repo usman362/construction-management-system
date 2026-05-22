@@ -349,7 +349,10 @@ class EstimateController extends Controller
         //   - `labor_hours` (legacy) → `hours` (new column EstimateLine reads)
         //   - `amount` alone (no qty/unit_cost) → treat as quantity=1 × unit_cost=amount
         //     so EstimateLine::recalculate() produces the right cost_amount.
-        $data['line_type'] = $data['line_type'] ?? 'other';
+        // 2026-05-23 (KH): auto-classify labor-only entries as line_type='labor'
+        //   so they get treated correctly downstream (vs landing as 'other'
+        //   with zero amount + zero quantity which looks like junk on the
+        //   estimate sheet).
         if (! empty($data['labor_hours']) && empty($data['hours'])) {
             $data['hours'] = $data['labor_hours'];
         }
@@ -359,6 +362,11 @@ class EstimateController extends Controller
             $data['unit_cost'] = $data['amount'];
         }
         unset($data['amount']);
+        if (empty($data['line_type'])) {
+            $hasLabor    = (float) ($data['hours']    ?? 0) > 0;
+            $hasMoney    = (float) ($data['quantity'] ?? 0) > 0 || (float) ($data['unit_cost'] ?? 0) > 0;
+            $data['line_type'] = ($hasLabor && ! $hasMoney) ? 'labor' : 'other';
+        }
 
         // If the user didn't pick a markup_percent, fall back to the client's
         // default for this line type (set in ClientDefaultMarkup).

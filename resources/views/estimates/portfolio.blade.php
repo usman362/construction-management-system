@@ -136,8 +136,14 @@
                                 </span>
                             </td>
                             <td class="px-3 py-2 text-xs text-gray-500">{{ optional($est->created_at)->format('M j, Y') }}</td>
-                            <td class="px-3 py-2 text-center">
+                            <td class="px-3 py-2 text-center whitespace-nowrap">
                                 <a href="{{ route('estimates.portfolio.show', $est->id) }}" class="text-blue-600 hover:text-blue-800 text-sm">Open &rarr;</a>
+                                @if($est->status !== 'converted_to_project')
+                                    <button type="button"
+                                            onclick="deleteEstimate({{ $est->id }}, @js($est->estimate_number ?? '#'.$est->id))"
+                                            class="ml-3 text-red-600 hover:text-red-800 text-sm"
+                                            title="Delete this estimate">Delete</button>
+                                @endif
                             </td>
                         </tr>
                     @endforeach
@@ -209,31 +215,101 @@
 
 @push('scripts')
 <script>
-function saveNewEstimate() {
+// 2026-05-23 (KH bug report — "Create Estimate button not working"):
+// Root cause was the JS swallowing validation errors. On a 422 from
+// Laravel, the response has {message, errors:{...}} but no success
+// flag, so the old check `!b.success` triggered a generic "Could not
+// create" toast with no actionable info — making the button feel
+// broken. New version: surface every validation message inline, and
+// disable the button while the request is in flight so double-clicks
+// don't spam.
+async function saveNewEstimate() {
     const form = document.getElementById('newEstimateForm');
     if (!form.reportValidity()) return;
+    const btn = form.querySelector('button[onclick="saveNewEstimate()"]');
+    const origLabel = btn ? btn.textContent : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+
     const fd = new FormData(form);
     const payload = {};
     fd.forEach((v, k) => { if (v !== '') payload[k] = v; });
 
-    fetch('{{ route("estimates.portfolio.store") }}', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-        },
-        body: JSON.stringify(payload),
-    })
-    .then(r => r.json())
-    .then(b => {
-        if (!b.success) {
-            Swal.fire({ icon: 'error', title: 'Could not create', text: b.message || 'Unknown error' });
+    try {
+        const r = await fetch('{{ route("estimates.portfolio.store") }}', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        let body = {};
+        try { body = await r.json(); } catch (_) {}
+
+        if (!r.ok) {
+            // 422 validation: show each field's first error
+            if (r.status === 422 && body.errors) {
+                const lines = Object.values(body.errors).flat();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Please fix these fields',
+                    html: '<ul style="text-align:left;margin:0 auto;display:inline-block;">'
+                        + lines.map(l => '<li>' + escapeHtmlSafe(l) + '</li>').join('')
+                        + '</ul>',
+                });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Could not create', text: body.message || ('HTTP ' + r.status) });
+            }
             return;
         }
-        location.href = b.url;
-    })
-    .catch(e => Swal.fire({ icon: 'error', title: 'Save failed', text: e.message }));
+
+        if (!body.success || !body.url) {
+            Swal.fire({ icon: 'error', title: 'Unexpected response', text: 'The server didn\'t return a redirect URL. Tell support.' });
+            return;
+        }
+        location.href = body.url;
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Save failed', text: e.message || 'Network error — check your connection and try again.' });
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+    }
+}
+
+function escapeHtmlSafe(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// 2026-05-23 (KH): Delete an estimate from the portfolio list.
+function deleteEstimate(id, label) {
+    Swal.fire({
+        title: 'Delete ' + label + '?',
+        text: 'This permanently removes the estimate, its sections, and its line items. This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        confirmButtonText: 'Delete',
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        fetch(window.BASE_URL + '/estimates/' + id, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+            },
+        })
+        .then(r => r.json())
+        .then(b => {
+            if (!b.success) {
+                Swal.fire({ icon: 'error', title: 'Could not delete', text: b.message || 'Unknown error' });
+                return;
+            }
+            Swal.fire({ icon: 'success', title: 'Deleted', text: b.message, timer: 1400, showConfirmButton: false });
+            setTimeout(() => location.reload(), 800);
+        })
+        .catch(e => Swal.fire({ icon: 'error', title: 'Delete failed', text: e.message }));
+    });
 }
 </script>
 @endpush

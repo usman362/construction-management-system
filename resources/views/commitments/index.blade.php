@@ -19,9 +19,11 @@
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <table id="dataTable" class="w-full">
             <thead class="bg-gray-100 border-b">
+                {{-- 2026-05-23 (KH): PO # column dropped — commit # already
+                     identifies the doc type (PO-5413-01, SC-5413-01, etc.).
+                     Removed from header AND from JS column list below. --}}
                 <tr>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Commit #</th>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">PO #</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Vendor</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phase Code</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cost Type</th>
@@ -43,14 +45,25 @@
             <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         <form id="createForm" class="p-6 space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
-                <select name="vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
-                    <option value="">Select Vendor</option>
-                    @foreach($vendors as $vendor)
-                        <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
-                    @endforeach
-                </select>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    {{-- 2026-05-23 (KH): commitment_number is user-editable now,
+                         e.g. PO-5413-01, SC-5413-01. If left blank, server
+                         auto-generates COMM-#####. --}}
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Commit #</label>
+                    <input type="text" name="commitment_number" placeholder="e.g. PO-5413-01, SC-5413-01"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <p class="text-[11px] text-gray-500 mt-1">Leave blank to auto-number.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
+                    <select name="vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                        <option value="">Select Vendor</option>
+                        @foreach($vendors as $vendor)
+                            <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
@@ -63,9 +76,12 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                    {{-- 2026-05-23 (KH): added Pending Signature + Executed. --}}
                     <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
                         <option value="">Select Status</option>
                         <option value="pending">Pending</option>
+                        <option value="pending_signature">Pending Signature</option>
+                        <option value="executed">Executed</option>
                         <option value="approved">Approved</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
@@ -117,14 +133,22 @@
         </div>
         <form id="editForm" class="p-6 space-y-4">
             <input type="hidden" name="_id" id="edit_id">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
-                <select name="vendor_id" id="edit_vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
-                    <option value="">Select Vendor</option>
-                    @foreach($vendors as $vendor)
-                        <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
-                    @endforeach
-                </select>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    {{-- 2026-05-23 (KH): editable commitment number. --}}
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Commit #</label>
+                    <input type="text" name="commitment_number" id="edit_commitment_number"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
+                    <select name="vendor_id" id="edit_vendor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                        <option value="">Select Vendor</option>
+                        @foreach($vendors as $vendor)
+                            <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
@@ -137,9 +161,12 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                    {{-- 2026-05-23 (KH): added Pending Signature + Executed. --}}
                     <select name="status" id="edit_status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
                         <option value="">Select Status</option>
                         <option value="pending">Pending</option>
+                        <option value="pending_signature">Pending Signature</option>
+                        <option value="executed">Executed</option>
                         <option value="approved">Approved</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
@@ -182,20 +209,26 @@ $(document).ready(function() {
         ajax: '{{ route("projects.commitments.index", $project) }}',
         columns: [
             {data:'commitment_number', name:'commitment_number'},
-            {data:'po_number', name:'po_number', render: function(d){return d||'<span class="text-gray-400">—</span>';}},
             {data:'vendor', name:'vendor'},
             {data:'cost_code', name:'cost_code', render: function(d){return d?'<span class="font-mono text-xs">'+d+'</span>':'<span class="text-gray-400">—</span>';}},
             {data:'cost_type', name:'cost_type', render: function(d){return d||'<span class="text-gray-400">—</span>';}},
             {data:'description', name:'description', render: function(d){return d||'—';}},
             {data:'amount', name:'amount', render: function(d){return '$'+parseFloat(d).toFixed(2);}, className:'text-right'},
             {data:'status', name:'status', render: function(d) {
+                // 2026-05-23 (KH): pending_signature + executed added.
                 var statusColors = {
-                    'pending': 'bg-amber-100 text-amber-800',
-                    'approved': 'bg-green-100 text-green-800',
-                    'completed': 'bg-purple-100 text-purple-800',
-                    'cancelled': 'bg-gray-100 text-gray-800'
+                    'pending':           'bg-amber-100 text-amber-800',
+                    'pending_signature': 'bg-orange-100 text-orange-800',
+                    'executed':          'bg-emerald-100 text-emerald-800',
+                    'approved':          'bg-green-100 text-green-800',
+                    'completed':         'bg-purple-100 text-purple-800',
+                    'cancelled':         'bg-gray-100 text-gray-800'
                 };
-                var label = d ? (d.charAt(0).toUpperCase()+d.slice(1)) : '—';
+                var labels = {
+                    'pending_signature': 'Pending Signature',
+                    'executed':          'Executed',
+                };
+                var label = labels[d] || (d ? (d.charAt(0).toUpperCase()+d.slice(1)) : '—');
                 return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium '+(statusColors[d]||'bg-gray-100 text-gray-800')+'">'+label+'</span>';
             }, className:'text-center'},
             {data:'actions', orderable:false, searchable:false, className:'text-center',
@@ -229,6 +262,7 @@ function deleteCommitment(id) {
 function editCommitment(id) {
     $.get(window.BASE_URL+'/projects/{{ $project->id }}/commitments/' + id + '/edit', function(d) {
         document.getElementById('edit_id').value = d.id;
+        document.getElementById('edit_commitment_number').value = d.commitment_number || '';
         document.getElementById('edit_vendor_id').value = d.vendor_id || '';
         document.getElementById('edit_description').value = d.description || '';
         document.getElementById('edit_amount').value = d.amount || '';

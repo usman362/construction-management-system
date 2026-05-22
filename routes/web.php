@@ -480,6 +480,8 @@ Route::middleware('auth')->group(function () {
         Route::post('estimates', [\App\Http\Controllers\EstimatePortfolioController::class, 'store'])->name('estimates.portfolio.store');
         Route::get('estimates/{estimate}', [\App\Http\Controllers\EstimatePortfolioController::class, 'show'])->name('estimates.portfolio.show');
         Route::post('estimates/{estimate}/spawn-project', [\App\Http\Controllers\EstimatePortfolioController::class, 'spawnProject'])->name('estimates.portfolio.spawn-project');
+        // 2026-05-23 (KH): Delete Estimate from the portfolio list.
+        Route::delete('estimates/{estimate}', [\App\Http\Controllers\EstimatePortfolioController::class, 'destroy'])->name('estimates.portfolio.destroy');
     });
 
     // ─── Foreman Dashboard — "My Crew Today" ─────────────────────

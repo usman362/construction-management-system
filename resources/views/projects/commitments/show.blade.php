@@ -15,7 +15,23 @@
                 <h1 class="text-xl font-bold text-gray-900">{{ $commitment->commitment_number ?? 'Commitment' }}</h1>
                 <p class="text-sm text-gray-500 mt-1">{{ $commitment->description }}</p>
             </div>
-            <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">{{ ucfirst($commitment->status) }}</span>
+            {{-- 2026-05-23 (KH): friendly labels for pending_signature + executed. --}}
+            @php
+                $statusLabel = match ($commitment->status) {
+                    'pending_signature' => 'Pending Signature',
+                    'executed'          => 'Executed',
+                    default             => ucfirst((string) $commitment->status),
+                };
+                $statusClass = match ($commitment->status) {
+                    'pending_signature' => 'bg-orange-100 text-orange-800',
+                    'executed'          => 'bg-emerald-100 text-emerald-800',
+                    'approved'          => 'bg-green-100 text-green-800',
+                    'completed'         => 'bg-purple-100 text-purple-800',
+                    'cancelled'         => 'bg-gray-200 text-gray-700',
+                    default             => 'bg-slate-100 text-slate-800',
+                };
+            @endphp
+            <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
         </div>
 
         <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
@@ -32,6 +48,20 @@
                 <p class="text-gray-900 mt-1">
                     @if($commitment->costCode)
                         {{ $commitment->costCode->code }} — {{ $commitment->costCode->name }}
+                    @else
+                        —
+                    @endif
+                </p>
+            </div>
+            {{-- 2026-05-23 (KH bug report — "Cost type not showing up"):
+                 commitment_show was missing Cost Type entirely even though
+                 the column is collected on create + saved on the model.
+                 Now displayed alongside Phase Code. --}}
+            <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase">Cost type</p>
+                <p class="text-gray-900 mt-1">
+                    @if($commitment->costType)
+                        {{ $commitment->costType->code }} — {{ $commitment->costType->name }}
                     @else
                         —
                     @endif
