@@ -88,6 +88,12 @@ class TimeClockEntry extends Model
 
     /**
      * Close an open entry — stamps clock-out time, GPS, and computes hours.
+     *
+     * 2026-05-22 (Brenda): hours are clamped to a 16-hour daily cap (or
+     * whatever's left of it after other punches/timesheets on the same
+     * day). The full raw duration is preserved as a note so the audit
+     * trail isn't lost. Clamping (not refusing) at close-out is the right
+     * call — the physical clock-out shouldn't error out a field worker.
      */
     public function closeOut(?float $lat, ?float $lng, ?int $accuracy = null, ?\DateTimeInterface $at = null): void
     {
@@ -97,10 +103,28 @@ class TimeClockEntry extends Model
         $this->clock_out_lng = $lng;
         $this->clock_out_accuracy_m = $accuracy;
 
-        // Hours computed from timestamps, rounded to 2 decimals.
-        $this->hours = $this->clock_in_at
+        // Raw hours computed from timestamps, rounded to 2 decimals.
+        $raw = $this->clock_in_at
             ? round(($this->clock_out_at->getTimestamp() - $this->clock_in_at->getTimestamp()) / 3600, 2)
             : 0;
+
+        if ($this->employee_id && $this->clock_in_at) {
+            $result = \App\Services\DailyHoursCap::clampPunch(
+                (int) $this->employee_id,
+                $this->clock_in_at->toDateString(),
+                (float) $raw,
+                $this->id
+            );
+            $this->hours = $result['hours'];
+            if ($result['was_clamped']) {
+                $existing = trim((string) $this->notes);
+                $this->notes = $existing === ''
+                    ? $result['note']
+                    : $existing . "\n\n" . $result['note'];
+            }
+        } else {
+            $this->hours = $raw;
+        }
 
         $this->status = 'closed';
         $this->save();

@@ -1266,15 +1266,10 @@ class TimesheetController extends Controller
      * @return array{regular_hours: float, overtime_hours: float, double_time_hours: float}
      */
     /**
-     * 2026-05-20 (Brenda): hard daily cap to keep a worker from ever rolling
-     * past 16 hours on a single date. Sums every other timesheet row this
-     * employee has on the same date (excluding the row being edited, if any)
-     * and rejects the new/updated row if the new combined total would blow
-     * past the cap.
-     *
-     * Returns null if OK, or a friendly error message string to surface in
-     * the API response. Cap configurable via env if Brenda ever needs to
-     * raise it (TIMESHEET_DAILY_CAP_HOURS).
+     * 2026-05-20 (Brenda): 16-hour daily cap on manual timesheet entry.
+     * Delegates to App\Services\DailyHoursCap so the same math is shared
+     * with the time-clock punch clamp (2026-05-22). See that service for
+     * the env-configurable cap value and full algorithm.
      */
     private function assertDailyHoursWithinCap(
         int $employeeId,
@@ -1282,25 +1277,9 @@ class TimesheetController extends Controller
         float $newRowHours,
         ?int $excludeTimesheetId = null
     ): ?string {
-        $cap = (float) env('TIMESHEET_DAILY_CAP_HOURS', 16);
-        if ($cap <= 0) return null;   // disable cap by setting env to 0
-
-        $existing = Timesheet::query()
-            ->where('employee_id', $employeeId)
-            ->whereDate('date', $date)
-            ->when($excludeTimesheetId, fn ($q) => $q->where('id', '!=', $excludeTimesheetId))
-            ->sum('total_hours');
-
-        $combined = (float) $existing + $newRowHours;
-        if ($combined > $cap + 0.001) {       // tiny epsilon for float jitter
-            $existingFmt = rtrim(rtrim(number_format($existing, 2), '0'), '.');
-            $newFmt      = rtrim(rtrim(number_format($newRowHours, 2), '0'), '.');
-            $combinedFmt = rtrim(rtrim(number_format($combined, 2), '0'), '.');
-            return "Daily cap of {$cap} hours exceeded for {$date}. "
-                . "Already on file: {$existingFmt} hrs; this entry would add {$newFmt} hrs (total {$combinedFmt}). "
-                . "Adjust the hours, or edit one of the existing rows for this day.";
-        }
-        return null;
+        return \App\Services\DailyHoursCap::checkTimesheet(
+            $employeeId, $date, $newRowHours, $excludeTimesheetId
+        );
     }
 
     private function resolveHourSplit(
