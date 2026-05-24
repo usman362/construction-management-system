@@ -69,6 +69,7 @@ class EstimateLine extends Model
         'markup_percent',
         'markup_amount',
         'price_amount',
+        'is_billable',
 
         'notes',
     ];
@@ -85,6 +86,7 @@ class EstimateLine extends Model
         'markup_percent'       => 'decimal:4',
         'markup_amount'        => 'decimal:2',
         'price_amount'         => 'decimal:2',
+        'is_billable'          => 'boolean',
         'sort_order'           => 'integer',
     ];
 
@@ -113,8 +115,18 @@ class EstimateLine extends Model
         $price     = round($cost + $markup, 2);
 
         $this->cost_amount   = round($cost, 2);
-        $this->markup_amount = $markup;
-        $this->price_amount  = $price;
+
+        // 2026-05-23 (KH): non-billable lines stay in the cost total but
+        // contribute $0 to markup / price. The Estimate's billable total
+        // therefore excludes them, while cost (what we spend) still
+        // includes them.
+        if ($this->is_billable === false) {
+            $this->markup_amount = 0;
+            $this->price_amount  = 0;
+        } else {
+            $this->markup_amount = $markup;
+            $this->price_amount  = $price;
+        }
 
         // Keep legacy `amount` aligned with `cost_amount` so reports/PDFs that
         // still reference the old column don't suddenly read 0 on enriched lines.

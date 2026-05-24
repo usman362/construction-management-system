@@ -292,19 +292,30 @@
                                 <th class="px-3 py-2 text-right">Unit / Rate</th>
                                 <th class="px-3 py-2 text-right">Markup %</th>
                                 <th class="px-3 py-2 text-right">Cost</th>
+                                {{-- 2026-05-23 (KH WBS): show per-line Billable check
+                                     so you can see which lines pass through to the
+                                     client vs which we eat on cost. --}}
+                                <th class="px-3 py-2 text-center" title="Pass through to client?">Bill?</th>
                                 <th class="px-3 py-2 text-right">Price</th>
                                 <th class="px-3 py-2"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach($section->lines as $line)
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 {{ $line->is_billable === false ? 'opacity-70' : '' }}">
                                     <td class="px-3 py-2"><span class="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded">{{ ucfirst($line->line_type ?? 'other') }}</span></td>
                                     <td class="px-3 py-2 text-gray-900">{{ $line->description }}</td>
                                     <td class="px-3 py-2 text-right">{{ $line->line_type === 'labor' ? number_format((float) $line->hours, 2) . ' hrs' : number_format((float) $line->quantity, 2) }}</td>
                                     <td class="px-3 py-2 text-right">${{ number_format((float) ($line->line_type === 'labor' ? $line->hourly_cost_rate : $line->unit_cost), 2) }}</td>
                                     <td class="px-3 py-2 text-right">{{ number_format(((float) $line->markup_percent) * 100, 1) }}%</td>
                                     <td class="px-3 py-2 text-right">${{ number_format((float) $line->cost_amount, 2) }}</td>
+                                    <td class="px-3 py-2 text-center">
+                                        @if($line->is_billable === false)
+                                            <span title="Not billable — line shows in cost but $0 in price" class="text-gray-400">—</span>
+                                        @else
+                                            <span title="Billable to client" class="text-emerald-600 font-bold">✓</span>
+                                        @endif
+                                    </td>
                                     <td class="px-3 py-2 text-right font-semibold text-blue-700">${{ number_format((float) $line->price_amount, 2) }}</td>
                                     <td class="px-3 py-2 text-right">
                                         <button type="button" onclick="confirmDeleteLine({{ $line->id }})" class="text-red-600 hover:text-red-800 text-xs">×</button>
@@ -700,6 +711,22 @@
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Labor Hours (Manhours)</label>
                 <input type="number" name="labor_hours" step="0.5" min="0" placeholder="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+            </div>
+            {{-- 2026-05-23 (KH WBS sheet): per-line Billable checkbox.
+                 Default checked because most lines pass through to the
+                 client. Uncheck for things like Misc Consumables that
+                 we eat on the cost side but never bill. The hidden
+                 is_billable_present field tells the server "this form
+                 actually rendered the checkbox" so an unchecked box
+                 isn't confused with the field being absent. --}}
+            <div class="mb-6 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <input type="hidden" name="is_billable_present" value="1">
+                <input type="checkbox" id="addline_is_billable" name="is_billable" value="1" checked
+                       class="rounded border-gray-300">
+                <label for="addline_is_billable" class="text-sm font-semibold text-gray-700">
+                    Billable
+                    <span class="text-xs font-normal text-gray-500">— uncheck if this line is a cost we eat but never bill the client</span>
+                </label>
             </div>
             <div class="flex gap-4">
                 <button type="button" onclick="submitAddLine()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1">Add Item</button>

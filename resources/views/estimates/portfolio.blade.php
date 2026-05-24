@@ -184,14 +184,25 @@
                 <input type="text" name="estimate_number" placeholder="Auto: EST-{{ now()->year }}-####"
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
             </div>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-3 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                    <input type="date" name="start_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <input type="date" name="start_date" id="newEst_start" oninput="recalcDuration()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                    <input type="date" name="end_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <input type="date" name="end_date" id="newEst_end" oninput="recalcDuration()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    {{-- 2026-05-23 (KH): Duration auto-fills from start/end
+                         dates but the user can override. Manual edits stick
+                         (the recalc only runs on date input changes). --}}
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Duration <span class="text-[10px] text-gray-500 font-normal">(days)</span>
+                    </label>
+                    <input type="number" min="0" name="duration_days" id="newEst_duration"
+                           placeholder="auto"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 </div>
             </div>
             <div>
@@ -215,6 +226,21 @@
 
 @push('scripts')
 <script>
+// 2026-05-23 (KH): auto-calculate Duration whenever Start or End date
+// changes. Manual edits to the duration field stick (we only overwrite
+// on date input change, not on every keystroke). Inclusive day count so
+// "5/1 → 5/5" reads as 5 days, not 4.
+function recalcDuration() {
+    const s = document.getElementById('newEst_start').value;
+    const e = document.getElementById('newEst_end').value;
+    if (!s || !e) return;
+    const startMs = Date.parse(s);
+    const endMs   = Date.parse(e);
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) return;
+    const days = Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1;
+    document.getElementById('newEst_duration').value = days;
+}
+
 // 2026-05-23 (KH bug report — "Create Estimate button not working"):
 // Root cause was the JS swallowing validation errors. On a 422 from
 // Laravel, the response has {message, errors:{...}} but no success

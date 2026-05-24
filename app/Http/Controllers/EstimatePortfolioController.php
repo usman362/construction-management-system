@@ -100,6 +100,10 @@ class EstimatePortfolioController extends Controller
             'start_date'       => 'nullable|date',
             'end_date'         => 'nullable|date|after_or_equal:start_date',
             'valid_until'      => 'nullable|date',
+            // 2026-05-23 (KH): duration is auto-derived from start/end on the
+            // client side but the user can override (e.g. "30 working days"
+            // vs raw calendar days). Accept the explicit value if provided.
+            'duration_days'    => 'nullable|integer|min:0|max:3650',
         ]);
 
         if (empty($data['estimate_number'])) {
@@ -114,9 +118,12 @@ class EstimatePortfolioController extends Controller
             $data['estimate_number'] = sprintf('EST-%d-%04d', $year, $nextSeq);
         }
 
-        if (!empty($data['start_date']) && !empty($data['end_date'])) {
-            $data['duration_days'] = \Carbon\Carbon::parse($data['start_date'])
-                ->diffInDays(\Carbon\Carbon::parse($data['end_date']));
+        // Only auto-calculate duration when the user didn't enter one
+        // (KH wants manual override to win — e.g. "30 working days" doesn't
+        // match calendar days between start and end).
+        if (empty($data['duration_days']) && !empty($data['start_date']) && !empty($data['end_date'])) {
+            $data['duration_days'] = (int) \Carbon\Carbon::parse($data['start_date'])
+                ->diffInDays(\Carbon\Carbon::parse($data['end_date']), false) + 1;
         }
 
         $data['estimate_type'] = 'standard';

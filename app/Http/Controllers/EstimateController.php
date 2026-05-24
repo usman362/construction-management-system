@@ -367,6 +367,18 @@ class EstimateController extends Controller
             $hasMoney    = (float) ($data['quantity'] ?? 0) > 0 || (float) ($data['unit_cost'] ?? 0) > 0;
             $data['line_type'] = ($hasLabor && ! $hasMoney) ? 'labor' : 'other';
         }
+        // 2026-05-23 (KH): browsers don't submit unchecked checkboxes, so an
+        // absent `is_billable` could be either "wasn't on the form" (=true)
+        // or "user unchecked it" (=false). Use the explicit Request->boolean
+        // helper which is_billable=0 → false; absent → false. The Add Line
+        // modal sends a hidden 'is_billable_present=1' so we can tell the
+        // form actually rendered the field — when present but the checkbox
+        // is unchecked, save false; otherwise default to true.
+        if ($request->has('is_billable_present')) {
+            $data['is_billable'] = $request->boolean('is_billable');
+        } else {
+            $data['is_billable'] = $data['is_billable'] ?? true;
+        }
 
         // If the user didn't pick a markup_percent, fall back to the client's
         // default for this line type (set in ClientDefaultMarkup).
@@ -476,6 +488,10 @@ class EstimateController extends Controller
             // Pricing
             'markup_percent' => 'nullable|numeric|min:0|max:10',
             'notes'          => 'nullable|string|max:1000',
+
+            // 2026-05-23 (KH WBS): per-line BILLABLE flag. Defaults to true
+            // if not sent (most lines pass through to the client).
+            'is_billable'    => 'nullable|boolean',
         ];
 
         return $request->validate($rules);
