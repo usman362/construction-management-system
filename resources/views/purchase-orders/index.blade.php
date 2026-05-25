@@ -583,7 +583,7 @@ function editPO(id) {
                         '<td class="px-3 py-2"><input type="number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right qty-input" value="' + parseFloat(item.quantity || 0) + '" step="0.01"></td>' +
                         '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center" value="' + uomEscaped + '"></td>' +
                         '<td class="px-3 py-2"><input type="number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right unit-cost-input" value="' + parseFloat(item.unit_cost || 0) + '" step="0.01"></td>' +
-                        '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right bg-gray-100 font-medium item-total" readonly value="$' + parseFloat(item.total_cost || 0).toFixed(2) + '"></td>' +
+                        '<td class="px-3 py-2"><input type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right bg-gray-100 font-medium item-total" readonly value="' + window.fmtMoney(item.total_cost || 0) + '"></td>' +
                         '<td class="px-3 py-2 text-center"><button type="button" onclick="removeItemRow(this)" class="text-red-600 hover:text-red-700"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>';
                     itemsBody.appendChild(row);
                     attachItemEventListeners(row);
@@ -699,8 +699,8 @@ function viewPO(id) {
                     row.innerHTML = '<td class="px-3 py-2">' + (item.description || '—') + '</td>' +
                         '<td class="px-3 py-2 text-right">' + item.quantity + '</td>' +
                         '<td class="px-3 py-2 text-center">' + (item.unit_of_measure || '—') + '</td>' +
-                        '<td class="px-3 py-2 text-right">$' + parseFloat(item.unit_cost).toFixed(2) + '</td>' +
-                        '<td class="px-3 py-2 text-right font-medium">$' + parseFloat(item.total_cost).toFixed(2) + '</td>';
+                        '<td class="px-3 py-2 text-right">' + window.fmtMoney(item.unit_cost) + '</td>' +
+                        '<td class="px-3 py-2 text-right font-medium">' + window.fmtMoney(item.total_cost) + '</td>';
                     itemsBody.appendChild(row);
                     subtotal += parseFloat(item.total_cost) || 0;
                 });
@@ -749,7 +749,7 @@ $(document).ready(function() {
             {data: 'date'},
             {data: 'vendor'},
             {data: 'project'},
-            {data: 'total_amount', render: d => '$' + parseFloat(d || 0).toFixed(2), className: 'text-right'},
+            {data: 'total_amount', render: d => window.fmtMoney(d || 0), className: 'text-right'},
             {data: 'status', className: 'text-center', render: function(d) {
                 var colors = {'draft':'bg-gray-100 text-gray-700','issued':'bg-blue-100 text-blue-700','partial':'bg-yellow-100 text-yellow-700','received':'bg-green-100 text-green-700','closed':'bg-gray-100 text-gray-700','cancelled':'bg-red-100 text-red-700'};
                 return '<span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ' + (colors[d] || 'bg-gray-100 text-gray-700') + '">' + d + '</span>';

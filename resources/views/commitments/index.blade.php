@@ -213,7 +213,7 @@ $(document).ready(function() {
             {data:'cost_code', name:'cost_code', render: function(d){return d?'<span class="font-mono text-xs">'+d+'</span>':'<span class="text-gray-400">—</span>';}},
             {data:'cost_type', name:'cost_type', render: function(d){return d||'<span class="text-gray-400">—</span>';}},
             {data:'description', name:'description', render: function(d){return d||'—';}},
-            {data:'amount', name:'amount', render: function(d){return '$'+parseFloat(d).toFixed(2);}, className:'text-right'},
+            {data:'amount', name:'amount', render: function(d){return window.fmtMoney(d);}, className:'text-right'},
             {data:'status', name:'status', render: function(d) {
                 // 2026-05-23 (KH): pending_signature + executed added.
                 var statusColors = {

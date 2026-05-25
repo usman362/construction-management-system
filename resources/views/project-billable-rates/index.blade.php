@@ -549,11 +549,11 @@
 
             $('#view_craft').text(craftName);
             $('#view_employee').text(employeeName);
-            $('#view_base_rate').text('$' + parseFloat(data.base_hourly_rate).toFixed(2));
+            $('#view_base_rate').text(window.fmtMoney(data.base_hourly_rate));
             $('#view_markup').text(markupPercent + '%');
-            $('#view_st_rate').text('$' + parseFloat(data.straight_time_rate).toFixed(2));
-            $('#view_ot_rate').text('$' + parseFloat(data.overtime_rate).toFixed(2));
-            $('#view_dt_rate').text('$' + parseFloat(data.double_time_rate).toFixed(2));
+            $('#view_st_rate').text(window.fmtMoney(data.straight_time_rate));
+            $('#view_ot_rate').text(window.fmtMoney(data.overtime_rate));
+            $('#view_dt_rate').text(window.fmtMoney(data.double_time_rate));
             $('#view_effective_date').text(data.effective_date);
 
             openViewModal();
@@ -591,7 +591,7 @@
                 data: 'base_hourly_rate',
                 name: 'base_hourly_rate',
                 render: function(data) {
-                    return '$' + parseFloat(data).toFixed(2);
+                    return window.fmtMoney(data);
                 },
                 className: 'text-right'
             },
@@ -604,7 +604,7 @@
                 data: 'straight_time_rate',
                 name: 'straight_time_rate',
                 render: function(data) {
-                    return '$' + parseFloat(data).toFixed(2);
+                    return window.fmtMoney(data);
                 },
                 className: 'text-right'
             },
@@ -612,7 +612,7 @@
                 data: 'overtime_rate',
                 name: 'overtime_rate',
                 render: function(data) {
-                    return '$' + parseFloat(data).toFixed(2);
+                    return window.fmtMoney(data);
                 },
                 className: 'text-right'
             },

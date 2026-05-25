@@ -27,9 +27,15 @@
             </div>
 
             <!-- Purchase Order Info -->
+            {{-- 2026-05-23 (Brenda): "Purchase order needs to pull the
+                 purchase order we typed in during set up or pull the
+                 original contract po." Fall through:
+                 project.po_number → CO's client_po → auto fallback. --}}
             <div>
                 <h3 class="text-sm font-semibold text-gray-700 mb-1">PURCHASE ORDER</h3>
-                <p class="text-lg font-bold text-gray-900">PO-{{ $project->id }}</p>
+                <p class="text-lg font-bold text-gray-900">
+                    {{ $project->po_number ?: ($changeOrder->client_po ?: 'PO-' . $project->id) }}
+                </p>
                 <p class="text-sm text-gray-600">Contract Value: ${{ number_format($project->contract_value ?? 0, 2) }}</p>
             </div>
 

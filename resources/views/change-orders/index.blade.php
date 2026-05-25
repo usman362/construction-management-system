@@ -75,12 +75,15 @@
          Phase Code, Cost Type, Description, Amount, Type, Status, Actions) -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <table id="dataTable" class="w-full">
+            {{-- 2026-05-23 (Brenda): hid Phase Code + Cost Type columns
+                 — they always rendered "—" because COs aggregate line
+                 items rather than carrying direct phase_code/cost_type
+                 fields. Removed from header AND from the JS columns
+                 list below. --}}
             <thead class="bg-gray-100 border-b">
                 <tr>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">CO #</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Client PO #</th>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phase Code</th>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cost Type</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
                     <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
                     <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Type</th>
@@ -237,10 +240,10 @@ $(document).ready(function() {
         columns: [
             {data:'co_number', name:'co_number'},
             {data:'client_po', name:'client_po', render: function(d){return d?d:'<span class="text-gray-400">—</span>';}},
-            {data:'phase_code', name:'phase_code', orderable:false, searchable:false, render: function(d){return d?'<span class="font-mono text-xs">'+d+'</span>':'<span class="text-gray-400">—</span>';}},
-            {data:'cost_type', name:'cost_type', orderable:false, searchable:false, render: function(d){return d?d:'<span class="text-gray-400">—</span>';}},
+            // 2026-05-23 (Brenda): phase_code + cost_type columns removed.
             {data:'description', name:'description', render: function(d){return d?d:'<span class="text-gray-400">—</span>';}},
-            {data:'amount', name:'amount', render: d=>'$'+parseFloat(d).toFixed(2), className:'text-right'},
+            // 2026-05-23 (Brenda): comma-format dollar amounts.
+            {data:'amount', name:'amount', render: d=>'$'+Number(d||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), className:'text-right'},
             {data:'pricing_type', name:'pricing_type', orderable:false, className:'text-center', render: function(d) {
                 if (d === 't_and_m') return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">T &amp; M</span>';
                 return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">Lump Sum</span>';

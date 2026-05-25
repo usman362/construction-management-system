@@ -584,7 +584,7 @@ var table = $('#dataTable').DataTable({
         // sortable so the office can group all rows for a given job together.
         {data:'project_number'},
         {data:'regular_hours', className:'text-right'}, {data:'overtime_hours', className:'text-right'}, {data:'double_time_hours', className:'text-right'},
-        {data:'total_hours', className:'text-right font-semibold'}, {data:'cost', render: d=>'$'+parseFloat(d||0).toFixed(2), className:'text-right'},
+        {data:'total_hours', className:'text-right font-semibold'}, {data:'cost', render: d=>window.fmtMoney(d||0), className:'text-right'},
         {data:'status', className:'text-center', render: function(d) {
             const colors = {'draft':'bg-gray-100 text-gray-700','submitted':'bg-yellow-100 text-yellow-700','approved':'bg-green-100 text-green-700','rejected':'bg-red-100 text-red-700'};
             return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium '+colors[d]+'">'+d+'</span>';

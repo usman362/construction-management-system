@@ -77,7 +77,7 @@ var table = $('#dataTable').DataTable({
     columns: [
         {data:'name'},
         {data:'unit_of_measure', render: d => d ? d : '<span class="text-gray-400">—</span>'},
-        {data:'unit_cost', render: function(d){ return '$'+parseFloat(d||0).toFixed(2); }},
+        {data:'unit_cost', render: function(d){ return window.fmtMoney(d||0); }},
         {data:'vendor_name', render: d => d ? d : '<span class="text-gray-400">—</span>'},
         {data:'actions', orderable:false, searchable:false, className:'text-center',
          render: function(data) {
@@ -118,7 +118,7 @@ function viewMaterial(id){
             '<div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div>'+
             (d.category ? '<div><p class="text-xs text-gray-500 mb-1">Category</p><p class="text-sm">'+d.category+'</p></div>' : '')+
             '<div><p class="text-xs text-gray-500 mb-1">Description</p><p class="text-sm">'+(d.description||'—')+'</p></div>'+
-            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Unit</p><p class="text-sm">'+(d.unit_of_measure||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Unit Cost</p><p class="text-sm font-semibold">$'+parseFloat(d.unit_cost||0).toFixed(2)+'</p></div></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Unit</p><p class="text-sm">'+(d.unit_of_measure||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Unit Cost</p><p class="text-sm font-semibold">'+window.fmtMoney(d.unit_cost||0)+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Vendor</p><p class="text-sm">'+vendorName+'</p></div>'+
             '</div>';
         openModal('viewModal');

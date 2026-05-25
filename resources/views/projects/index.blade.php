@@ -82,7 +82,7 @@ var table = $('#dataTable').DataTable({
             return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium '+colors[d]+'">'+d.replace('_',' ')+'</span>';
         }},
         {data:'start_date', render: d=>d?new Date(d).toLocaleDateString():'—'},
-        {data:'budget', render: d=>d?'$'+parseFloat(d).toFixed(2):'$0.00'},
+        {data:'budget', render: d=>d?window.fmtMoney(d):'$0.00'},
         {data:'id', orderable:false, searchable:false, className:'text-center',
          render: function(id) {
             return '<div class="flex items-center justify-center gap-1">'+

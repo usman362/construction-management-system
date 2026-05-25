@@ -288,7 +288,7 @@ var table = $('#dataTable').DataTable({
     columns: [
         {data:'invoice_number'}, {data:'invoice_date'},
         {data:'vendor'}, {data:'project'},
-        {data:'amount', render: d=>'$'+parseFloat(d).toFixed(2)},
+        {data:'amount', render: d=>window.fmtMoney(d)},
         {data:'status', render: d=>'<span class="px-2 py-1 rounded text-xs font-medium '+(d==='paid'?'bg-green-100 text-green-700':d==='approved'?'bg-blue-100 text-blue-700':d==='submitted'?'bg-yellow-100 text-yellow-700':'bg-gray-100 text-gray-700')+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</span>'},
         {data:'actions', orderable:false, searchable:false, className:'text-right',
          render: function(id) {
@@ -345,7 +345,7 @@ function viewInvoice(id){
             '<div class="space-y-4">'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Invoice Number</p><p class="text-sm font-semibold">'+(d.invoice_number||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Invoice Date</p><p class="text-sm font-semibold">'+(d.invoice_date||'—')+'</p></div></div>'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Project</p><p class="text-sm">'+(d.project?.name||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Vendor</p><p class="text-sm">'+(d.vendor?.name||'—')+'</p></div></div>'+
-            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Amount</p><p class="text-sm font-semibold">$'+parseFloat(d.amount).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Status</p><p class="text-sm font-semibold capitalize">'+d.status+'</p></div></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Amount</p><p class="text-sm font-semibold">'+window.fmtMoney(d.amount)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Status</p><p class="text-sm font-semibold capitalize">'+d.status+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Due Date</p><p class="text-sm">'+(d.due_date||'—')+'</p></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Description</p><p class="text-sm">'+(d.description||'—')+'</p></div>'+
             '</div>';

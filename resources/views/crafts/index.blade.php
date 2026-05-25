@@ -212,9 +212,9 @@ var table = $('#dataTable').DataTable({
     ajax: '{{ route("crafts.index") }}',
     columns: [
         {data:'code'}, {data:'name'},
-        {data:'base_hourly_rate', render: d=>'$'+parseFloat(d).toFixed(2)},
-        {data:'billable_rate', render: d=>'$'+parseFloat(d).toFixed(2)},
-        {data:'ot_billable_rate', render: d=>d?'$'+parseFloat(d).toFixed(2):'<span class="text-gray-400">—</span>'},
+        {data:'base_hourly_rate', render: d=>window.fmtMoney(d)},
+        {data:'billable_rate', render: d=>window.fmtMoney(d)},
+        {data:'ot_billable_rate', render: d=>d?window.fmtMoney(d):'<span class="text-gray-400">—</span>'},
         {data:'employees_count', className:'text-center'},
         {data:'is_active', className:'text-center', render: d=>d?'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>':'<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>'},
         {data:'actions', orderable:false, searchable:false, className:'text-center',
@@ -257,7 +257,7 @@ function editCraft(id){
 function viewCraft(id){
     $.get(window.BASE_URL+'/crafts/'+id, function(d){
         var fmtRate = function(v){ return v ? parseFloat(v).toFixed(4) : '—'; };
-        var fmtDollar = function(v){ return v ? '$'+parseFloat(v).toFixed(2) : '—'; };
+        var fmtDollar = function(v){ return v ? window.fmtMoney(v) : '—'; };
         var burdenRow = function(label, st, ot, isDollar){
             var fmt = isDollar ? fmtDollar : fmtRate;
             return '<div class="grid grid-cols-3 gap-2 text-sm py-1 border-b border-gray-50"><div class="text-gray-600">'+label+'</div><div class="font-medium">ST: '+fmt(st)+'</div><div class="font-medium">OT: '+fmt(ot)+'</div></div>';
@@ -266,7 +266,7 @@ function viewCraft(id){
             '<div class="space-y-4">'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Code</p><p class="text-sm font-semibold">'+d.code+'</p></div><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Description</p><p class="text-sm">'+(d.description||'—')+'</p></div>'+
-            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Hourly Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.base_hourly_rate).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">ST Billable Rate</p><p class="text-sm font-semibold">$'+parseFloat(d.billable_rate).toFixed(2)+'</p></div></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Hourly Rate</p><p class="text-sm font-semibold">'+window.fmtMoney(d.base_hourly_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">ST Billable Rate</p><p class="text-sm font-semibold">'+window.fmtMoney(d.billable_rate)+'</p></div></div>'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">OT Billable Rate</p><p class="text-sm font-semibold">'+fmtDollar(d.ot_billable_rate)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Overhead Rate</p><p class="text-sm font-semibold">'+fmtRate(d.overhead_rate)+'</p></div></div>'+
             '<div class="pt-2 border-t border-gray-100"><p class="text-xs font-semibold uppercase text-gray-500 mb-2">Burden Rates (ST / OT)</p>'+
                 burdenRow('FICA', d.fica_st_rate, d.fica_ot_rate, false)+
