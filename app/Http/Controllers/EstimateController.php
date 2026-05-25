@@ -426,6 +426,101 @@ class EstimateController extends Controller
     }
 
     /**
+     * 2026-05-23 (KH WBS — "ESTIMATE - LABOR" tab + Misc tab math):
+     * Labor tile shortcut. User picks Craft + Qty workers + Hrs/Day +
+     * Duration days; we compute ST/OT split (max ST = 40 hrs/wk per
+     * person, anything over → OT) and create 1 or 2 EstimateLine rows
+     * (one for ST, one for OT if applicable) so the estimate reflects
+     * the labor build-up exactly the way KH sketched it.
+     */
+    public function addLaborBundle(Request $request, Project $project, Estimate $estimate): JsonResponse
+    {
+        $this->assertEstimateBelongsToProject($project, $estimate);
+        $data = $request->validate([
+            'craft_id'       => 'required|exists:crafts,id',
+            'classification' => 'nullable|string|max:100',
+            'section_id'     => 'nullable|exists:estimate_sections,id',
+            'qty'            => 'required|integer|min:1|max:500',
+            'hrs_per_day'    => 'required|numeric|min:0.25|max:24',
+            'duration_days'  => 'required|numeric|min:0.5|max:730',
+            'markup_percent' => 'nullable|numeric|min:0|max:10',
+            'is_billable'    => 'nullable|boolean',
+        ]);
+
+        $craft = \App\Models\Craft::findOrFail($data['craft_id']);
+        $qty   = (int)   $data['qty'];
+        $hpd   = (float) $data['hrs_per_day'];
+        $dur   = (float) $data['duration_days'];
+
+        // KH Misc tab formula: Max ST = 40 hrs / week / person.
+        $weeks         = $dur / 7;
+        $maxStTotal    = 40 * $weeks * $qty;
+        $totalHrs      = $qty * $hpd * $dur;
+        $stHrs         = min($totalHrs, $maxStTotal);
+        $otHrs         = max(0, $totalHrs - $maxStTotal);
+
+        $stRate   = (float) ($craft->base_hourly_rate ?? 0);
+        $otMult   = (float) ($craft->overtime_multiplier ?? 1.5);
+        $otRate   = $stRate * $otMult;
+        $billSt   = (float) ($craft->billable_rate    ?? 0);
+        $billOt   = (float) ($craft->ot_billable_rate ?? $billSt * $otMult);
+
+        $markup     = $data['markup_percent']
+            ?? $this->resolveMarkup(['cost_type_id' => null], $estimate);
+        $isBillable = array_key_exists('is_billable', $data)
+            ? (bool) $data['is_billable']
+            : true;
+
+        $classification = trim((string) ($data['classification'] ?? ''));
+        $baseDesc       = $craft->name . ($classification !== '' ? " — {$classification}" : '');
+
+        $created = [];
+        \DB::transaction(function () use (
+            $estimate, $data, $craft, $stHrs, $otHrs, $stRate, $otRate,
+            $billSt, $billOt, $markup, $isBillable, $baseDesc, $qty, $hpd, $dur, &$created
+        ) {
+            if ($stHrs > 0) {
+                $created[] = EstimateLine::create([
+                    'estimate_id'          => $estimate->id,
+                    'section_id'           => $data['section_id'] ?? null,
+                    'line_type'            => EstimateLine::TYPE_LABOR,
+                    'craft_id'             => $craft->id,
+                    'description'          => "{$baseDesc} — ST (Qty {$qty} × {$hpd} hrs/day × {$dur} days)",
+                    'hours'                => $stHrs,
+                    'hourly_cost_rate'     => $stRate,
+                    'hourly_billable_rate' => $billSt,
+                    'markup_percent'       => $markup,
+                    'is_billable'          => $isBillable,
+                ]);
+            }
+            if ($otHrs > 0) {
+                $created[] = EstimateLine::create([
+                    'estimate_id'          => $estimate->id,
+                    'section_id'           => $data['section_id'] ?? null,
+                    'line_type'            => EstimateLine::TYPE_LABOR,
+                    'craft_id'             => $craft->id,
+                    'description'          => "{$baseDesc} — OT (over 40 hrs/wk/person)",
+                    'hours'                => $otHrs,
+                    'hourly_cost_rate'     => $otRate,
+                    'hourly_billable_rate' => $billOt,
+                    'markup_percent'       => $markup,
+                    'is_billable'          => $isBillable,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success'  => true,
+            'message'  => count($created) . ' labor line(s) created (ST/OT split: '
+                . number_format($stHrs, 1) . ' / ' . number_format($otHrs, 1) . ' hrs).',
+            'created'  => count($created),
+            'st_hours' => $stHrs,
+            'ot_hours' => $otHrs,
+            'totals'   => $this->totalsFor($estimate),
+        ], 201);
+    }
+
+    /**
      * 2026-05-12 (Brenda — Phase 6 recommendation): AI Estimate Builder.
      *
      * POST { scope: string } → AI returns suggested sections + line items.
@@ -491,6 +586,11 @@ class EstimateController extends Controller
             'quantity'  => 'nullable|numeric|min:0',
             'unit'      => 'nullable|string|max:50',
             'unit_cost' => 'nullable|numeric|min:0',
+
+            // 2026-05-23 (KH WBS): cost build-up fields. Cost = sum.
+            'quote_amount'   => 'nullable|numeric|min:0',
+            'freight_amount' => 'nullable|numeric|min:0',
+            'tax_amount'     => 'nullable|numeric|min:0',
 
             // Legacy fields that the simple "Add Line Item" modal sends.
             // Mapped onto the new schema inside addLine() below.

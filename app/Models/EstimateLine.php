@@ -46,6 +46,11 @@ class EstimateLine extends Model
         'quantity',
         'unit',
         'unit_cost',
+        // 2026-05-23 (KH WBS): separate quote / freight / tax columns so
+        // the cost build-up matches her spreadsheet. Cost = sum of these.
+        'quote_amount',
+        'freight_amount',
+        'tax_amount',
         'amount',
         'labor_hours',
 
@@ -77,6 +82,9 @@ class EstimateLine extends Model
     protected $casts = [
         'quantity'             => 'decimal:2',
         'unit_cost'            => 'decimal:2',
+        'quote_amount'         => 'decimal:2',
+        'freight_amount'       => 'decimal:2',
+        'tax_amount'           => 'decimal:2',
         'amount'               => 'decimal:2',
         'labor_hours'          => 'decimal:2',
         'hours'                => 'decimal:2',
@@ -107,7 +115,19 @@ class EstimateLine extends Model
         if ($this->line_type === self::TYPE_LABOR) {
             $cost = (float) ($this->hours ?? 0) * (float) ($this->hourly_cost_rate ?? 0);
         } else {
-            $cost = (float) ($this->quantity ?? 0) * (float) ($this->unit_cost ?? 0);
+            // 2026-05-23 (KH WBS): if quote/freight/tax are populated they
+            // win (cost = sum); otherwise fall back to legacy qty × unit_cost.
+            $quote   = (float) ($this->quote_amount   ?? 0);
+            $freight = (float) ($this->freight_amount ?? 0);
+            $tax     = (float) ($this->tax_amount     ?? 0);
+            if ($quote > 0 || $freight > 0 || $tax > 0) {
+                $cost = $quote + $freight + $tax;
+                // Mirror onto unit_cost so legacy reports stay sane.
+                $this->quantity  = $this->quantity  ?: 1;
+                $this->unit_cost = $cost / max(1, (float) $this->quantity);
+            } else {
+                $cost = (float) ($this->quantity ?? 0) * (float) ($this->unit_cost ?? 0);
+            }
         }
 
         $markupPct = (float) ($this->markup_percent ?? 0);

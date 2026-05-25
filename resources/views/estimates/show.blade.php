@@ -279,51 +279,110 @@
                     </div>
                 </summary>
 
-                {{-- Lines table --}}
+                {{-- 2026-05-23 (KH WBS sheet): table reshaped to match her
+                     spreadsheet layout exactly — Phase Code | Cost Type |
+                     Description | Quote | Freight | Tax | Cost | Billable |
+                     Mark-Up % | Mark-Up $ | Billable Total. Section totals
+                     strip appears BOTH at top (header) and bottom (tfoot).
+                     Inline-edit / TAB-to-add still on the roadmap; for now
+                     entries go through the "+ Add Line Item" modal which
+                     also takes the same WBS columns. --}}
                 @if($section->lines->isEmpty())
                     <div class="px-4 py-6 text-center text-sm text-gray-400">No lines in this section yet.</div>
                 @else
+                    @php
+                        // Pre-compute section totals once for both top + bottom strips.
+                        $sec_quote   = (float) $section->lines->sum('quote_amount');
+                        $sec_freight = (float) $section->lines->sum('freight_amount');
+                        $sec_tax     = (float) $section->lines->sum('tax_amount');
+                        $sec_cost    = (float) $section->lines->sum('cost_amount');
+                        $sec_markup  = (float) $section->lines->sum('markup_amount');
+                        $sec_bill    = (float) $section->lines->sum('price_amount');
+                    @endphp
+                    <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead class="bg-white border-b border-gray-100">
                             <tr class="text-xs uppercase text-gray-500">
-                                <th class="px-3 py-2 text-left">Type</th>
-                                <th class="px-3 py-2 text-left">Description</th>
-                                <th class="px-3 py-2 text-right">Qty / Hrs</th>
-                                <th class="px-3 py-2 text-right">Unit / Rate</th>
-                                <th class="px-3 py-2 text-right">Markup %</th>
-                                <th class="px-3 py-2 text-right">Cost</th>
-                                {{-- 2026-05-23 (KH WBS): show per-line Billable check
-                                     so you can see which lines pass through to the
-                                     client vs which we eat on cost. --}}
-                                <th class="px-3 py-2 text-center" title="Pass through to client?">Bill?</th>
-                                <th class="px-3 py-2 text-right">Price</th>
-                                <th class="px-3 py-2"></th>
+                                <th class="px-2 py-2 text-left">Phase Code</th>
+                                <th class="px-2 py-2 text-left">Cost Type</th>
+                                <th class="px-2 py-2 text-left">Description</th>
+                                <th class="px-2 py-2 text-right">Quote</th>
+                                <th class="px-2 py-2 text-right">Freight</th>
+                                <th class="px-2 py-2 text-right">Tax</th>
+                                <th class="px-2 py-2 text-right">Cost $</th>
+                                <th class="px-2 py-2 text-center" title="Pass through to client?">Bill?</th>
+                                <th class="px-2 py-2 text-right">Mark-Up %</th>
+                                <th class="px-2 py-2 text-right">Mark-Up $</th>
+                                <th class="px-2 py-2 text-right">Billable Total</th>
+                                <th class="px-2 py-2"></th>
+                            </tr>
+                            {{-- Top totals strip — totals visible at a glance before scrolling --}}
+                            <tr class="bg-blue-50 text-blue-900 font-semibold text-xs">
+                                <td class="px-2 py-1.5" colspan="3">Section totals</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_quote, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_freight, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_tax, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_cost, 2) }}</td>
+                                <td class="px-2 py-1.5"></td>
+                                <td class="px-2 py-1.5"></td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_markup, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_bill, 2) }}</td>
+                                <td class="px-2 py-1.5"></td>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach($section->lines as $line)
-                                <tr class="hover:bg-gray-50 {{ $line->is_billable === false ? 'opacity-70' : '' }}">
-                                    <td class="px-3 py-2"><span class="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded">{{ ucfirst($line->line_type ?? 'other') }}</span></td>
-                                    <td class="px-3 py-2 text-gray-900">{{ $line->description }}</td>
-                                    <td class="px-3 py-2 text-right">{{ $line->line_type === 'labor' ? number_format((float) $line->hours, 2) . ' hrs' : number_format((float) $line->quantity, 2) }}</td>
-                                    <td class="px-3 py-2 text-right">${{ number_format((float) ($line->line_type === 'labor' ? $line->hourly_cost_rate : $line->unit_cost), 2) }}</td>
-                                    <td class="px-3 py-2 text-right">{{ number_format(((float) $line->markup_percent) * 100, 1) }}%</td>
-                                    <td class="px-3 py-2 text-right">${{ number_format((float) $line->cost_amount, 2) }}</td>
-                                    <td class="px-3 py-2 text-center">
+                                @php
+                                    $isLabor = $line->line_type === 'labor';
+                                    // For labor lines, quote/freight/tax are blank; show hours in Description.
+                                    $descSuffix = $isLabor && (float) $line->hours > 0
+                                        ? sprintf(' (%s hrs @ $%s/hr)', number_format((float) $line->hours, 2), number_format((float) $line->hourly_cost_rate, 2))
+                                        : '';
+                                @endphp
+                                <tr class="hover:bg-gray-50 {{ $line->is_billable === false ? 'opacity-70 bg-gray-50' : '' }}">
+                                    <td class="px-2 py-2 font-mono text-xs text-gray-700">{{ $line->costCode?->code ?? '—' }}</td>
+                                    <td class="px-2 py-2 text-xs text-gray-600">{{ $line->costType?->code ?? '—' }}</td>
+                                    <td class="px-2 py-2 text-gray-900">
+                                        {{ $line->description }}{{ $descSuffix }}
+                                        @if($isLabor)<span class="ml-1 text-[10px] uppercase bg-amber-100 text-amber-800 px-1 rounded">labor</span>@endif
+                                    </td>
+                                    <td class="px-2 py-2 text-right text-gray-700">{{ $line->quote_amount   !== null ? '$' . number_format((float) $line->quote_amount, 2)   : '—' }}</td>
+                                    <td class="px-2 py-2 text-right text-gray-700">{{ $line->freight_amount !== null ? '$' . number_format((float) $line->freight_amount, 2) : '—' }}</td>
+                                    <td class="px-2 py-2 text-right text-gray-700">{{ $line->tax_amount     !== null ? '$' . number_format((float) $line->tax_amount, 2)     : '—' }}</td>
+                                    <td class="px-2 py-2 text-right font-semibold text-gray-900">${{ number_format((float) $line->cost_amount, 2) }}</td>
+                                    <td class="px-2 py-2 text-center">
                                         @if($line->is_billable === false)
-                                            <span title="Not billable — line shows in cost but $0 in price" class="text-gray-400">—</span>
+                                            <span title="Not billable — line shows in cost but $0 in billable" class="text-gray-400">—</span>
                                         @else
                                             <span title="Billable to client" class="text-emerald-600 font-bold">✓</span>
                                         @endif
                                     </td>
-                                    <td class="px-3 py-2 text-right font-semibold text-blue-700">${{ number_format((float) $line->price_amount, 2) }}</td>
-                                    <td class="px-3 py-2 text-right">
+                                    <td class="px-2 py-2 text-right text-gray-700">{{ number_format(((float) $line->markup_percent) * 100, 1) }}%</td>
+                                    <td class="px-2 py-2 text-right text-gray-700">${{ number_format((float) $line->markup_amount, 2) }}</td>
+                                    <td class="px-2 py-2 text-right font-bold text-blue-700">${{ number_format((float) $line->price_amount, 2) }}</td>
+                                    <td class="px-2 py-2 text-right">
                                         <button type="button" onclick="confirmDeleteLine({{ $line->id }})" class="text-red-600 hover:text-red-800 text-xs">×</button>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
+                        <tfoot>
+                            {{-- Bottom totals strip — mirrors the top one --}}
+                            <tr class="bg-blue-50 text-blue-900 font-semibold text-xs border-t-2 border-blue-200">
+                                <td class="px-2 py-1.5" colspan="3">Section totals</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_quote, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_freight, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_tax, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_cost, 2) }}</td>
+                                <td class="px-2 py-1.5"></td>
+                                <td class="px-2 py-1.5"></td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_markup, 2) }}</td>
+                                <td class="px-2 py-1.5 text-right">${{ number_format($sec_bill, 2) }}</td>
+                                <td class="px-2 py-1.5"></td>
+                            </tr>
+                        </tfoot>
                     </table>
+                    </div>
                 @endif
 
                 {{-- Add Line form for this section --}}
@@ -589,11 +648,106 @@
         </div>
     </div>
 
-    <!-- Add Line Item Button -->
-    <div class="mb-6">
+    <!-- Add Line Item + Labor buttons -->
+    <div class="mb-6 flex flex-wrap gap-2">
         <button onclick="openAddLineModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
             Add Line Item
         </button>
+        {{-- 2026-05-23 (KH ESTIMATE-LABOR tab): Labor tile — auto computes
+             ST/OT split from Craft × Qty × Hrs/Day × Duration. --}}
+        <button onclick="openLaborModal()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Add Labor (Craft × Qty × Hrs × Days)
+        </button>
+    </div>
+
+    {{-- ───── Labor builder modal (KH 2026-05-23) ─────
+         Pick a craft + qty + hrs/day + duration → live preview shows
+         Total Hrs, ST/OT split, ST $, OT $. Submit creates 1-2 labor
+         lines on the estimate (one for ST, one for OT if any). --}}
+    <div id="laborModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full mx-4 max-h-[92vh] overflow-y-auto">
+            <h2 class="text-xl font-bold mb-4">Add Labor</h2>
+            <p class="text-xs text-gray-500 mb-4">Pick a craft and the system computes total hours + ST/OT split (40 hrs/wk per person max) + cost & billable using the craft's hourly rates.</p>
+            <form id="laborForm" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Craft *</label>
+                        <select name="craft_id" id="lab_craft" required oninput="laborRecalc()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">— Pick a craft —</option>
+                            @foreach($crafts ?? [] as $c)
+                                <option value="{{ $c->id }}"
+                                        data-rate="{{ (float) $c->base_hourly_rate }}"
+                                        data-otmult="{{ (float) ($c->overtime_multiplier ?? 1.5) }}"
+                                        data-bill="{{ (float) $c->billable_rate }}"
+                                        data-otbill="{{ (float) ($c->ot_billable_rate ?? $c->billable_rate * ($c->overtime_multiplier ?? 1.5)) }}">
+                                    {{ $c->code }} — {{ $c->name }} (${{ number_format((float) $c->base_hourly_rate, 2) }}/hr)
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Classification (optional)</label>
+                        <input type="text" name="classification" placeholder="e.g. Foreman, Apprentice"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Qty (workers) *</label>
+                        <input type="number" name="qty" id="lab_qty" min="1" max="500" value="1" required oninput="laborRecalc()"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Hrs/Day *</label>
+                        <input type="number" name="hrs_per_day" id="lab_hpd" step="0.5" min="0.25" max="24" value="10" required oninput="laborRecalc()"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Duration (days) *</label>
+                        <input type="number" name="duration_days" id="lab_dur" step="1" min="0.5" max="730" value="14" required oninput="laborRecalc()"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Mark-Up %</label>
+                    <input type="number" name="markup_percent" id="lab_markup" step="0.5" min="0" max="500" value="10" oninput="laborRecalc()"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                    <p class="text-[10px] text-gray-500 mt-1">Enter 10 for 10%.</p>
+                </div>
+
+                {{-- Live preview --}}
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
+                    <div class="font-semibold text-amber-900 uppercase tracking-wide text-[10px] mb-2">Live calculation</div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <div>Total Hours:        <span id="lab_total"  class="font-bold text-gray-900">0</span></div>
+                        <div>Weeks:              <span id="lab_weeks"  class="font-bold text-gray-900">0</span></div>
+                        <div>Max ST (40 × wks × qty): <span id="lab_max_st" class="font-bold text-gray-900">0</span></div>
+                        <div>Actual OT:          <span id="lab_ot"     class="font-bold text-amber-700">0</span></div>
+                        <div>ST $:               <span id="lab_st_cost" class="font-bold text-gray-900">$0</span></div>
+                        <div>OT $:               <span id="lab_ot_cost" class="font-bold text-amber-700">$0</span></div>
+                        <div class="col-span-2 border-t border-amber-300 pt-1 mt-1">
+                            Total Cost: <span id="lab_total_cost" class="font-bold text-gray-900">$0</span>
+                            &nbsp;·&nbsp; Billable: <span id="lab_billable" class="font-bold text-blue-700">$0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="is_billable" value="1" checked class="rounded border-gray-300">
+                    Billable to client
+                </label>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="submitLaborBundle()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded">
+                        Create Labor Line(s)
+                    </button>
+                    <button type="button" onclick="closeModal('laborModal')" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Status Badge -->
@@ -680,18 +834,52 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">Description *</label>
                 <input type="text" name="description" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                <input type="number" name="amount" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
-                {{-- 2026-05-23 (KH bug report — "Error adding line item"): Amount
-                     used to be required, but pure-labor lines only need Labor
-                     Hours. Now Amount is optional — provide either a dollar
-                     amount OR a Qty × Unit Cost OR Labor Hours, and at least
-                     one of those must be > 0 (validated below before submit). --}}
-                <p class="text-[11px] text-gray-500 mt-1">Optional. Skip if this is a labor-only line — fill Labor Hours below instead.</p>
+            {{-- 2026-05-23 (KH WBS sheet): Cost build-up by Quote + Freight + Tax.
+                 Live preview shows Cost (sum) and Billable Total (Cost × (1 + markup))
+                 underneath. Each field is optional — for a labor-only line you can
+                 still leave these blank and just fill Labor Hours below. --}}
+            <div class="mb-4 grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Quote ($)</label>
+                    <input type="number" name="quote_amount" step="0.01" min="0" placeholder="0.00"
+                           oninput="addLineRecalc()" id="al_quote"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Freight ($)</label>
+                    <input type="number" name="freight_amount" step="0.01" min="0" placeholder="0.00"
+                           oninput="addLineRecalc()" id="al_freight"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Tax ($)</label>
+                    <input type="number" name="tax_amount" step="0.01" min="0" placeholder="0.00"
+                           oninput="addLineRecalc()" id="al_tax"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                </div>
+            </div>
+            <div class="mb-4 grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Mark-Up %</label>
+                    <input type="number" name="markup_percent" step="0.01" min="0" max="500" placeholder="0"
+                           oninput="addLineRecalc()" id="al_markup"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
+                    <p class="text-[10px] text-gray-500 mt-1">Enter 10 for 10%</p>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                    <div class="text-[10px] uppercase tracking-wide text-blue-700 font-semibold">Live preview</div>
+                    <div class="text-xs text-gray-700 mt-0.5">Cost: <span id="al_cost_preview" class="font-bold text-gray-900">$0.00</span></div>
+                    <div class="text-xs text-gray-700">Mark-Up $: <span id="al_markup_preview" class="font-bold text-gray-900">$0.00</span></div>
+                    <div class="text-xs text-blue-800 mt-1">Billable Total: <span id="al_billable_preview" class="font-bold">$0.00</span></div>
+                </div>
             </div>
             <details class="mb-4">
-                <summary class="text-sm font-medium text-blue-700 cursor-pointer">Advanced: break down by Qty × Unit Cost</summary>
+                <summary class="text-sm font-medium text-blue-700 cursor-pointer">Alternative: simple Amount or Qty × Unit Cost</summary>
+                <div class="mt-3">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Amount ($)</label>
+                    <input type="number" name="amount" step="0.01" min="0" placeholder="0.00"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
                 <div class="grid grid-cols-3 gap-3 mt-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">Qty</label>
@@ -706,7 +894,7 @@
                         <input type="number" name="unit_cost" step="0.01" min="0" placeholder="0.00" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     </div>
                 </div>
-                <p class="text-[11px] text-gray-500 mt-2">If Qty and Unit Cost are both filled, they override the Amount above.</p>
+                <p class="text-[11px] text-gray-500 mt-2">Use these only if you don't have a Quote/Freight/Tax breakdown.</p>
             </details>
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Labor Hours (Manhours)</label>
@@ -757,20 +945,131 @@ function openAddLineModal() {
     openModal('addLineModal');
 }
 
+// 2026-05-23 (KH ESTIMATE-LABOR + Misc tab math): Labor builder.
+// Live computes Total Hrs, ST/OT split (40 hrs/wk/person cap), ST $,
+// OT $, total cost, billable. Submit POSTs to addLaborBundle which
+// creates 1-2 EstimateLine rows server-side.
+function openLaborModal() {
+    document.getElementById('laborForm').reset();
+    document.getElementById('lab_qty').value    = 1;
+    document.getElementById('lab_hpd').value    = 10;
+    document.getElementById('lab_dur').value    = 14;
+    document.getElementById('lab_markup').value = 10;
+    laborRecalc();
+    openModal('laborModal');
+}
+
+function laborRecalc() {
+    const num = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+    const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtH = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+
+    const craftSel = document.getElementById('lab_craft');
+    const opt = craftSel?.selectedOptions?.[0];
+    const stRate   = opt ? parseFloat(opt.dataset.rate   || 0) : 0;
+    const otMult   = opt ? parseFloat(opt.dataset.otmult || 1.5) : 1.5;
+    const otRate   = stRate * otMult;
+    const billSt   = opt ? parseFloat(opt.dataset.bill   || 0) : 0;
+    const billOt   = opt ? parseFloat(opt.dataset.otbill || (billSt * otMult)) : 0;
+
+    const qty = num('lab_qty');
+    const hpd = num('lab_hpd');
+    const dur = num('lab_dur');
+    const weeks = dur / 7;
+    const maxStTotal = 40 * weeks * qty;
+    const totalHrs   = qty * hpd * dur;
+    const stHrs      = Math.min(totalHrs, maxStTotal);
+    const otHrs      = Math.max(0, totalHrs - maxStTotal);
+
+    const stCost  = stHrs * stRate;
+    const otCost  = otHrs * otRate;
+    const totCost = stCost + otCost;
+
+    const markupPct = num('lab_markup') / 100;
+    const billable  = stHrs * billSt + otHrs * billOt;
+    const billableWithMarkup = billable > 0 ? billable * (1 + markupPct) : totCost * (1 + markupPct);
+
+    document.getElementById('lab_total').textContent      = fmtH(totalHrs)   + ' hrs';
+    document.getElementById('lab_weeks').textContent      = weeks.toFixed(2);
+    document.getElementById('lab_max_st').textContent     = fmtH(maxStTotal) + ' hrs';
+    document.getElementById('lab_ot').textContent         = fmtH(otHrs)      + ' hrs';
+    document.getElementById('lab_st_cost').textContent    = fmt(stCost);
+    document.getElementById('lab_ot_cost').textContent    = fmt(otCost);
+    document.getElementById('lab_total_cost').textContent = fmt(totCost);
+    document.getElementById('lab_billable').textContent   = fmt(billableWithMarkup);
+}
+
+async function submitLaborBundle() {
+    const form = document.getElementById('laborForm');
+    if (!form.reportValidity()) return;
+    const fd = new FormData(form);
+    const payload = {};
+    fd.forEach((v, k) => { if (v !== '') payload[k] = v; });
+    // markup % → decimal (10 → 0.10)
+    if (payload.markup_percent) payload.markup_percent = (parseFloat(payload.markup_percent) || 0) / 100;
+    // checkbox: present + checked → 1; not present → not billable (0)
+    payload.is_billable = form.querySelector('input[name="is_billable"]').checked ? 1 : 0;
+
+    try {
+        const r = await fetch(EST_BASE + '/labor-bundle', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json', 'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+            },
+            body: JSON.stringify(payload),
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok || !body.success) {
+            const msg = body.message || ('HTTP ' + r.status);
+            Swal.fire({ icon: 'error', title: 'Could not create labor lines', text: msg });
+            return;
+        }
+        Toast.fire({ icon: 'success', title: body.message });
+        closeModal('laborModal');
+        setTimeout(() => location.reload(), 600);
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Network error', text: e.message });
+    }
+}
+
+// 2026-05-23 (KH WBS): live Cost + Mark-Up + Billable Total preview as
+// the user types Quote / Freight / Tax / Markup % in the Add Line modal.
+function addLineRecalc() {
+    const num = id => parseFloat(document.getElementById(id)?.value) || 0;
+    const cost   = num('al_quote') + num('al_freight') + num('al_tax');
+    const mPct   = num('al_markup') / 100;
+    const markup = cost * mPct;
+    const fmt    = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('al_cost_preview').textContent     = fmt(cost);
+    document.getElementById('al_markup_preview').textContent   = fmt(markup);
+    document.getElementById('al_billable_preview').textContent = fmt(cost + markup);
+}
+
 function submitAddLine() {
     var form = document.getElementById('addLineForm');
     var formData = new FormData(form);
     var data = {};
     formData.forEach(function(v, k) { if (v !== '') data[k] = v; });
 
+    // 2026-05-23 (KH WBS): user types markup as percent ("10" = 10%) but
+    // the server expects decimal (0.10). Convert before submit.
+    if (data.markup_percent !== undefined && data.markup_percent !== '') {
+        data.markup_percent = (parseFloat(data.markup_percent) || 0) / 100;
+    }
+
     // 2026-05-23 (KH bug report — "Error adding line item"): client-side
     // sanity check so the user gets a clear message instead of a generic
     // server-side fail when they fill no money / qty / hours at all.
-    var amt   = parseFloat(data.amount       || 0);
-    var qty   = parseFloat(data.quantity     || 0);
-    var unit  = parseFloat(data.unit_cost    || 0);
-    var hrs   = parseFloat(data.labor_hours  || 0);
-    if (amt <= 0 && (qty <= 0 || unit <= 0) && hrs <= 0) {
+    var amt   = parseFloat(data.amount        || 0);
+    var qty   = parseFloat(data.quantity      || 0);
+    var unit  = parseFloat(data.unit_cost     || 0);
+    var hrs   = parseFloat(data.labor_hours   || 0);
+    var quote = parseFloat(data.quote_amount  || 0);
+    var freight = parseFloat(data.freight_amount || 0);
+    var tax   = parseFloat(data.tax_amount    || 0);
+    var hasCost = (quote + freight + tax) > 0;
+    if (amt <= 0 && (qty <= 0 || unit <= 0) && hrs <= 0 && !hasCost) {
         Swal.fire({
             icon: 'warning',
             title: 'Add at least one of: Amount, Qty × Unit Cost, or Labor Hours.',

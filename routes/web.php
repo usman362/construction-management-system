@@ -178,6 +178,9 @@ Route::middleware('auth')->group(function () {
             // 2026-05-12 (Brenda — Phase 6 / AI Estimate Builder): paste a
             // scope of work, get back AI-suggested sections + lines.
             Route::post('estimates/{estimate}/ai-suggest', [EstimateController::class, 'aiSuggest'])->name('estimates.ai-suggest');
+            // 2026-05-23 (KH Labor tile): Craft × Qty × Hrs/Day × Duration
+            // → auto ST/OT split into 1-2 EstimateLine rows.
+            Route::post('estimates/{estimate}/labor-bundle', [EstimateController::class, 'addLaborBundle'])->name('estimates.add-labor-bundle');
             // Estimating Phase 1 — section CRUD
             Route::post('estimates/{estimate}/sections', [EstimateController::class, 'storeSection'])->name('estimates.sections.store');
             Route::put('estimates/{estimate}/sections/{section}', [EstimateController::class, 'updateSection'])->name('estimates.sections.update');
