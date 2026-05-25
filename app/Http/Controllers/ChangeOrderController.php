@@ -122,7 +122,10 @@ class ChangeOrderController extends Controller
             'contract_time_change_days' => 'nullable|integer',
             'new_completion_date' => 'nullable|date',
             'amount' => 'required|numeric|min:0',
-            'status' => 'required|in:pending,approved,rejected',
+            // 2026-05-23 (Brenda): widened to include revising / cancelled /
+            // potential. Legacy rejected + voided kept so existing rows + any
+            // ops that still set them continue to work.
+            'status' => 'required|in:pending,approved,revising,cancelled,potential,rejected,voided',
             'pricing_type' => 'nullable|in:lump_sum,t_and_m',
         ]);
 
@@ -182,7 +185,10 @@ class ChangeOrderController extends Controller
             'contract_time_change_days' => 'nullable|integer',
             'new_completion_date' => 'nullable|date',
             'amount' => 'required|numeric|min:0',
-            'status' => 'required|in:pending,approved,rejected',
+            // 2026-05-23 (Brenda): widened to include revising / cancelled /
+            // potential. Legacy rejected + voided kept so existing rows + any
+            // ops that still set them continue to work.
+            'status' => 'required|in:pending,approved,revising,cancelled,potential,rejected,voided',
             'pricing_type' => 'nullable|in:lump_sum,t_and_m',
         ]);
 

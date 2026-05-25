@@ -48,12 +48,17 @@
     <div class="bg-white rounded-lg shadow border border-gray-200 p-3 mb-4">
         <div class="flex items-center gap-3 flex-wrap">
             <label class="text-xs font-semibold text-gray-600">Filter:</label>
+            {{-- 2026-05-23 (Brenda): filter list includes her 5 + legacy
+                 rejected/voided so old data is still discoverable. --}}
             <select id="coStatusFilter" onchange="reloadCOs()" class="border border-gray-300 rounded-lg px-2 py-1 text-sm">
                 <option value="">Any status</option>
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="voided">Voided</option>
+                <option value="revising">Revising</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="potential">Potential</option>
+                <option value="rejected">Rejected (legacy)</option>
+                <option value="voided">Voided (legacy)</option>
             </select>
             <select id="coPricingFilter" onchange="reloadCOs()" class="border border-gray-300 rounded-lg px-2 py-1 text-sm">
                 <option value="">Any pricing type</option>
@@ -127,11 +132,16 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                    {{-- 2026-05-23 (Brenda): her requested 5 options.
+                         Legacy 'rejected'/'voided' still in the DB enum
+                         for backward compat but not surfaced here. --}}
                     <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
                         <option value="">Select Status</option>
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
+                        <option value="revising">Revising</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="potential">Potential</option>
                     </select>
                 </div>
             </div>
@@ -184,11 +194,16 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                    {{-- 2026-05-23 (Brenda): her requested 5 options.
+                         Legacy 'rejected'/'voided' still in the DB enum
+                         for backward compat but not surfaced here. --}}
                     <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
                         <option value="">Select Status</option>
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
+                        <option value="revising">Revising</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="potential">Potential</option>
                     </select>
                 </div>
             </div>
@@ -231,12 +246,24 @@ $(document).ready(function() {
                 return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">Lump Sum</span>';
             }},
             {data:'status', name:'status', render: function(d) {
+                // 2026-05-23 (Brenda): colors picked to roughly match the
+                // tint strip she sent in her screenshot.
                 const statusColors = {
-                    'pending': 'bg-yellow-100 text-yellow-800',
-                    'approved': 'bg-green-100 text-green-800',
-                    'rejected': 'bg-red-100 text-red-800'
+                    'pending':   'bg-pink-100 text-pink-800',
+                    'approved':  'bg-green-100 text-green-800',
+                    'revising':  'bg-rose-100 text-rose-700',
+                    'cancelled': 'bg-red-100 text-red-800',
+                    'potential': 'bg-purple-100 text-purple-800',
+                    'rejected':  'bg-red-100 text-red-700',
+                    'voided':    'bg-gray-200 text-gray-700',
                 };
-                return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium '+statusColors[d]+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</span>';
+                const labels = {
+                    'pending':'Pending','approved':'Approved','revising':'Revising',
+                    'cancelled':'Cancelled','potential':'Potential',
+                    'rejected':'Rejected','voided':'Voided',
+                };
+                const label = labels[d] || (d ? d.charAt(0).toUpperCase()+d.slice(1) : '—');
+                return '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium '+(statusColors[d]||'bg-gray-100 text-gray-800')+'">'+label+'</span>';
             }, className:'text-center'},
             {data:'actions', orderable:false, searchable:false, className:'text-center',
                 render: function(id) {
