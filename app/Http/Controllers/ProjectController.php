@@ -242,6 +242,43 @@ class ProjectController extends Controller
             ? min(round(($committedTotal / $revisedBudget) * 100, 1), 100)
             : 0;
 
+        // 2026-05-23 (KH): Estimate tile total + Committed breakdown by
+        // cost type. Estimate falls back through approved → any estimate
+        // → projects.estimate column → contract_value (matches the same
+        // fallback chain used on the Estimates portfolio + Bid vs Actual
+        // report so the number reads consistently across the app).
+        $approvedEstimateTotal = (float) $project->estimates()
+            ->where('status', 'approved')
+            ->sum('total_amount');
+        $anyEstimateTotal = $approvedEstimateTotal > 0
+            ? $approvedEstimateTotal
+            : (float) $project->estimates()->sum('total_amount');
+        $estimateTotal = $approvedEstimateTotal > 0 ? $approvedEstimateTotal
+            : ($anyEstimateTotal > 0 ? $anyEstimateTotal
+                : (float) ($project->estimate ?? $project->contract_value ?? 0));
+
+        // Per-cost-type committed breakdown (vendor commitments + labor).
+        // KH wants the Committed tile to show what's committed PER cost
+        // type so she can see at a glance where the big spend is going.
+        $commByCostType  = $commitments->groupBy('cost_type_id');
+        $laborByCostType = $laborTimesheets->groupBy('cost_type_id');
+        $allCostTypeIds  = collect()->merge($commByCostType->keys())
+            ->merge($laborByCostType->keys())->filter()->unique();
+        $costTypeLookup = \App\Models\CostType::whereIn('id', $allCostTypeIds)
+            ->get(['id', 'code', 'name'])->keyBy('id');
+        $committedByCostType = $allCostTypeIds->map(function ($ctId) use ($commByCostType, $laborByCostType, $costTypeLookup) {
+            $vendor = (float) ($commByCostType[$ctId]  ?? collect())->sum('amount');
+            $labor  = (float) ($laborByCostType[$ctId] ?? collect())->sum('total_cost');
+            $ct = $costTypeLookup->get($ctId);
+            return (object) [
+                'code'   => $ct?->code ?? '—',
+                'name'   => $ct?->name ?? 'Uncategorized',
+                'vendor' => $vendor,
+                'labor'  => $labor,
+                'total'  => $vendor + $labor,
+            ];
+        })->sortByDesc('total')->values();
+
         foreach ($budgetLines as $line) {
             $lineVendor = (float) ($commitmentsByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
             $lineLabor  = (float) ($laborByCostCode[$line->cost_code_id] ?? collect())->sum('total_cost');
@@ -271,6 +308,9 @@ class ProjectController extends Controller
             'coTotal' => $coTotal,
             'balance' => ($budgetTotal + $coTotal) - $committedTotal,
             'percentComplete' => $percentComplete,
+            // 2026-05-23 (KH): added for the project-home tile redesign.
+            'estimateTotal'        => $estimateTotal,
+            'committedByCostType'  => $committedByCostType,
             'allCostCodes' => \App\Models\CostCode::active()->orderBy('code')->get(['id', 'code', 'name']),
             'allCostTypes' => \App\Models\CostType::active()->orderBy('sort_order')->get(['id', 'code', 'name']),
             'assignableUsers' => \App\Models\User::orderBy('name')->get(['id', 'name']),

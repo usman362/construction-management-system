@@ -55,26 +55,43 @@
         </div>
     </div>
 
+    {{-- 2026-05-23 (KH): swapped Original/Current Budget tiles for
+         Budget + Estimate (her ask: "she wanted to see budget and
+         estimate"). Committed tile now breaks down by Cost Type
+         instead of POs/Subs vs Labor. --}}
     <!-- Financial Summary -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-sm text-gray-600">Original Budget</p>
-            <p class="text-2xl font-bold text-gray-900">${{ number_format($project->original_budget, 0) }}</p>
+            <p class="text-sm text-gray-600">Budget</p>
+            <p class="text-2xl font-bold text-gray-900">${{ number_format($project->current_budget ?? $project->original_budget ?? 0, 0) }}</p>
+            @if(($project->current_budget ?? 0) !== ($project->original_budget ?? 0) && ($project->original_budget ?? 0) > 0)
+                <p class="text-[11px] text-gray-500 mt-1">Originally ${{ number_format($project->original_budget, 0) }}</p>
+            @endif
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-sm text-gray-600">Current Budget</p>
-            <p class="text-2xl font-bold text-gray-900">${{ number_format($project->current_budget ?? 0, 0) }}</p>
+            <p class="text-sm text-gray-600">Estimate</p>
+            <p class="text-2xl font-bold text-gray-900">${{ number_format($estimateTotal ?? 0, 0) }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">Approved estimate (or latest)</p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Committed</p>
             <p class="text-2xl font-bold text-gray-900">${{ number_format($committedTotal ?? 0, 0) }}</p>
-            {{-- Breakdown so the user can see how much of "Committed" came
-                 from vendor POs vs labor hours booked on timesheets. --}}
-            <p class="text-[11px] text-gray-500 mt-1">
-                POs/Subs ${{ number_format($vendorCommitted ?? 0, 0) }}
-                &nbsp;·&nbsp;
-                Labor ${{ number_format($laborCommitted ?? 0, 0) }}
-            </p>
+            {{-- KH: break down by cost type so she can see at a glance
+                 where the spend is going (Direct Labor, Subs, Materials,
+                 etc.). Show up to 3 biggest types inline; rest tucked
+                 under a "+N more" hint. --}}
+            @if(($committedByCostType ?? collect())->isNotEmpty())
+                <div class="text-[11px] text-gray-500 mt-1 leading-tight space-y-0.5">
+                    @foreach($committedByCostType->take(3) as $ct)
+                        <div class="flex justify-between"><span class="truncate pr-2">{{ $ct->code }} {{ $ct->name }}</span><span>${{ number_format($ct->total, 0) }}</span></div>
+                    @endforeach
+                    @if($committedByCostType->count() > 3)
+                        <div class="text-[10px] text-gray-400">+{{ $committedByCostType->count() - 3 }} more cost type(s) — see Cost Report</div>
+                    @endif
+                </div>
+            @else
+                <p class="text-[11px] text-gray-500 mt-1">Nothing committed yet.</p>
+            @endif
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
             <p class="text-sm text-gray-600">Profit</p>

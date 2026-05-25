@@ -109,9 +109,21 @@ class EstimateController extends Controller
     private function assertEstimateBelongsToProject(Project $project, Estimate $estimate): void
     {
         // null project_id is allowed (estimate created before project) but
-        // when both are set, they MUST agree.
-        if ($estimate->project_id !== null && $estimate->project_id !== $project->id) {
-            abort(404);
+        // when both are set, they MUST agree. Use loose comparison so type
+        // jitter (string DB driver vs int route binding) doesn't trip us.
+        // 2026-05-23 (Brenda): instead of a raw 404 (which surfaces to the
+        // user as a generic "could not save" with no actionable info),
+        // throw a 422 with a clear message AND log the mismatch so we can
+        // diagnose URL drift. Includes both ids in the message so support
+        // can repro fast.
+        if ($estimate->project_id !== null && (int) $estimate->project_id !== (int) $project->id) {
+            \Log::warning('Estimate-project mismatch on action', [
+                'url_project_id'      => $project->id,
+                'estimate_id'         => $estimate->id,
+                'estimate_project_id' => $estimate->project_id,
+                'url'                 => request()->fullUrl(),
+            ]);
+            abort(422, "This estimate belongs to project #{$estimate->project_id} but the URL points at project #{$project->id}. Reload the page from the correct project's estimate list and try again.");
         }
     }
 

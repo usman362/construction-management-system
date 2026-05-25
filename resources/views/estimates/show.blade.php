@@ -885,15 +885,27 @@ function estimateBuilder(estimateId) {
         // ── API calls ──
         async saveSection() {
             if (!this.newSectionName.trim()) return;
-            const r = await fetch(EST_BASE + '/sections', {
-                method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json',
-                           'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-                body: JSON.stringify({ name: this.newSectionName.trim(), description: this.newSectionDescription }),
-            });
-            if (!r.ok) { Toast.fire({icon:'error', title:'Save failed'}); return; }
-            this.openSectionModal = false;
-            location.reload();
+            try {
+                const r = await fetch(EST_BASE + '/sections', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json',
+                               'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify({ name: this.newSectionName.trim(), description: this.newSectionDescription }),
+                });
+                if (!r.ok) {
+                    // 2026-05-23 (Brenda bug report): "I can't add a new section
+                    // either." Old version showed generic "Save failed" with
+                    // no clue. Now surfaces the real server message + status.
+                    let msg = 'HTTP ' + r.status;
+                    try { const j = await r.json(); if (j.message) msg = j.message; } catch (_) {}
+                    Swal.fire({ icon: 'error', title: 'Could not save section', text: msg });
+                    return;
+                }
+                this.openSectionModal = false;
+                location.reload();
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Network error', text: e.message });
+            }
         },
 
         async saveLine() {
@@ -934,15 +946,38 @@ function confirmDeleteSection(sectionId) {
 
 /* ─── Phase 2 + 3 controls ─────────────────────────────────────────── */
 
-function markEstimateSent() {
-    fetch(EST_BASE + '/mark-sent', {
-        method: 'POST',
-        headers: { 'Accept': 'application/json',
-                   'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-    }).then(r => r.json()).then(b => {
-        Toast.fire({ icon: b.success ? 'success' : 'error', title: b.message || 'Done' });
-        if (b.success) setTimeout(() => location.reload(), 600);
-    });
+// 2026-05-23 (Brenda bug report): every action button used to fail
+// silently or show "Done" with no diagnostic when the server returned
+// a non-2xx. Centralized error surfacing via reportAjaxError so users
+// see WHAT went wrong (HTTP status, message, body excerpt) and we get
+// actionable bug reports instead of "the button doesn't work."
+async function reportAjaxError(response, fallbackTitle) {
+    let bodyText = '';
+    let parsed = null;
+    try {
+        bodyText = await response.text();
+        parsed = JSON.parse(bodyText);
+    } catch (_) { /* not JSON */ }
+    const msg = parsed?.message
+        || (bodyText && bodyText.length < 400 ? bodyText : null)
+        || ('HTTP ' + response.status + ' — check the server logs.');
+    Swal.fire({ icon: 'error', title: fallbackTitle, text: msg });
+}
+
+async function markEstimateSent() {
+    try {
+        const r = await fetch(EST_BASE + '/mark-sent', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json',
+                       'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+        });
+        if (!r.ok) { await reportAjaxError(r, 'Could not mark as sent'); return; }
+        const b = await r.json();
+        Toast.fire({ icon: 'success', title: b.message || 'Marked sent.' });
+        setTimeout(() => location.reload(), 600);
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Network error', text: e.message });
+    }
 }
 
 function recordEstimateResponse(response) {
@@ -951,17 +986,22 @@ function recordEstimateResponse(response) {
         icon: response === 'accepted' ? 'success' : 'warning',
         showCancelButton: true,
         confirmButtonColor: response === 'accepted' ? '#059669' : '#d97706',
-    }).then(r => {
+    }).then(async r => {
         if (!r.isConfirmed) return;
-        fetch(EST_BASE + '/response', {
-            method: 'POST',
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json',
-                       'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-            body: JSON.stringify({ response }),
-        }).then(r => r.json()).then(b => {
-            Toast.fire({ icon: b.success ? 'success' : 'error', title: b.message || 'Done' });
-            if (b.success) setTimeout(() => location.reload(), 600);
-        });
+        try {
+            const resp = await fetch(EST_BASE + '/response', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json',
+                           'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                body: JSON.stringify({ response }),
+            });
+            if (!resp.ok) { await reportAjaxError(resp, 'Could not record response'); return; }
+            const b = await resp.json();
+            Toast.fire({ icon: 'success', title: b.message || 'Done.' });
+            setTimeout(() => location.reload(), 600);
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Network error', text: e.message });
+        }
     });
 }
 
@@ -973,14 +1013,17 @@ function confirmConvertEstimate() {
         showCancelButton: true,
         confirmButtonColor: '#7c3aed',
         confirmButtonText: 'Convert',
-    }).then(r => {
+    }).then(async r => {
         if (!r.isConfirmed) return;
-        fetch(EST_BASE + '/convert', {
-            method: 'POST',
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json',
-                       'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-            body: JSON.stringify({}),
-        }).then(r => r.json()).then(b => {
+        try {
+            const resp = await fetch(EST_BASE + '/convert', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json',
+                           'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                body: JSON.stringify({}),
+            });
+            if (!resp.ok) { await reportAjaxError(resp, 'Conversion failed'); return; }
+            const b = await resp.json();
             if (!b.success) {
                 Swal.fire({ icon: 'error', title: 'Conversion failed', text: b.message });
                 return;
@@ -991,7 +1034,9 @@ function confirmConvertEstimate() {
                 html: b.message + '<br><a href="' + b.project_url + '" class="text-blue-600 underline">Open project</a>',
                 confirmButtonText: 'Open project',
             }).then(() => location.href = b.project_url);
-        });
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Network error', text: e.message });
+        }
     });
 }
 

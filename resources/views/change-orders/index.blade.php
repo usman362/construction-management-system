@@ -41,6 +41,31 @@
         </div>
     </div>
 
+    {{-- 2026-05-23 (KH): filter strip — status dropdown + amount range +
+         pricing type. The DataTables built-in search box (top right) still
+         works for free-text. Combined with column sort headers, this
+         covers the "sort / filter" ask on her CO screenshot. --}}
+    <div class="bg-white rounded-lg shadow border border-gray-200 p-3 mb-4">
+        <div class="flex items-center gap-3 flex-wrap">
+            <label class="text-xs font-semibold text-gray-600">Filter:</label>
+            <select id="coStatusFilter" onchange="reloadCOs()" class="border border-gray-300 rounded-lg px-2 py-1 text-sm">
+                <option value="">Any status</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="voided">Voided</option>
+            </select>
+            <select id="coPricingFilter" onchange="reloadCOs()" class="border border-gray-300 rounded-lg px-2 py-1 text-sm">
+                <option value="">Any pricing type</option>
+                <option value="lump_sum">Lump Sum</option>
+                <option value="t_and_m">T &amp; M</option>
+            </select>
+            <button type="button" onclick="document.getElementById('coStatusFilter').value=''; document.getElementById('coPricingFilter').value=''; reloadCOs();"
+                    class="text-xs text-gray-600 hover:text-gray-900 underline">Reset</button>
+            <span class="ml-auto text-[11px] text-gray-500">Click any column header to sort • Use the search box (top right) to filter by text</span>
+        </div>
+    </div>
+
     <!-- Change Orders Table (layout mirrors Commitments — CO #, Client PO #,
          Phase Code, Cost Type, Description, Amount, Type, Status, Actions) -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -179,11 +204,21 @@
 <script>
 var table;
 
+// 2026-05-23 (KH): trigger a fresh DataTables fetch when status/pricing
+// filters change. The server-side dataTable reads these query params.
+function reloadCOs() { if (table) table.ajax.reload(null, false); }
+
 $(document).ready(function() {
     table = $('#dataTable').DataTable({
         processing: true,
         serverSide: true,
-        ajax: '{{ route("projects.change-orders.index", $project) }}',
+        ajax: {
+            url:  '{{ route("projects.change-orders.index", $project) }}',
+            data: function (d) {
+                d.status        = document.getElementById('coStatusFilter')?.value  || '';
+                d.pricing_type  = document.getElementById('coPricingFilter')?.value || '';
+            },
+        },
         columns: [
             {data:'co_number', name:'co_number'},
             {data:'client_po', name:'client_po', render: function(d){return d?d:'<span class="text-gray-400">—</span>';}},

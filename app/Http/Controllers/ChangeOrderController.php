@@ -46,6 +46,15 @@ class ChangeOrderController extends Controller
                   ->orWhere('description', 'like', "%{$search}%");
             });
         }
+
+        // 2026-05-23 (KH): inline filter strip — status + pricing type.
+        // Empty string from the dropdown means "any" — skip the where.
+        if ($status = trim((string) $request->input('status'))) {
+            $query->where('status', $status);
+        }
+        if ($pricing = trim((string) $request->input('pricing_type'))) {
+            $query->where('pricing_type', $pricing);
+        }
         $filteredRecords = $query->count();
 
         // Order
