@@ -164,6 +164,10 @@
 
         {{-- Quick Links Bar --}}
         <div class="flex flex-wrap gap-2 px-6 py-3 bg-gray-50 border-b border-gray-200">
+            {{-- 2026-05-23 (Brenda): "Setup" is the new entry point — one
+                 page showing project info + Labor Rates + Equipment Rates
+                 + missing-rates warnings before user starts estimating. --}}
+            <a href="{{ route('projects.setup', $project) }}" class="text-sm px-3 py-1.5 bg-amber-100 border border-amber-300 rounded-lg hover:bg-amber-200 hover:border-amber-400 text-amber-800 font-semibold transition">⚙ Setup</a>
             <a href="{{ route('projects.budget.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Budget Lines</a>
             <a href="{{ route('projects.change-orders.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Change Orders</a>
             <a href="{{ route('projects.estimates.index', $project) }}" class="text-sm px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition text-gray-700">Estimates</a>

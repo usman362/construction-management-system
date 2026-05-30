@@ -330,47 +330,81 @@
                                 <td class="px-2 py-1.5"></td>
                             </tr>
                         </thead>
+                        {{-- 2026-05-23 (Brenda + KH): every cell is now an inline
+                             editable input/select. TAB navigates left-to-right
+                             through the row. Each input auto-saves to the
+                             existing updateLine endpoint on blur (or after
+                             a 600ms debounce on number typing). Spreadsheet
+                             feel without a click-to-enter-edit-mode step. --}}
                         <tbody class="divide-y divide-gray-100">
                             @foreach($section->lines as $line)
                                 @php
                                     $isLabor = $line->line_type === 'labor';
-                                    // 2026-05-23 (Brenda): labor lines now carry ST + OT on a
-                                    // single row. Build a compact two-line description suffix
-                                    // showing "ST: X hrs @ $Y/hr" + "OT: A hrs @ $B/hr".
-                                    $descSuffix = '';
-                                    if ($isLabor) {
-                                        $stHrs = (float) ($line->hours ?? 0);
-                                        $otHrs = (float) ($line->ot_hours ?? 0);
-                                        $bits = [];
-                                        if ($stHrs > 0) $bits[] = 'ST: ' . number_format($stHrs, 2) . ' hrs @ $' . number_format((float) $line->hourly_cost_rate, 2) . '/hr';
-                                        if ($otHrs > 0) $bits[] = 'OT: ' . number_format($otHrs, 2) . ' hrs @ $' . number_format((float) $line->ot_hourly_cost_rate, 2) . '/hr';
-                                        if ($bits) $descSuffix = '<div class="text-[10px] text-gray-500 mt-0.5">' . implode(' &nbsp;·&nbsp; ', $bits) . '</div>';
-                                    }
                                 @endphp
-                                <tr class="hover:bg-gray-50 {{ $line->is_billable === false ? 'opacity-70 bg-gray-50' : '' }}">
-                                    <td class="px-2 py-2 font-mono text-xs text-gray-700">{{ $line->costCode?->code ?? '—' }}</td>
-                                    <td class="px-2 py-2 text-xs text-gray-600">{{ $line->costType?->code ?? '—' }}</td>
-                                    <td class="px-2 py-2 text-gray-900">
-                                        {{ $line->description }}
-                                        @if($isLabor)<span class="ml-1 text-[10px] uppercase bg-amber-100 text-amber-800 px-1 rounded">labor</span>@endif
-                                        {!! $descSuffix !!}
+                                <tr class="hover:bg-blue-50/40 {{ $line->is_billable === false ? 'bg-gray-50' : '' }}"
+                                    x-data="wbsRow({{ $line->id }})">
+                                    <td class="px-1 py-1">
+                                        <select x-model="row.cost_code_id" @change="save()" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-xs font-mono bg-transparent">
+                                            <option value="">—</option>
+                                            @foreach($costCodes as $cc)
+                                                <option value="{{ $cc->id }}" @selected($line->cost_code_id === $cc->id)>{{ $cc->code }}</option>
+                                            @endforeach
+                                        </select>
                                     </td>
-                                    <td class="px-2 py-2 text-right text-gray-700">{{ $line->quote_amount   !== null ? '$' . number_format((float) $line->quote_amount, 2)   : '—' }}</td>
-                                    <td class="px-2 py-2 text-right text-gray-700">{{ $line->freight_amount !== null ? '$' . number_format((float) $line->freight_amount, 2) : '—' }}</td>
-                                    <td class="px-2 py-2 text-right text-gray-700">{{ $line->tax_amount     !== null ? '$' . number_format((float) $line->tax_amount, 2)     : '—' }}</td>
-                                    <td class="px-2 py-2 text-right font-semibold text-gray-900">${{ number_format((float) $line->cost_amount, 2) }}</td>
-                                    <td class="px-2 py-2 text-center">
-                                        @if($line->is_billable === false)
-                                            <span title="Not billable — line shows in cost but $0 in billable" class="text-gray-400">—</span>
-                                        @else
-                                            <span title="Billable to client" class="text-emerald-600 font-bold">✓</span>
+                                    <td class="px-1 py-1">
+                                        <select x-model="row.cost_type_id" @change="save()" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-xs bg-transparent">
+                                            <option value="">—</option>
+                                            @foreach($costTypes as $ct)
+                                                <option value="{{ $ct->id }}" @selected($line->cost_type_id === $ct->id)>{{ $ct->code }}</option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                    <td class="px-1 py-1">
+                                        <input type="text" x-model="row.description" @blur="save()"
+                                               value="{{ $line->description }}"
+                                               class="w-full border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-sm bg-transparent">
+                                        @if($isLabor)
+                                            <div class="text-[10px] text-gray-500 mt-0.5 flex flex-wrap gap-x-3 px-2">
+                                                <span>ST:
+                                                    <input type="number" step="0.25" min="0" x-model="row.hours" @blur="save()" value="{{ $line->hours }}" class="w-14 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
+                                                    hrs @ $<input type="number" step="0.01" min="0" x-model="row.hourly_cost_rate" @blur="save()" value="{{ $line->hourly_cost_rate }}" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">/hr
+                                                </span>
+                                                <span>OT:
+                                                    <input type="number" step="0.25" min="0" x-model="row.ot_hours" @blur="save()" value="{{ $line->ot_hours }}" class="w-14 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
+                                                    hrs @ $<input type="number" step="0.01" min="0" x-model="row.ot_hourly_cost_rate" @blur="save()" value="{{ $line->ot_hourly_cost_rate }}" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">/hr
+                                                </span>
+                                            </div>
                                         @endif
                                     </td>
-                                    <td class="px-2 py-2 text-right text-gray-700">{{ number_format(((float) $line->markup_percent) * 100, 1) }}%</td>
+                                    <td class="px-1 py-1">
+                                        <input type="number" step="0.01" min="0" x-model="row.quote_amount" @blur="save()" value="{{ $line->quote_amount }}" placeholder="0.00"
+                                               class="w-24 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-sm text-right bg-transparent">
+                                    </td>
+                                    <td class="px-1 py-1">
+                                        <input type="number" step="0.01" min="0" x-model="row.freight_amount" @blur="save()" value="{{ $line->freight_amount }}" placeholder="0.00"
+                                               class="w-20 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-sm text-right bg-transparent">
+                                    </td>
+                                    <td class="px-1 py-1">
+                                        <input type="number" step="0.01" min="0" x-model="row.tax_amount" @blur="save()" value="{{ $line->tax_amount }}" placeholder="0.00"
+                                               class="w-20 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-sm text-right bg-transparent">
+                                    </td>
+                                    <td class="px-2 py-2 text-right font-semibold text-gray-900">${{ number_format((float) $line->cost_amount, 2) }}</td>
+                                    <td class="px-2 py-2 text-center">
+                                        <input type="checkbox" x-model="row.is_billable" @change="save()" @if($line->is_billable !== false) checked @endif
+                                               title="Billable to client">
+                                    </td>
+                                    <td class="px-1 py-1">
+                                        <input type="number" step="0.1" min="0" max="500" x-model="row.markup_percent_display" @blur="save()" value="{{ number_format(((float) $line->markup_percent) * 100, 1) }}" placeholder="0"
+                                               class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-sm text-right bg-transparent">
+                                        <span class="text-[10px] text-gray-400">%</span>
+                                    </td>
                                     <td class="px-2 py-2 text-right text-gray-700">${{ number_format((float) $line->markup_amount, 2) }}</td>
                                     <td class="px-2 py-2 text-right font-bold text-blue-700">${{ number_format((float) $line->price_amount, 2) }}</td>
-                                    <td class="px-2 py-2 text-right">
-                                        <button type="button" onclick="confirmDeleteLine({{ $line->id }})" class="text-red-600 hover:text-red-800 text-xs">×</button>
+                                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                                        <span x-show="status==='saving'" class="text-[10px] text-gray-400">saving…</span>
+                                        <span x-show="status==='saved'"  class="text-[10px] text-emerald-600">✓</span>
+                                        <span x-show="status==='error'"  class="text-[10px] text-rose-600" :title="errorMsg">⚠</span>
+                                        <button type="button" onclick="confirmDeleteLine({{ $line->id }})" class="text-red-600 hover:text-red-800 text-xs ml-1">×</button>
                                     </td>
                                 </tr>
                             @endforeach
@@ -968,6 +1002,97 @@ function submitEditEstimate() {
 function openAddLineModal() {
     document.getElementById('addLineForm').reset();
     openModal('addLineModal');
+}
+
+// 2026-05-23 (Brenda + KH): Excel-style inline-edit on the WBS table.
+// Each row gets its own Alpine component that auto-saves on blur via
+// the existing updateLine endpoint. TAB navigation comes free from
+// native browser behavior — cells are real inputs, browser walks
+// through them in DOM order. Saving state shows on the right.
+function wbsRow(lineId) {
+    return {
+        row: {
+            cost_code_id: null, cost_type_id: null, description: '',
+            quote_amount: null, freight_amount: null, tax_amount: null,
+            hours: null, hourly_cost_rate: null,
+            ot_hours: null, ot_hourly_cost_rate: null,
+            is_billable: true, markup_percent_display: null,
+        },
+        status: '',  // '' | 'saving' | 'saved' | 'error'
+        errorMsg: '',
+        timer: null,
+        init() {
+            // Read initial values from the rendered inputs so we don't
+            // duplicate them as JS literals (avoids template-vs-runtime
+            // drift if the row is re-rendered).
+            const row = this.$el;
+            this.row.cost_code_id = row.querySelector('[x-model="row.cost_code_id"]')?.value || '';
+            this.row.cost_type_id = row.querySelector('[x-model="row.cost_type_id"]')?.value || '';
+            this.row.description  = row.querySelector('[x-model="row.description"]')?.value || '';
+            this.row.quote_amount   = row.querySelector('[x-model="row.quote_amount"]')?.value   || '';
+            this.row.freight_amount = row.querySelector('[x-model="row.freight_amount"]')?.value || '';
+            this.row.tax_amount     = row.querySelector('[x-model="row.tax_amount"]')?.value     || '';
+            this.row.hours              = row.querySelector('[x-model="row.hours"]')?.value || '';
+            this.row.hourly_cost_rate   = row.querySelector('[x-model="row.hourly_cost_rate"]')?.value || '';
+            this.row.ot_hours           = row.querySelector('[x-model="row.ot_hours"]')?.value || '';
+            this.row.ot_hourly_cost_rate= row.querySelector('[x-model="row.ot_hourly_cost_rate"]')?.value || '';
+            this.row.is_billable        = row.querySelector('[x-model="row.is_billable"]')?.checked ?? true;
+            this.row.markup_percent_display = row.querySelector('[x-model="row.markup_percent_display"]')?.value || '0';
+        },
+        save() {
+            // Debounce — if multiple fields change in quick succession we
+            // only fire one PUT.
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this._doSave(), 350);
+        },
+        async _doSave() {
+            this.status = 'saving';
+            const blankToNull = v => (v === '' || v === null || v === undefined) ? null : v;
+            const payload = {
+                cost_code_id: blankToNull(this.row.cost_code_id),
+                cost_type_id: blankToNull(this.row.cost_type_id),
+                description:  this.row.description || '(no description)',
+                quote_amount:   blankToNull(this.row.quote_amount),
+                freight_amount: blankToNull(this.row.freight_amount),
+                tax_amount:     blankToNull(this.row.tax_amount),
+                hours:                   blankToNull(this.row.hours),
+                hourly_cost_rate:        blankToNull(this.row.hourly_cost_rate),
+                ot_hours:                blankToNull(this.row.ot_hours),
+                ot_hourly_cost_rate:     blankToNull(this.row.ot_hourly_cost_rate),
+                is_billable:  this.row.is_billable ? 1 : 0,
+                // User types markup as "10" → server expects 0.10
+                markup_percent: this.row.markup_percent_display !== ''
+                    ? (parseFloat(this.row.markup_percent_display) || 0) / 100
+                    : null,
+            };
+            try {
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + lineId, {
+                    method: 'PUT',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json',
+                               'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify(payload),
+                });
+                if (!r.ok) {
+                    const b = await r.json().catch(() => ({}));
+                    this.status = 'error';
+                    this.errorMsg = b.errors
+                        ? Object.values(b.errors).flat().join(' ')
+                        : (b.message || ('HTTP ' + r.status));
+                    return;
+                }
+                this.status = 'saved';
+                // Refresh totals row after a beat — easiest is a full reload
+                // since cost/markup/price are computed server-side via the
+                // recalculate observer. Reload debounced so rapid edits
+                // don't reload mid-typing.
+                clearTimeout(window.__wbsReload);
+                window.__wbsReload = setTimeout(() => location.reload(), 1200);
+            } catch (e) {
+                this.status = 'error';
+                this.errorMsg = e.message;
+            }
+        },
+    };
 }
 
 // 2026-05-23 (KH ESTIMATE-LABOR + Misc tab math): Labor builder.

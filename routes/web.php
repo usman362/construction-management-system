@@ -146,6 +146,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('projects', ProjectController::class);
 
     Route::prefix('projects/{project}')->name('projects.')->group(function () {
+        // 2026-05-23 (Brenda): single "Setup" tab per project — one place
+        // to find Labor Rates + Equipment Rates + Markups + duration etc.
+        // Mirrors the way her old Excel template had one Estimate Summary
+        // tab linking to Labor Rates + Equipment Rates + Data tabs.
+        Route::middleware('role:admin,project_manager,accountant')->group(function () {
+            Route::get('setup', [\App\Http\Controllers\ProjectSetupController::class, 'show'])->name('setup');
+        });
+
         // Budget Lines — Admin, PM, Accountant
         Route::middleware('role:admin,project_manager,accountant')->group(function () {
             Route::get('budget', [BudgetLineController::class, 'index'])->name('budget.index');
