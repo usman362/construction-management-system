@@ -116,7 +116,11 @@ class BillingController extends Controller
             // 2026-05-01 (Brenda): "How to we put an amount in client billing?"
             // — direct entry on the create form. Auto-Generate flow still
             // available on the show page for pulling from timesheets.
-            'total_amount' => 'required|numeric|min:0',
+            // 2026-05-30 (Brenda): "I will also need to be able to enter
+            // credit invoice under client invoices." — allow negative
+            // amounts. Credit memos / write-offs / refunds are entered as
+            // a negative billing invoice so they net against open billing.
+            'total_amount' => 'required|numeric',
         ]);
 
         BillingInvoice::create([
@@ -170,8 +174,9 @@ class BillingController extends Controller
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
             'description' => 'nullable|string',
-            // 2026-05-01 (Brenda): allow editing the amount as well
-            'total_amount' => 'nullable|numeric|min:0',
+            // 2026-05-01 (Brenda): allow editing the amount as well.
+            // 2026-05-30: credit invoices accepted (negative ok).
+            'total_amount' => 'nullable|numeric',
         ]);
 
         $billingInvoice->update(array_filter([
@@ -347,7 +352,7 @@ class BillingController extends Controller
             'invoice_date'      => 'required|date',
             'due_date'          => 'nullable|date',
             'description'       => 'nullable|string|max:2000',
-            'total_amount'      => 'required|numeric|min:0',
+            'total_amount'      => 'required|numeric',
         ]);
 
         $invoice = BillingInvoice::create([

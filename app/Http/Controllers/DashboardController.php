@@ -232,27 +232,32 @@ class DashboardController extends Controller
         }
         $horizonEnd = $weeks[11]->end;
 
-        // Receivables — billing invoices not yet paid
+        // 2026-05-30 (Brenda): "cash flow not updating" — the original
+        // query excluded draft invoices AND required a due_date. Most
+        // invoices on the simplified create modal don't carry a due_date,
+        // so nothing showed up. Fixed by: (a) including draft + sent, (b)
+        // falling back to invoice_date + 30 days when due_date is null.
         $receivables = BillingInvoice::query()
-            ->whereNotIn('status', ['draft', 'voided', 'paid'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<=', $horizonEnd)
-            ->get(['id', 'due_date', 'total_amount']);
+            ->whereNotIn('status', ['voided', 'paid'])
+            ->get(['id', 'due_date', 'invoice_date', 'total_amount']);
 
         foreach ($receivables as $r) {
-            $idx = $this->bucketIndex($r->due_date, $weeks);
+            $when = $r->due_date ?: ($r->invoice_date ? \Carbon\Carbon::parse($r->invoice_date)->addDays(30) : null);
+            if (! $when) continue;
+            $idx = $this->bucketIndex($when, $weeks);
             if ($idx !== null) $weeks[$idx]->inflow += (float) $r->total_amount;
         }
 
-        // Payables — vendor invoices not yet paid
+        // Payables — vendor invoices not yet paid. Same fix: include all
+        // un-paid statuses, fall back invoice_date+30 when due_date null.
         $payables = \App\Models\Invoice::query()
-            ->whereIn('status', ['pending', 'approved'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<=', $horizonEnd)
-            ->get(['id', 'due_date', 'amount']);
+            ->whereNotIn('status', ['paid', 'voided', 'rejected'])
+            ->get(['id', 'due_date', 'invoice_date', 'amount']);
 
         foreach ($payables as $p) {
-            $idx = $this->bucketIndex($p->due_date, $weeks);
+            $when = $p->due_date ?: ($p->invoice_date ? \Carbon\Carbon::parse($p->invoice_date)->addDays(30) : null);
+            if (! $when) continue;
+            $idx = $this->bucketIndex($when, $weeks);
             if ($idx !== null) $weeks[$idx]->outflow += (float) $p->amount;
         }
 

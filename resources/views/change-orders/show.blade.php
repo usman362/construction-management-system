@@ -140,41 +140,93 @@
         </div>
     @endif
 
-    <!-- Service Job Breakdown Section -->
+    {{-- ───── Service Job Breakdown ─────
+         2026-05-23 (Brenda bug — "this area of the change order is not
+         populating"): three of the four sections (Equipment, Material,
+         Other) were static placeholder text. Now all four sections pull
+         from the CO's linked estimate's line items, grouped by
+         line_type. Labor falls back to legacy laborDetails (legacy COs
+         created before the estimate flow). If nothing exists for a
+         section we show a one-line "—" placeholder instead of
+         pretending data is there. --}}
+    @php
+        $coEst         = \App\Models\Estimate::where('change_order_id', $changeOrder->id)->first();
+        $coEstLines    = $coEst ? $coEst->lines : collect();
+        $laborLines    = $coEstLines->filter(fn($l) => $l->line_type === 'labor');
+        $equipLines    = $coEstLines->filter(fn($l) => $l->line_type === 'equipment');
+        $materialLines = $coEstLines->filter(fn($l) => in_array($l->line_type, ['material', 'consumable']));
+        $otherLines    = $coEstLines->filter(fn($l) => ! in_array($l->line_type, ['labor', 'equipment', 'material', 'consumable']));
+
+        $laborCost = $laborLines->sum('cost_amount');
+        $equipCost = $equipLines->sum('cost_amount');
+        $matCost   = $materialLines->sum('cost_amount');
+        $othCost   = $otherLines->sum('cost_amount');
+        $sjbTotal  = $laborCost + $equipCost + $matCost + $othCost;
+
+        // Fall back to legacy laborDetails if no estimate lines exist
+        $hasLegacyLabor = $laborLines->isEmpty() && $changeOrder->laborDetails && $changeOrder->laborDetails->count() > 0;
+    @endphp
     <div class="bg-white rounded-lg shadow p-8 mb-6">
-        <h2 class="text-2xl font-bold mb-6">Service Job Breakdown</h2>
+        <div class="flex items-start justify-between mb-6 flex-wrap gap-3">
+            <h2 class="text-2xl font-bold">Service Job Breakdown</h2>
+            {{-- 2026-05-30 (KH red tab): Phase Code editable on ALL line
+                 types lives on the linked estimate's inline WBS table.
+                 One-click jump so the user doesn't have to hunt for it. --}}
+            @if($coEst)
+                <a href="{{ route('estimates.show', $coEst) }}"
+                   class="text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded inline-flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                    Edit lines on linked estimate
+                </a>
+            @endif
+        </div>
 
         <!-- LABOR -->
         <div class="mb-8">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2">LABOR</h3>
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2 flex justify-between">
+                <span>LABOR</span>
+                <span class="text-sm font-normal text-gray-500">{{ $hasLegacyLabor ? $changeOrder->laborDetails->count() : $laborLines->count() }} line(s) · ${{ number_format($hasLegacyLabor ? $changeOrder->laborDetails->sum('cost') : $laborCost, 2) }}</span>
+            </h3>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-100">
-                        <tr>
-                            <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700">Skill</th>
-                            <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">Amt Needed</th>
-                            <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">Rate $/Hr</th>
-                            <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">Hours/Day</th>
-                            <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">Duration</th>
-                            <th class="px-4 py-2 text-right text-sm font-semibold text-gray-700">Cost</th>
+                        <tr class="text-xs uppercase text-gray-700">
+                            <th class="px-3 py-2 text-left">Phase Code</th>
+                            <th class="px-3 py-2 text-left">Description</th>
+                            <th class="px-3 py-2 text-right">ST Hrs</th>
+                            <th class="px-3 py-2 text-right">ST Rate</th>
+                            <th class="px-3 py-2 text-right">OT Hrs</th>
+                            <th class="px-3 py-2 text-right">OT Rate</th>
+                            <th class="px-3 py-2 text-right">Cost</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @if ($changeOrder->laborDetails && $changeOrder->laborDetails->count())
-                            @foreach ($changeOrder->laborDetails as $labor)
+                        @if($hasLegacyLabor)
+                            @foreach($changeOrder->laborDetails as $labor)
                                 <tr class="border-b">
-                                    <td class="px-4 py-2 text-sm text-gray-900">{{ $labor->skill }}</td>
-                                    <td class="px-4 py-2 text-sm text-center text-gray-900">{{ $labor->amount_needed }}</td>
-                                    <td class="px-4 py-2 text-sm text-center text-gray-900">${{ number_format($labor->rate, 2) }}</td>
-                                    <td class="px-4 py-2 text-sm text-center text-gray-900">{{ $labor->hours_per_day }}</td>
-                                    <td class="px-4 py-2 text-sm text-center text-gray-900">{{ $labor->duration }}</td>
-                                    <td class="px-4 py-2 text-sm text-right text-gray-900">${{ number_format($labor->cost, 2) }}</td>
+                                    <td class="px-3 py-2 text-sm font-mono text-gray-700">—</td>
+                                    <td class="px-3 py-2 text-sm text-gray-900">{{ $labor->skill }}</td>
+                                    <td class="px-3 py-2 text-sm text-right">{{ $labor->hours_per_day }} × {{ $labor->duration }}d × {{ $labor->amount_needed }}</td>
+                                    <td class="px-3 py-2 text-sm text-right">${{ number_format($labor->rate, 2) }}</td>
+                                    <td class="px-3 py-2 text-sm text-right text-gray-400">—</td>
+                                    <td class="px-3 py-2 text-sm text-right text-gray-400">—</td>
+                                    <td class="px-3 py-2 text-sm text-right font-semibold">${{ number_format($labor->cost, 2) }}</td>
+                                </tr>
+                            @endforeach
+                        @elseif($laborLines->isNotEmpty())
+                            @foreach($laborLines as $l)
+                                <tr class="border-b">
+                                    <td class="px-3 py-2 text-sm font-mono text-gray-700">{{ $l->costCode?->code ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-900">{{ $l->description }}</td>
+                                    <td class="px-3 py-2 text-sm text-right">{{ number_format((float) $l->hours, 2) }}</td>
+                                    <td class="px-3 py-2 text-sm text-right">${{ number_format((float) $l->hourly_cost_rate, 2) }}</td>
+                                    <td class="px-3 py-2 text-sm text-right">{{ $l->ot_hours ? number_format((float) $l->ot_hours, 2) : '—' }}</td>
+                                    <td class="px-3 py-2 text-sm text-right">{{ $l->ot_hourly_cost_rate ? '$' . number_format((float) $l->ot_hourly_cost_rate, 2) : '—' }}</td>
+                                    <td class="px-3 py-2 text-sm text-right font-semibold">${{ number_format((float) $l->cost_amount, 2) }}</td>
                                 </tr>
                             @endforeach
                         @else
-                            <tr>
-                                <td colspan="6" class="px-4 py-4 text-center text-gray-500">No labor items</td>
-                            </tr>
+                            <tr><td colspan="7" class="px-4 py-4 text-center text-gray-400 text-sm">No labor lines on the CO estimate yet.</td></tr>
                         @endif
                     </tbody>
                 </table>
@@ -183,20 +235,106 @@
 
         <!-- EQUIPMENT -->
         <div class="mb-8">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2">EQUIPMENT</h3>
-            <p class="text-gray-600">Equipment details would be displayed here.</p>
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2 flex justify-between">
+                <span>EQUIPMENT</span>
+                <span class="text-sm font-normal text-gray-500">{{ $equipLines->count() }} line(s) · ${{ number_format($equipCost, 2) }}</span>
+            </h3>
+            @if($equipLines->isEmpty())
+                <p class="text-gray-400 text-sm">No equipment lines on the CO estimate yet.</p>
+            @else
+                <table class="w-full">
+                    <thead class="bg-gray-100">
+                        <tr class="text-xs uppercase text-gray-700">
+                            <th class="px-3 py-2 text-left">Phase Code</th>
+                            <th class="px-3 py-2 text-left">Description</th>
+                            <th class="px-3 py-2 text-right">Qty</th>
+                            <th class="px-3 py-2 text-left">Unit</th>
+                            <th class="px-3 py-2 text-right">Unit Cost</th>
+                            <th class="px-3 py-2 text-right">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($equipLines as $l)
+                            <tr class="border-b">
+                                <td class="px-3 py-2 text-sm font-mono text-gray-700">{{ $l->costCode?->code ?? '—' }}</td>
+                                <td class="px-3 py-2 text-sm text-gray-900">{{ $l->description }}</td>
+                                <td class="px-3 py-2 text-sm text-right">{{ rtrim(rtrim(number_format((float) $l->quantity, 2), '0'), '.') }}</td>
+                                <td class="px-3 py-2 text-sm text-gray-600">{{ $l->unit ?: '—' }}</td>
+                                <td class="px-3 py-2 text-sm text-right">${{ number_format((float) $l->unit_cost, 2) }}</td>
+                                <td class="px-3 py-2 text-sm text-right font-semibold">${{ number_format((float) $l->cost_amount, 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
         </div>
 
         <!-- MATERIAL & CONSUMABLES -->
         <div class="mb-8">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2">MATERIAL & CONSUMABLES</h3>
-            <p class="text-gray-600">Material and consumables details would be displayed here.</p>
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2 flex justify-between">
+                <span>MATERIAL &amp; CONSUMABLES</span>
+                <span class="text-sm font-normal text-gray-500">{{ $materialLines->count() }} line(s) · ${{ number_format($matCost, 2) }}</span>
+            </h3>
+            @if($materialLines->isEmpty())
+                <p class="text-gray-400 text-sm">No material / consumable lines on the CO estimate yet.</p>
+            @else
+                <table class="w-full">
+                    <thead class="bg-gray-100">
+                        <tr class="text-xs uppercase text-gray-700">
+                            <th class="px-3 py-2 text-left">Phase Code</th>
+                            <th class="px-3 py-2 text-left">Description</th>
+                            <th class="px-3 py-2 text-right">Quote</th>
+                            <th class="px-3 py-2 text-right">Freight</th>
+                            <th class="px-3 py-2 text-right">Tax</th>
+                            <th class="px-3 py-2 text-right">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($materialLines as $l)
+                            <tr class="border-b">
+                                <td class="px-3 py-2 text-sm font-mono text-gray-700">{{ $l->costCode?->code ?? '—' }}</td>
+                                <td class="px-3 py-2 text-sm text-gray-900">{{ $l->description }}</td>
+                                <td class="px-3 py-2 text-sm text-right">{{ $l->quote_amount   !== null ? '$' . number_format((float) $l->quote_amount, 2)   : '—' }}</td>
+                                <td class="px-3 py-2 text-sm text-right">{{ $l->freight_amount !== null ? '$' . number_format((float) $l->freight_amount, 2) : '—' }}</td>
+                                <td class="px-3 py-2 text-sm text-right">{{ $l->tax_amount     !== null ? '$' . number_format((float) $l->tax_amount, 2)     : '—' }}</td>
+                                <td class="px-3 py-2 text-sm text-right font-semibold">${{ number_format((float) $l->cost_amount, 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
         </div>
 
         <!-- OTHER COSTS -->
         <div class="mb-8">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2">OTHER COSTS</h3>
-            <p class="text-gray-600">Other costs details would be displayed here.</p>
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2 flex justify-between">
+                <span>OTHER COSTS</span>
+                <span class="text-sm font-normal text-gray-500">{{ $otherLines->count() }} line(s) · ${{ number_format($othCost, 2) }}</span>
+            </h3>
+            @if($otherLines->isEmpty())
+                <p class="text-gray-400 text-sm">No other-cost lines on the CO estimate yet.</p>
+            @else
+                <table class="w-full">
+                    <thead class="bg-gray-100">
+                        <tr class="text-xs uppercase text-gray-700">
+                            <th class="px-3 py-2 text-left">Phase Code</th>
+                            <th class="px-3 py-2 text-left">Type</th>
+                            <th class="px-3 py-2 text-left">Description</th>
+                            <th class="px-3 py-2 text-right">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($otherLines as $l)
+                            <tr class="border-b">
+                                <td class="px-3 py-2 text-sm font-mono text-gray-700">{{ $l->costCode?->code ?? '—' }}</td>
+                                <td class="px-3 py-2 text-xs uppercase text-gray-600">{{ str_replace('_', ' ', $l->line_type ?? 'other') }}</td>
+                                <td class="px-3 py-2 text-sm text-gray-900">{{ $l->description }}</td>
+                                <td class="px-3 py-2 text-sm text-right font-semibold">${{ number_format((float) $l->cost_amount, 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
         </div>
 
         <!-- GRAND TOTAL -->
@@ -204,6 +342,11 @@
             <span class="text-lg font-bold">GRAND TOTAL</span>
             <span class="text-2xl font-bold">${{ number_format($changeOrder->amount, 2) }}</span>
         </div>
+        @if($coEst && abs($changeOrder->amount - $sjbTotal) > 0.01)
+            <p class="text-[11px] text-gray-500 mt-2 text-right">
+                Breakdown sum: ${{ number_format($sjbTotal, 2) }} · CO amount: ${{ number_format($changeOrder->amount, 2) }}. The CO amount is the price quoted to the owner (includes markup); the breakdown shows cost only.
+            </p>
+        @endif
     </div>
 
     {{-- ── CO Estimate (the "smaller estimating module") ──

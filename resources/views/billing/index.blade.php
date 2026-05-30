@@ -73,13 +73,17 @@
                      — added a direct Amount field so the office can type the
                      billed amount on the same screen instead of needing to
                      run the auto-Generate flow first. --}}
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Amount $ *</label><input type="number" name="total_amount" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+                {{-- 2026-05-30 (Brenda): "I will also need to be able to
+                     enter credit invoice under client invoices. As it is
+                     set now I cannot" — removed min="0" so a negative
+                     amount (credit memo / refund / write-off) is accepted. --}}
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Amount $ * <span class="text-gray-400 font-normal text-xs">(use negative for credit invoice)</span></label><input type="number" name="total_amount" step="0.01" placeholder="0.00 or -0.00 for credit" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date *</label><input type="date" name="invoice_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label><input type="date" name="due_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" placeholder="For credit invoices, briefly note the reason (e.g. price adjustment, return)…" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
         </form>
         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
             <button onclick="closeModal('createModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
@@ -123,7 +127,8 @@
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number *</label><input type="text" name="invoice_number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Amount $ *</label><input type="number" name="total_amount" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
+                {{-- 2026-05-30: credit invoices ok — see create modal. --}}
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Amount $ * <span class="text-gray-400 font-normal text-xs">(use negative for credit invoice)</span></label><input type="number" name="total_amount" step="0.01" placeholder="0.00 or -0.00 for credit" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date *</label><input type="date" name="invoice_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
@@ -235,7 +240,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Total Amount $ *</label>
-                            <input type="number" step="0.01" min="0" x-model="form.total_amount" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-right">
+                            <input type="number" step="0.01" x-model="form.total_amount" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-right">
                         </div>
                     </div>
 
@@ -269,7 +274,14 @@ var table = $('#dataTable').DataTable({
     columns: [
         {data:'invoice_number'}, {data:'invoice_date'},
         {data:'project'},
-        {data:'total_amount', render: d=>'$'+parseFloat(d).toFixed(2)},
+        {data:'total_amount', render: function(d){
+            // 2026-05-30: credit invoices (negative) render in red with
+            // a "CREDIT" badge so they're visually distinct from regular bills.
+            var n = parseFloat(d) || 0;
+            var abs = '$' + (typeof window.fmtMoney === 'function' ? window.fmtMoney(Math.abs(n)).replace('$','') : Math.abs(n).toFixed(2));
+            if (n < 0) return '<span class="text-red-600 font-semibold">-'+abs+'</span> <span class="ml-1 px-1.5 py-0.5 text-[10px] bg-red-100 text-red-700 rounded font-bold">CREDIT</span>';
+            return abs;
+        }},
         {data:'status', render: d=>'<span class="px-2 py-1 rounded text-xs font-medium '+(d==='paid'?'bg-green-100 text-green-700':d==='sent'?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-700')+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</span>'},
         {data:'actions', orderable:false, searchable:false, className:'text-center',
          render: function(data) {

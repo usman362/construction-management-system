@@ -238,45 +238,132 @@ class Project extends Model
 
     public function getProfitAttribute()
     {
-        return $this->estimate - $this->current_budget;
+        return $this->effectiveEstimate() - $this->effectiveBudget();
     }
 
     public function getProfitPercentageAttribute()
     {
-        if ($this->estimate == 0) {
+        $est = $this->effectiveEstimate();
+        if ($est == 0) {
             return 0;
         }
-        return (($this->estimate - $this->current_budget) / $this->estimate) * 100;
+        return (($est - $this->effectiveBudget()) / $est) * 100;
     }
 
     /**
-     * % of current budget that is already committed (PO / subcontracts).
+     * 2026-05-30 (Brenda): "On the dashboard the %Complete, Profit Margin
+     * and cash flow are not updating." — these accessors used to look at
+     * the raw `estimate` / `current_budget` columns only, which most
+     * projects leave empty (the real values live in the related Estimate
+     * rows and budget_lines). Switched to an effective-estimate / effective-
+     * budget helper so the dashboard numbers move the moment a user enters
+     * an estimate line, a budget line, or types a contract value.
+     */
+    public function effectiveEstimate(): float
+    {
+        // 1. Column on the project record (manually typed)
+        $direct = (float) ($this->estimate ?? 0);
+        if ($direct > 0) {
+            return $direct;
+        }
+        // 2. Approved estimate(s) total
+        $approved = (float) $this->estimates()
+            ->where('status', 'approved')
+            ->sum('total_amount');
+        if ($approved > 0) {
+            return $approved;
+        }
+        // 3. Any estimate(s) total — drafts, sent, etc.
+        $any = (float) $this->estimates()->sum('total_amount');
+        if ($any > 0) {
+            return $any;
+        }
+        // 4. Sum of budget_lines.revised_amount (or budget_amount) — fallback
+        $lineTotal = (float) $this->budgetLines()->get()->sum(function ($l) {
+            return (float) ($l->revised_amount ?? $l->budget_amount ?? 0);
+        });
+        if ($lineTotal > 0) {
+            return $lineTotal;
+        }
+        // 5. contract_value
+        return (float) ($this->contract_value ?? 0);
+    }
+
+    public function effectiveBudget(): float
+    {
+        $direct = (float) ($this->current_budget ?? 0);
+        if ($direct > 0) {
+            return $direct;
+        }
+        return (float) $this->budgetLines()->get()->sum(function ($l) {
+            return (float) ($l->revised_amount ?? $l->budget_amount ?? 0);
+        });
+    }
+
+    /**
+     * Total of approved change orders — added to the "denominator" so
+     * % Committed and Margin both reflect approved scope changes.
+     */
+    public function effectiveApprovedCOs(): float
+    {
+        return (float) $this->changeOrders()
+            ->where('status', 'approved')
+            ->sum('amount');
+    }
+
+    /**
+     * Real committed-cost total: vendor commitments + invoices (no
+     * double-count) + booked labor from approved/submitted timesheets.
+     * Labor is the chunk that was missing before, which made the
+     * dashboard Margin and %Complete look stuck.
+     */
+    public function effectiveCommittedCost(): float
+    {
+        $invoices    = $this->invoices()->get();
+        $commitments = $this->commitments()->get();
+        $invoicedIds = $invoices->pluck('commitment_id')->filter()->unique();
+        $uncommitted = $commitments->whereNotIn('id', $invoicedIds);
+        $vendor = (float) $invoices->sum('amount') + (float) $uncommitted->sum('amount');
+
+        $labor = (float) $this->timesheets()
+            ->where('status', '!=', 'rejected')
+            ->sum('total_cost');
+
+        return $vendor + $labor;
+    }
+
+    /**
+     * % Committed — what fraction of the effective budget (+approved COs)
+     * has been committed so far. Drives the "% Committed" column on the
+     * dashboard project list. Updates as soon as estimates / budget lines
+     * / commitments / labor flow in.
      */
     public function getCommittedPercentageAttribute(): float
     {
-        $budget = (float) ($this->current_budget ?? 0);
-        if ($budget <= 0) {
+        $denom = $this->effectiveBudget() + $this->effectiveApprovedCOs();
+        if ($denom <= 0) {
+            // Fall back to estimate so we don't show 0% on an active
+            // project that only has an estimate (no separate budget yet).
+            $denom = $this->effectiveEstimate();
+        }
+        if ($denom <= 0) {
             return 0;
         }
-        $committed = (float) $this->commitments()->sum('amount');
-        return round(($committed / $budget) * 100, 1);
+        return round(($this->effectiveCommittedCost() / $denom) * 100, 1);
     }
 
     /**
-     * Profit margin % = (estimate - committed cost) / estimate * 100.
-     * Uses commitments + invoices (avoiding double-count) as actual cost.
+     * Margin % = (effective estimate - committed cost) / estimate * 100.
+     * "Updating" because both sides use the fallback helpers now, so
+     * editing an estimate line OR booking a vendor invoice OR approving
+     * a timesheet will move this number.
      */
     public function getProfitMarginAttribute(): float
     {
-        $estimate = (float) ($this->estimate ?? 0);
+        $estimate = $this->effectiveEstimate() + $this->effectiveApprovedCOs();
         if ($estimate <= 0) {
             return 0;
         }
-        $invoices = $this->invoices()->get();
-        $commitments = $this->commitments()->get();
-        $invoicedCommitmentIds = $invoices->pluck('commitment_id')->filter()->unique();
-        $uninvoicedCommitments = $commitments->whereNotIn('id', $invoicedCommitmentIds);
-        $totalCost = (float) $invoices->sum('amount') + (float) $uninvoicedCommitments->sum('amount');
-        return round((($estimate - $totalCost) / $estimate) * 100, 1);
+        return round((($estimate - $this->effectiveCommittedCost()) / $estimate) * 100, 1);
     }
 }

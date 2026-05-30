@@ -55,55 +55,70 @@
         </div>
     </div>
 
-    {{-- 2026-05-23 (KH): swapped Original/Current Budget tiles for
-         Budget + Estimate (her ask: "she wanted to see budget and
-         estimate"). Committed tile now breaks down by Cost Type
-         instead of POs/Subs vs Labor. --}}
-    <!-- Financial Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+    {{-- 2026-05-30 (KH red-tab notes): replaced 5 tiles with the exact
+         6 KH wrote on her notes sheet:
+           1. Original Estimate · 2. Approved COs · 3. PO Value (incl. COs)
+           4. Committed         · 5. Margin       · 6. % Complete
+         "Original Estimate" stays anchored to the very first estimate
+         created on the project so it never drifts as new COs land.
+         "PO Value (w/COs)" = contracted PO + approved CO $.
+         Margin shows $ + % so KH can read both at a glance. --}}
+    @php
+        // Original (first) estimate — anchored, doesn't drift when COs land.
+        $originalEstimate = (float) (\App\Models\Estimate::where('project_id', $project->id)
+            ->orderBy('created_at')
+            ->value('total_amount')
+            ?? $project->estimate
+            ?? $project->contract_value
+            ?? 0);
+        $poBase     = (float) ($project->contract_value ?? $originalEstimate ?? 0);
+        $poWithCOs  = $poBase + (float) ($coTotal ?? 0);
+        $marginDol  = $poWithCOs - (float) ($committedTotal ?? 0);
+        $marginPct  = $poWithCOs > 0 ? round(($marginDol / $poWithCOs) * 100, 1) : 0;
+        $marginCls  = $marginDol >= 0 ? 'text-green-600' : 'text-red-600';
+    @endphp
+    <!-- Financial Summary — KH 6-tile spec -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-sm text-gray-600">Budget</p>
-            <p class="text-2xl font-bold text-gray-900">${{ number_format($project->current_budget ?? $project->original_budget ?? 0, 0) }}</p>
-            @if(($project->current_budget ?? 0) !== ($project->original_budget ?? 0) && ($project->original_budget ?? 0) > 0)
-                <p class="text-[11px] text-gray-500 mt-1">Originally ${{ number_format($project->original_budget, 0) }}</p>
-            @endif
+            <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Original Estimate</p>
+            <p class="text-2xl font-bold text-gray-900">${{ number_format($originalEstimate, 0) }}</p>
+            <p class="text-[10px] text-gray-400 mt-1">First estimate created</p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-sm text-gray-600">Estimate</p>
-            <p class="text-2xl font-bold text-gray-900">${{ number_format($estimateTotal ?? 0, 0) }}</p>
-            <p class="text-[11px] text-gray-500 mt-1">Approved estimate (or latest)</p>
+            <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Approved COs</p>
+            <p class="text-2xl font-bold text-gray-900">${{ number_format($coTotal ?? 0, 0) }}</p>
+            <p class="text-[10px] text-gray-400 mt-1">{{ $changeOrders->where('status', 'approved')->count() }} change order(s)</p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-sm text-gray-600">Committed</p>
+            <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">PO Value <span class="normal-case text-gray-400">(w/ COs)</span></p>
+            <p class="text-2xl font-bold text-gray-900">${{ number_format($poWithCOs, 0) }}</p>
+            <p class="text-[10px] text-gray-400 mt-1">PO ${{ number_format($poBase, 0) }} + COs</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-md p-4">
+            <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Committed</p>
             <p class="text-2xl font-bold text-gray-900">${{ number_format($committedTotal ?? 0, 0) }}</p>
-            {{-- KH: break down by cost type so she can see at a glance
-                 where the spend is going (Direct Labor, Subs, Materials,
-                 etc.). Show up to 3 biggest types inline; rest tucked
-                 under a "+N more" hint. --}}
             @if(($committedByCostType ?? collect())->isNotEmpty())
-                <div class="text-[11px] text-gray-500 mt-1 leading-tight space-y-0.5">
-                    @foreach($committedByCostType->take(3) as $ct)
-                        <div class="flex justify-between"><span class="truncate pr-2">{{ $ct->code }} {{ $ct->name }}</span><span>${{ number_format($ct->total, 0) }}</span></div>
+                <div class="text-[10px] text-gray-500 mt-1 leading-tight space-y-0.5">
+                    @foreach($committedByCostType->take(2) as $ct)
+                        <div class="flex justify-between"><span class="truncate pr-2">{{ $ct->code }}</span><span>${{ number_format($ct->total, 0) }}</span></div>
                     @endforeach
-                    @if($committedByCostType->count() > 3)
-                        <div class="text-[10px] text-gray-400">+{{ $committedByCostType->count() - 3 }} more cost type(s) — see Cost Report</div>
+                    @if($committedByCostType->count() > 2)
+                        <div class="text-[10px] text-gray-400">+{{ $committedByCostType->count() - 2 }} more</div>
                     @endif
                 </div>
             @else
-                <p class="text-[11px] text-gray-500 mt-1">Nothing committed yet.</p>
+                <p class="text-[10px] text-gray-400 mt-1">Nothing committed yet</p>
             @endif
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-sm text-gray-600">Profit</p>
-            @php
-                $profit = ($project->contract_value ?? 0) - ($committedTotal ?? 0);
-                $profitClass = $profit >= 0 ? 'text-green-600' : 'text-red-600';
-            @endphp
-            <p class="text-2xl font-bold {{ $profitClass }}">${{ number_format($profit, 0) }}</p>
+            <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Margin</p>
+            <p class="text-2xl font-bold {{ $marginCls }}">${{ number_format($marginDol, 0) }}</p>
+            <p class="text-[10px] {{ $marginCls }} mt-1 font-semibold">{{ $marginPct }}% of PO value</p>
         </div>
         <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-sm text-gray-600">% Complete</p>
+            <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">% Complete</p>
             <p class="text-2xl font-bold text-gray-900">{{ $percentComplete ?? 0 }}%</p>
+            <p class="text-[10px] text-gray-400 mt-1">Committed ÷ Budget+COs</p>
         </div>
     </div>
 
