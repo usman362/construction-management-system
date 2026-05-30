@@ -145,42 +145,42 @@
 
             </div>
 
-            <!-- Markup Rates (ST / OT) -->
+            {{-- 2026-05-23 (Brenda): primary fields she actually uses now —
+                 ST Billable + OT Billable typed directly. Old 7-row markup
+                 grid moved into an "Advanced" disclosure for legacy projects
+                 that were set up that way. --}}
             <div class="mt-6 border-t border-gray-200 pt-4">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-semibold text-gray-900">Markup Rates</h3>
-                    <p class="text-xs text-gray-500">Enter as decimal (e.g. 0.0765 for 7.65%)</p>
-                </div>
-                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
-                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
-                </div>
-                @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
-                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
-                        <label class="text-sm text-gray-700">{{ $label }}</label>
-                        <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
-                        <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000">
+                <h3 class="text-sm font-semibold text-gray-900 mb-3">Billable Rates</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="create_straight_time_rate" class="block text-sm font-medium text-gray-700 mb-2">ST Billable Rate *</label>
+                        <input type="number" name="straight_time_rate" id="create_straight_time_rate" step="0.01" min="0" required class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="0.00">
+                        <p class="text-[11px] text-gray-500 mt-1">What you bill the client per straight-time hour.</p>
                     </div>
-                @endforeach
+                    <div>
+                        <label for="create_overtime_rate" class="block text-sm font-medium text-gray-700 mb-2">OT Billable Rate *</label>
+                        <input type="number" name="overtime_rate" id="create_overtime_rate" step="0.01" min="0" required class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="0.00">
+                        <p class="text-[11px] text-gray-500 mt-1">What you bill the client per overtime hour.</p>
+                    </div>
+                </div>
             </div>
 
-            <!-- Auto-calculated Preview -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-                <h3 class="text-sm font-semibold text-gray-700 mb-3">Calculated Rates Preview</h3>
-                <div class="grid grid-cols-3 gap-4">
-                    <div>
-                        <p class="text-xs text-gray-600 mb-1">Straight Time Rate</p>
-                        <p id="create_st_rate_preview" class="text-lg font-bold text-gray-900">$0.00</p>
+            <details class="mt-4">
+                <summary class="text-sm font-medium text-blue-700 cursor-pointer">Advanced: auto-calculate from markup percentages</summary>
+                <div class="mt-3 border-l-2 border-blue-200 pl-4">
+                    <p class="text-xs text-gray-500 mb-2">Skip this section if you typed the billable rates above. Use only if you want the system to compute billable from base + payroll tax + burden + WC + overhead + profit.</p>
+                    <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                        <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                     </div>
-                    <div>
-                        <p class="text-xs text-gray-600 mb-1">Overtime Rate (1.5x)</p>
-                        <p id="create_ot_rate_preview" class="text-lg font-bold text-gray-900">$0.00</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-600 mb-1">Double Time Rate (2x)</p>
-                        <p id="create_dt_rate_preview" class="text-lg font-bold text-gray-900">$0.00</p>
-                    </div>
+                    @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
+                        <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                            <label class="text-sm text-gray-700">{{ $label }}</label>
+                            <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                            <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000">
+                        </div>
+                    @endforeach
                 </div>
-            </div>
+            </details>
 
             <div class="flex gap-4 mt-6">
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1">
@@ -245,42 +245,39 @@
                 <!-- Markup Rate Fields -->
             </div>
 
-            <!-- Markup Rates (ST / OT) -->
+            {{-- 2026-05-23 (Brenda): same simplification on Edit — direct
+                 ST/OT Billable inputs up front, markup grid moved into
+                 Advanced disclosure. --}}
             <div class="mt-6 border-t border-gray-200 pt-4">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-semibold text-gray-900">Markup Rates</h3>
-                    <p class="text-xs text-gray-500">Enter as decimal (e.g. 0.0765 for 7.65%)</p>
-                </div>
-                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
-                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
-                </div>
-                @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
-                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
-                        <label class="text-sm text-gray-700">{{ $label }}</label>
-                        <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
-                        <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000">
+                <h3 class="text-sm font-semibold text-gray-900 mb-3">Billable Rates</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="edit_straight_time_rate" class="block text-sm font-medium text-gray-700 mb-2">ST Billable Rate *</label>
+                        <input type="number" name="straight_time_rate" id="edit_straight_time_rate" step="0.01" min="0" required class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="0.00">
                     </div>
-                @endforeach
+                    <div>
+                        <label for="edit_overtime_rate" class="block text-sm font-medium text-gray-700 mb-2">OT Billable Rate *</label>
+                        <input type="number" name="overtime_rate" id="edit_overtime_rate" step="0.01" min="0" required class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="0.00">
+                    </div>
+                </div>
             </div>
 
-            <!-- Auto-calculated Preview -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-                <h3 class="text-sm font-semibold text-gray-700 mb-3">Calculated Rates Preview</h3>
-                <div class="grid grid-cols-3 gap-4">
-                    <div>
-                        <p class="text-xs text-gray-600 mb-1">Straight Time Rate</p>
-                        <p id="edit_st_rate_preview" class="text-lg font-bold text-gray-900">$0.00</p>
+            <details class="mt-4">
+                <summary class="text-sm font-medium text-blue-700 cursor-pointer">Advanced: auto-calculate from markup percentages</summary>
+                <div class="mt-3 border-l-2 border-blue-200 pl-4">
+                    <p class="text-xs text-gray-500 mb-2">Skip this section if you typed the billable rates above.</p>
+                    <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                        <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                     </div>
-                    <div>
-                        <p class="text-xs text-gray-600 mb-1">Overtime Rate (1.5x)</p>
-                        <p id="edit_ot_rate_preview" class="text-lg font-bold text-gray-900">$0.00</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-600 mb-1">Double Time Rate (2x)</p>
-                        <p id="edit_dt_rate_preview" class="text-lg font-bold text-gray-900">$0.00</p>
-                    </div>
+                    @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
+                        <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                            <label class="text-sm text-gray-700">{{ $label }}</label>
+                            <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                            <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000">
+                        </div>
+                    @endforeach
                 </div>
-            </div>
+            </details>
 
             <div class="flex gap-4 mt-6">
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1">
@@ -512,6 +509,10 @@
             $('#edit_base_ot_hourly_rate').val(data.base_ot_hourly_rate != null && parseFloat(data.base_ot_hourly_rate) > 0
                 ? parseFloat(data.base_ot_hourly_rate).toFixed(4)
                 : '');
+            // 2026-05-23 (Brenda): primary billable rate inputs — pre-fill
+            // from existing row so the user can adjust without re-typing.
+            $('#edit_straight_time_rate').val(parseFloat(data.straight_time_rate || 0).toFixed(2));
+            $('#edit_overtime_rate').val(parseFloat(data.overtime_rate || 0).toFixed(2));
             $('#edit_payroll_tax_rate').val(parseFloat(data.payroll_tax_rate || 0).toFixed(4));
             $('#edit_burden_rate').val(parseFloat(data.burden_rate || 0).toFixed(4));
             $('#edit_insurance_rate').val(parseFloat(data.insurance_rate || 0).toFixed(4));

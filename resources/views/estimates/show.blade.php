@@ -681,10 +681,22 @@
                                         data-otmult="{{ (float) ($c->overtime_multiplier ?? 1.5) }}"
                                         data-bill="{{ (float) $c->billable_rate }}"
                                         data-otbill="{{ (float) ($c->ot_billable_rate ?? $c->billable_rate * ($c->overtime_multiplier ?? 1.5)) }}">
-                                    {{ $c->code }} — {{ $c->name }} (${{ number_format((float) $c->base_hourly_rate, 2) }}/hr)
+                                    {{ $c->code }} — {{ $c->name }}
                                 </option>
                             @endforeach
                         </select>
+                        {{-- 2026-05-23 (Brenda): show both rates explicitly so it's
+                             clear that COST = what we pay, BILLABLE = what we
+                             bill the client. Both come from the project's
+                             Billable Rates page (or the craft master if no
+                             project-level override exists). --}}
+                        <div id="lab_craft_rates" class="hidden mt-1 text-[11px] text-gray-600 leading-relaxed">
+                            Cost rate (our cost): <span id="lab_craft_cost" class="font-semibold text-gray-900">—</span>/hr ST,
+                            <span id="lab_craft_cost_ot" class="font-semibold text-gray-900">—</span>/hr OT
+                            <br>Billable rate (to client): <span id="lab_craft_bill" class="font-semibold text-blue-700">—</span>/hr ST,
+                            <span id="lab_craft_bill_ot" class="font-semibold text-blue-700">—</span>/hr OT
+                            <br><span id="lab_craft_warn" class="hidden text-rose-600">⚠ Rate is $0 — set it on the project's Billable Rates page.</span>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Classification (optional)</label>
@@ -700,12 +712,16 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Hrs/Day *</label>
-                        <input type="number" name="hrs_per_day" id="lab_hpd" step="0.5" min="0.25" max="24" value="10" required oninput="laborRecalc()"
+                        {{-- 2026-05-23 (Brenda bug): step="0.5" combined with min="0.25"
+                             made round numbers like 10 invalid (browser only allows
+                             0.25, 0.75, 1.25, …). Switched to step="0.25" min="0"
+                             so 10, 11.5, 8 all work. Same fix on Duration below. --}}
+                        <input type="number" name="hrs_per_day" id="lab_hpd" step="0.25" min="0" max="24" value="10" required oninput="laborRecalc()"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Duration (days) *</label>
-                        <input type="number" name="duration_days" id="lab_dur" step="1" min="0.5" max="730" value="14" required oninput="laborRecalc()"
+                        <input type="number" name="duration_days" id="lab_dur" step="1" min="1" max="730" value="14" required oninput="laborRecalc()"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right">
                     </div>
                 </div>
@@ -971,6 +987,21 @@ function laborRecalc() {
     const otRate   = stRate * otMult;
     const billSt   = opt ? parseFloat(opt.dataset.bill   || 0) : 0;
     const billOt   = opt ? parseFloat(opt.dataset.otbill || (billSt * otMult)) : 0;
+
+    // Show / hide the rate breakdown panel under the dropdown
+    const ratesBox = document.getElementById('lab_craft_rates');
+    if (opt && opt.value) {
+        ratesBox.classList.remove('hidden');
+        document.getElementById('lab_craft_cost').textContent    = fmt(stRate);
+        document.getElementById('lab_craft_cost_ot').textContent = fmt(otRate);
+        document.getElementById('lab_craft_bill').textContent    = fmt(billSt);
+        document.getElementById('lab_craft_bill_ot').textContent = fmt(billOt);
+        const warn = document.getElementById('lab_craft_warn');
+        if (stRate === 0 || billSt === 0) warn.classList.remove('hidden');
+        else warn.classList.add('hidden');
+    } else {
+        ratesBox.classList.add('hidden');
+    }
 
     const qty = num('lab_qty');
     const hpd = num('lab_hpd');

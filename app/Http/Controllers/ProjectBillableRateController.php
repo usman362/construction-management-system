@@ -96,6 +96,11 @@ class ProjectBillableRateController extends Controller
             'employee_id' => 'nullable|exists:employees,id',
             'base_hourly_rate' => 'required|numeric|min:0',
             'base_ot_hourly_rate' => 'nullable|numeric|min:0',
+            // 2026-05-23 (Brenda): user can now type ST/OT billable rates
+            // directly — markup rows are optional. Model observer respects
+            // these when dirty (no overwrite from markup calc).
+            'straight_time_rate' => 'nullable|numeric|min:0',
+            'overtime_rate'      => 'nullable|numeric|min:0',
             'payroll_tax_rate' => 'nullable|numeric|min:0|max:1',
             'burden_rate' => 'nullable|numeric|min:0|max:1',
             'insurance_rate' => 'nullable|numeric|min:0|max:1',
@@ -139,6 +144,11 @@ class ProjectBillableRateController extends Controller
             'employee_id' => 'nullable|exists:employees,id',
             'base_hourly_rate' => 'required|numeric|min:0',
             'base_ot_hourly_rate' => 'nullable|numeric|min:0',
+            // 2026-05-23 (Brenda): user can now type ST/OT billable rates
+            // directly — markup rows are optional. Model observer respects
+            // these when dirty (no overwrite from markup calc).
+            'straight_time_rate' => 'nullable|numeric|min:0',
+            'overtime_rate'      => 'nullable|numeric|min:0',
             'payroll_tax_rate' => 'nullable|numeric|min:0|max:1',
             'burden_rate' => 'nullable|numeric|min:0|max:1',
             'insurance_rate' => 'nullable|numeric|min:0|max:1',

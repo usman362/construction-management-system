@@ -221,7 +221,21 @@ class ProjectBillableRate extends Model
     protected static function booted(): void
     {
         static::saving(function (self $model) {
-            // Auto-calculate loaded rates if base rate is set and rates aren't already calculated
+            // 2026-05-23 (Brenda): if the user typed ST/OT billable rates
+            // directly (the simplified flow), respect those — don't overwrite
+            // with the markup-based auto-calc. Double-time still derives
+            // from ST if not explicitly set.
+            $userTypedRates = $model->isDirty('straight_time_rate')
+                || $model->isDirty('overtime_rate');
+            if ($userTypedRates) {
+                if (! $model->double_time_rate && $model->straight_time_rate) {
+                    $model->double_time_rate = (float) $model->straight_time_rate * 2;
+                }
+                return;
+            }
+
+            // Legacy markup-calc path — only fires when the user didn't
+            // type rates directly.
             if ($model->base_hourly_rate && (!$model->straight_time_rate || $model->isDirty([
                 'base_hourly_rate', 'base_ot_hourly_rate',
                 'payroll_tax_rate', 'payroll_tax_ot_rate',
@@ -234,8 +248,8 @@ class ProjectBillableRate extends Model
             ]))) {
                 $rates = $model->calculateLoadedRate();
                 $model->straight_time_rate = $rates['straight_time'];
-                $model->overtime_rate = $rates['overtime'];
-                $model->double_time_rate = $rates['double_time'];
+                $model->overtime_rate      = $rates['overtime'];
+                $model->double_time_rate   = $rates['double_time'];
             }
         });
     }

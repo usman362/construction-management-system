@@ -163,12 +163,35 @@ class EstimateController extends Controller
             'lines.equipment',
         ]);
 
+        // 2026-05-23 (Brenda): pass the project-level billable rate per
+        // craft so the Labor tile's live preview can show the SAME
+        // numbers the server will use when it creates the lines. Falls
+        // through to craft master if the project has no override.
+        $crafts = Craft::where('is_active', true)->orderBy('name')
+            ->get(['id', 'code', 'name', 'base_hourly_rate', 'overtime_multiplier', 'billable_rate', 'ot_billable_rate']);
+
+        $pbrByCraft = \App\Models\ProjectBillableRate::where('project_id', $project->id)
+            ->whereNull('employee_id')
+            ->orderByDesc('effective_date')
+            ->get()
+            ->keyBy('craft_id');
+
+        foreach ($crafts as $c) {
+            $row = $pbrByCraft->get($c->id);
+            if ($row) {
+                if ($row->base_hourly_rate)     $c->base_hourly_rate    = $row->base_hourly_rate;
+                if ($row->base_ot_hourly_rate)  $c->setAttribute('base_ot_hourly_rate', $row->base_ot_hourly_rate);
+                if ($row->straight_time_rate)   $c->billable_rate       = $row->straight_time_rate;
+                if ($row->overtime_rate)        $c->ot_billable_rate    = $row->overtime_rate;
+            }
+        }
+
         return view('estimates.show', [
             'project'   => $project,
             'estimate'  => $estimate,
             'costCodes' => CostCode::orderBy('code')->get(['id', 'code', 'name']),
             'costTypes' => \App\Models\CostType::active()->orderBy('sort_order')->get(['id', 'code', 'name']),
-            'crafts'    => Craft::where('is_active', true)->orderBy('name')->get(['id', 'code', 'name', 'base_hourly_rate']),
+            'crafts'    => $crafts,
             'materials' => Material::orderBy('name')->get(['id', 'name', 'unit_of_measure', 'unit_cost']),
             'equipment' => Equipment::orderBy('name')->get(['id', 'name', 'daily_rate', 'weekly_rate', 'monthly_rate']),
             'lineTypes' => EstimateLine::TYPES,
@@ -441,8 +464,8 @@ class EstimateController extends Controller
             'classification' => 'nullable|string|max:100',
             'section_id'     => 'nullable|exists:estimate_sections,id',
             'qty'            => 'required|integer|min:1|max:500',
-            'hrs_per_day'    => 'required|numeric|min:0.25|max:24',
-            'duration_days'  => 'required|numeric|min:0.5|max:730',
+            'hrs_per_day'    => 'required|numeric|min:0|max:24',
+            'duration_days'  => 'required|numeric|min:1|max:730',
             'markup_percent' => 'nullable|numeric|min:0|max:10',
             'is_billable'    => 'nullable|boolean',
         ]);
@@ -459,11 +482,31 @@ class EstimateController extends Controller
         $stHrs         = min($totalHrs, $maxStTotal);
         $otHrs         = max(0, $totalHrs - $maxStTotal);
 
-        $stRate   = (float) ($craft->base_hourly_rate ?? 0);
-        $otMult   = (float) ($craft->overtime_multiplier ?? 1.5);
-        $otRate   = $stRate * $otMult;
-        $billSt   = (float) ($craft->billable_rate    ?? 0);
-        $billOt   = (float) ($craft->ot_billable_rate ?? $billSt * $otMult);
+        // 2026-05-23 (Brenda bug): Labor tile was pulling billable from
+        // the craft master only — when a project has its own
+        // ProjectBillableRate row for the craft (the simplified flow
+        // where she types ST/OT billable directly), use that instead.
+        // Look-up order: project-billable-rate for (project, craft) →
+        // craft master → 1.5× ST fallback for OT.
+        $pbr = \App\Models\ProjectBillableRate::where('project_id', $project->id)
+            ->where('craft_id', $craft->id)
+            ->whereNull('employee_id')
+            ->orderByDesc('effective_date')
+            ->first();
+
+        $stRate = $pbr && $pbr->base_hourly_rate
+            ? (float) $pbr->base_hourly_rate
+            : (float) ($craft->base_hourly_rate ?? 0);
+        $otMult = (float) ($craft->overtime_multiplier ?? 1.5);
+        $otRate = $pbr && $pbr->base_ot_hourly_rate
+            ? (float) $pbr->base_ot_hourly_rate
+            : $stRate * $otMult;
+        $billSt = $pbr && $pbr->straight_time_rate
+            ? (float) $pbr->straight_time_rate
+            : (float) ($craft->billable_rate ?? 0);
+        $billOt = $pbr && $pbr->overtime_rate
+            ? (float) $pbr->overtime_rate
+            : (float) ($craft->ot_billable_rate ?? $billSt * $otMult);
 
         $markup     = $data['markup_percent']
             ?? $this->resolveMarkup(['cost_type_id' => null], $estimate);
