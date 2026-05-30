@@ -53,6 +53,11 @@ class EstimateLine extends Model
         'tax_amount',
         'amount',
         'labor_hours',
+        // 2026-05-23 (Brenda): OT companion to hours / hourly_cost_rate /
+        // hourly_billable_rate so one labor row carries both ST + OT.
+        'ot_hours',
+        'ot_hourly_cost_rate',
+        'ot_hourly_billable_rate',
 
         // Phase 1 additions
         'line_type',
@@ -90,6 +95,9 @@ class EstimateLine extends Model
         'hours'                => 'decimal:2',
         'hourly_cost_rate'     => 'decimal:2',
         'hourly_billable_rate' => 'decimal:2',
+        'ot_hours'                => 'decimal:2',
+        'ot_hourly_cost_rate'     => 'decimal:2',
+        'ot_hourly_billable_rate' => 'decimal:2',
         'cost_amount'          => 'decimal:2',
         'markup_percent'       => 'decimal:4',
         'markup_amount'        => 'decimal:2',
@@ -113,7 +121,13 @@ class EstimateLine extends Model
     public function recalculate(): void
     {
         if ($this->line_type === self::TYPE_LABOR) {
-            $cost = (float) ($this->hours ?? 0) * (float) ($this->hourly_cost_rate ?? 0);
+            // 2026-05-23 (Brenda): single labor line now carries both ST
+            // and OT. Cost = ST hrs × ST rate + OT hrs × OT rate (each side
+            // independent so OT rate can be ≠ 1.5× ST when union /
+            // prevailing wage rules differ). Billable computed the same.
+            $stCost = (float) ($this->hours ?? 0)    * (float) ($this->hourly_cost_rate ?? 0);
+            $otCost = (float) ($this->ot_hours ?? 0) * (float) ($this->ot_hourly_cost_rate ?? 0);
+            $cost = $stCost + $otCost;
         } else {
             // 2026-05-23 (KH WBS): if quote/freight/tax are populated they
             // win (cost = sum); otherwise fall back to legacy qty × unit_cost.

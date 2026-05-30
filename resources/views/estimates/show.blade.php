@@ -334,17 +334,26 @@
                             @foreach($section->lines as $line)
                                 @php
                                     $isLabor = $line->line_type === 'labor';
-                                    // For labor lines, quote/freight/tax are blank; show hours in Description.
-                                    $descSuffix = $isLabor && (float) $line->hours > 0
-                                        ? sprintf(' (%s hrs @ $%s/hr)', number_format((float) $line->hours, 2), number_format((float) $line->hourly_cost_rate, 2))
-                                        : '';
+                                    // 2026-05-23 (Brenda): labor lines now carry ST + OT on a
+                                    // single row. Build a compact two-line description suffix
+                                    // showing "ST: X hrs @ $Y/hr" + "OT: A hrs @ $B/hr".
+                                    $descSuffix = '';
+                                    if ($isLabor) {
+                                        $stHrs = (float) ($line->hours ?? 0);
+                                        $otHrs = (float) ($line->ot_hours ?? 0);
+                                        $bits = [];
+                                        if ($stHrs > 0) $bits[] = 'ST: ' . number_format($stHrs, 2) . ' hrs @ $' . number_format((float) $line->hourly_cost_rate, 2) . '/hr';
+                                        if ($otHrs > 0) $bits[] = 'OT: ' . number_format($otHrs, 2) . ' hrs @ $' . number_format((float) $line->ot_hourly_cost_rate, 2) . '/hr';
+                                        if ($bits) $descSuffix = '<div class="text-[10px] text-gray-500 mt-0.5">' . implode(' &nbsp;·&nbsp; ', $bits) . '</div>';
+                                    }
                                 @endphp
                                 <tr class="hover:bg-gray-50 {{ $line->is_billable === false ? 'opacity-70 bg-gray-50' : '' }}">
                                     <td class="px-2 py-2 font-mono text-xs text-gray-700">{{ $line->costCode?->code ?? '—' }}</td>
                                     <td class="px-2 py-2 text-xs text-gray-600">{{ $line->costType?->code ?? '—' }}</td>
                                     <td class="px-2 py-2 text-gray-900">
-                                        {{ $line->description }}{{ $descSuffix }}
+                                        {{ $line->description }}
                                         @if($isLabor)<span class="ml-1 text-[10px] uppercase bg-amber-100 text-amber-800 px-1 rounded">labor</span>@endif
+                                        {!! $descSuffix !!}
                                     </td>
                                     <td class="px-2 py-2 text-right text-gray-700">{{ $line->quote_amount   !== null ? '$' . number_format((float) $line->quote_amount, 2)   : '—' }}</td>
                                     <td class="px-2 py-2 text-right text-gray-700">{{ $line->freight_amount !== null ? '$' . number_format((float) $line->freight_amount, 2) : '—' }}</td>

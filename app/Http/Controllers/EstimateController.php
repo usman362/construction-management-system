@@ -515,48 +515,33 @@ class EstimateController extends Controller
             : true;
 
         $classification = trim((string) ($data['classification'] ?? ''));
-        $baseDesc       = $craft->name . ($classification !== '' ? " — {$classification}" : '');
+        $baseDesc       = $craft->name . ($classification !== '' ? " — {$classification}" : '')
+                        . " (Qty {$qty} × {$hpd} hrs/day × {$dur} days)";
 
-        $created = [];
-        \DB::transaction(function () use (
-            $estimate, $data, $craft, $stHrs, $otHrs, $stRate, $otRate,
-            $billSt, $billOt, $markup, $isBillable, $baseDesc, $qty, $hpd, $dur, &$created
-        ) {
-            if ($stHrs > 0) {
-                $created[] = EstimateLine::create([
-                    'estimate_id'          => $estimate->id,
-                    'section_id'           => $data['section_id'] ?? null,
-                    'line_type'            => EstimateLine::TYPE_LABOR,
-                    'craft_id'             => $craft->id,
-                    'description'          => "{$baseDesc} — ST (Qty {$qty} × {$hpd} hrs/day × {$dur} days)",
-                    'hours'                => $stHrs,
-                    'hourly_cost_rate'     => $stRate,
-                    'hourly_billable_rate' => $billSt,
-                    'markup_percent'       => $markup,
-                    'is_billable'          => $isBillable,
-                ]);
-            }
-            if ($otHrs > 0) {
-                $created[] = EstimateLine::create([
-                    'estimate_id'          => $estimate->id,
-                    'section_id'           => $data['section_id'] ?? null,
-                    'line_type'            => EstimateLine::TYPE_LABOR,
-                    'craft_id'             => $craft->id,
-                    'description'          => "{$baseDesc} — OT (over 40 hrs/wk/person)",
-                    'hours'                => $otHrs,
-                    'hourly_cost_rate'     => $otRate,
-                    'hourly_billable_rate' => $billOt,
-                    'markup_percent'       => $markup,
-                    'is_billable'          => $isBillable,
-                ]);
-            }
-        });
+        // 2026-05-23 (Brenda): single labor line carries both ST and OT
+        // so the user gets one row to edit instead of two separate entries.
+        $line = EstimateLine::create([
+            'estimate_id'             => $estimate->id,
+            'section_id'              => $data['section_id'] ?? null,
+            'line_type'               => EstimateLine::TYPE_LABOR,
+            'craft_id'                => $craft->id,
+            'description'             => $baseDesc,
+            'hours'                   => $stHrs,
+            'hourly_cost_rate'        => $stRate,
+            'hourly_billable_rate'    => $billSt,
+            'ot_hours'                => $otHrs > 0 ? $otHrs : null,
+            'ot_hourly_cost_rate'     => $otHrs > 0 ? $otRate : null,
+            'ot_hourly_billable_rate' => $otHrs > 0 ? $billOt : null,
+            'markup_percent'          => $markup,
+            'is_billable'             => $isBillable,
+        ]);
 
         return response()->json([
             'success'  => true,
-            'message'  => count($created) . ' labor line(s) created (ST/OT split: '
+            'message'  => 'Labor line created (ST/OT split: '
                 . number_format($stHrs, 1) . ' / ' . number_format($otHrs, 1) . ' hrs).',
-            'created'  => count($created),
+            'created'  => 1,
+            'line_id'  => $line->id,
             'st_hours' => $stHrs,
             'ot_hours' => $otHrs,
             'totals'   => $this->totalsFor($estimate),
@@ -620,6 +605,10 @@ class EstimateController extends Controller
             'hours'                => 'nullable|numeric|min:0',
             'hourly_cost_rate'     => 'nullable|numeric|min:0',
             'hourly_billable_rate' => 'nullable|numeric|min:0',
+            // 2026-05-23 (Brenda): ST + OT on same row.
+            'ot_hours'                => 'nullable|numeric|min:0',
+            'ot_hourly_cost_rate'     => 'nullable|numeric|min:0',
+            'ot_hourly_billable_rate' => 'nullable|numeric|min:0',
 
             // Material/equipment lookups
             'material_id'  => 'nullable|exists:materials,id',
