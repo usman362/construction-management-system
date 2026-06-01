@@ -363,9 +363,17 @@
     function closeCreateModal() {
         document.getElementById('createModal').classList.add('hidden');
         document.getElementById('createForm').reset();
-        document.getElementById('create_st_rate_preview').textContent = '$0.00';
-        document.getElementById('create_ot_rate_preview').textContent = '$0.00';
-        document.getElementById('create_dt_rate_preview').textContent = '$0.00';
+        // 2026-05-31 (Brenda bug): preview <spans> were removed when the
+        // create/edit modals were simplified — guard against the missing
+        // nodes so closing the modal doesn't throw and abort everything.
+        setText('create_st_rate_preview', '$0.00');
+        setText('create_ot_rate_preview', '$0.00');
+        setText('create_dt_rate_preview', '$0.00');
+    }
+
+    function setText(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
     }
 
     function openEditModal() {
@@ -375,9 +383,9 @@
     function closeEditModal() {
         document.getElementById('editModal').classList.add('hidden');
         document.getElementById('editForm').reset();
-        document.getElementById('edit_st_rate_preview').textContent = '$0.00';
-        document.getElementById('edit_ot_rate_preview').textContent = '$0.00';
-        document.getElementById('edit_dt_rate_preview').textContent = '$0.00';
+        setText('edit_st_rate_preview', '$0.00');
+        setText('edit_ot_rate_preview', '$0.00');
+        setText('edit_dt_rate_preview', '$0.00');
         currentRateId = null;
     }
 
@@ -462,16 +470,16 @@
 
     function updateCreatePreview() {
         const r = computeRatesFor('create');
-        document.getElementById('create_st_rate_preview').textContent = '$' + r.st.toFixed(2);
-        document.getElementById('create_ot_rate_preview').textContent = formatRate(r.ot);
-        document.getElementById('create_dt_rate_preview').textContent = formatRate(r.dt);
+        setText('create_st_rate_preview', '$' + r.st.toFixed(2));
+        setText('create_ot_rate_preview', formatRate(r.ot));
+        setText('create_dt_rate_preview', formatRate(r.dt));
     }
 
     function updateEditPreview() {
         const r = computeRatesFor('edit');
-        document.getElementById('edit_st_rate_preview').textContent = '$' + r.st.toFixed(2);
-        document.getElementById('edit_ot_rate_preview').textContent = formatRate(r.ot);
-        document.getElementById('edit_dt_rate_preview').textContent = formatRate(r.dt);
+        setText('edit_st_rate_preview', '$' + r.st.toFixed(2));
+        setText('edit_ot_rate_preview', formatRate(r.ot));
+        setText('edit_dt_rate_preview', formatRate(r.dt));
     }
 
     // Attach event listeners for create form inputs
