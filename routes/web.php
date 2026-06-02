@@ -154,6 +154,13 @@ Route::middleware('auth')->group(function () {
             Route::get('setup', [\App\Http\Controllers\ProjectSetupController::class, 'show'])->name('setup');
         });
 
+        // 2026-05-31 (Brenda): "please add a recompute rates for Admin only."
+        // Admin-only — the controller double-checks isAdmin() inside.
+        Route::middleware('role:admin')->group(function () {
+            Route::post('recompute-rates', \App\Http\Controllers\ProjectRecomputeRatesController::class)
+                ->name('recompute-rates');
+        });
+
         // Budget Lines — Admin, PM, Accountant
         Route::middleware('role:admin,project_manager,accountant')->group(function () {
             Route::get('budget', [BudgetLineController::class, 'index'])->name('budget.index');
