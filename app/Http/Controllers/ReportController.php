@@ -80,6 +80,47 @@ class ReportController extends Controller
             $buckets[$k]['budget'] += (float) $line->amount;
         }
 
+        // 2026-05-31 (Brenda: "change order budges are not pulling over to
+        // the cost report") — fold APPROVED change-order lines into the
+        // budget column at the phase-code/cost-type they were entered
+        // against. KH expects an approved CO to add to the budget by
+        // phase code, not just sit in a flat row at the bottom.
+        // Two sources cover both flows in the app:
+        //   (a) change_order_items — the legacy / inline CO line table.
+        //   (b) estimate_lines on an estimate that's linked to the CO
+        //       via change_order_id — the new WBS-style flow used by
+        //       the inline editor.
+        $approvedCoIds = $project->changeOrders()
+            ->where('status', 'approved')
+            ->pluck('id');
+
+        if ($approvedCoIds->isNotEmpty()) {
+            $coItems = \App\Models\ChangeOrderItem::query()
+                ->whereIn('change_order_id', $approvedCoIds)
+                ->with(['costCode', 'costType'])
+                ->get();
+            foreach ($coItems as $ci) {
+                $k = $keyFor($ci->cost_code_id, $ci->cost_type_id);
+                $buckets[$k] ??= $makeBucket($ci->cost_code_id, $ci->cost_type_id, $ci->costCode, $ci->costType);
+                $buckets[$k]['budget'] += (float) $ci->amount;
+            }
+
+            $coEstimateLines = \App\Models\EstimateLine::query()
+                ->whereHas('estimate', function ($q) use ($approvedCoIds) {
+                    $q->whereIn('change_order_id', $approvedCoIds);
+                })
+                ->with(['costCode', 'costType'])
+                ->get();
+            foreach ($coEstimateLines as $el) {
+                $k = $keyFor($el->cost_code_id, $el->cost_type_id);
+                $buckets[$k] ??= $makeBucket($el->cost_code_id, $el->cost_type_id, $el->costCode, $el->costType);
+                // Use the cost_amount (Quote + Freight + Tax, or Qty x Unit Cost
+                // for non-WBS rows) so labor + material + everything else flows
+                // in at the right "budget" number.
+                $buckets[$k]['budget'] += (float) $el->cost_amount;
+            }
+        }
+
         // Vendor commitments.
         foreach ($commitments as $c) {
             $k = $keyFor($c->cost_code_id, $c->cost_type_id);

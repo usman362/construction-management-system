@@ -166,15 +166,22 @@
                         @endphp
                         @foreach($changeOrders as $co)
                             @php
-                                $coTotalAmount += $co['amount'] ?? 0;
-                                $coTotalCommitted += $co['committed'] ?? 0;
+                                // 2026-05-31 (Brenda): CO Name was always "N/A"
+                                // because the model has co_number + title, not
+                                // 'name'. Pull the real label. Committed for
+                                // a CO = committed dollars on the linked estimate
+                                // or items, not yet tracked separately on the
+                                // CO record, so show 0 until we track it.
+                                $coTotalAmount += $co->amount ?? 0;
+                                $coTotalCommitted += 0;
                                 $bgClass = $rowClass % 2 === 0 ? 'bg-gray-50' : 'bg-white';
                                 $rowClass++;
+                                $coLabel = trim(($co->co_number ?? '') . ' — ' . ($co->title ?? $co->description ?? ''), ' —');
                             @endphp
                             <tr class="{{ $bgClass }} border border-gray-300">
-                                <td class="border border-gray-300 px-4 py-2">{{ $co['name'] ?? 'N/A' }}</td>
-                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($co['amount'] ?? 0, 2) }}</td>
-                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($co['committed'] ?? 0, 2) }}</td>
+                                <td class="border border-gray-300 px-4 py-2">{{ $coLabel ?: 'CO #' . $co->id }}</td>
+                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format($co->amount ?? 0, 2) }}</td>
+                                <td class="border border-gray-300 px-4 py-2 text-right">${{ number_format(0, 2) }}</td>
                             </tr>
                         @endforeach
                         <tr class="bg-blue-100 border border-gray-300 font-bold">
