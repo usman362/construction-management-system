@@ -72,7 +72,7 @@
 </div>
 
 <!-- Upload Modal -->
-<div id="{{ $uid }}_modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('{{ $uid }}_modal')">
+<div id="{{ $uid }}_modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="{{ $uid }}_modal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Upload Document</h3>

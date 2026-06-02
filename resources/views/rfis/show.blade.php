@@ -154,7 +154,7 @@
 </div>
 
 <!-- Edit RFI Modal -->
-<div id="editRfiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editRfiModal')">
+<div id="editRfiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="editRfiModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Edit RFI</h3>

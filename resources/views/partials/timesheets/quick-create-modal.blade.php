@@ -14,7 +14,7 @@
     - $projects     Collection<Project> — for the project picker
     - $costCodes    Collection<CostCode> — phase code picker
 --}}
-<div id="quickTimesheetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('quickTimesheetModal')">
+<div id="quickTimesheetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="quickTimesheetModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div>

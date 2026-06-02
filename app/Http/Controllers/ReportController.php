@@ -479,7 +479,10 @@ class ReportController extends Controller
             'project_id' => 'nullable|exists:projects,id',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-            'group_by' => 'nullable|in:employee,project,date,weekly',
+            // 2026-05-31 (KH red tab): added phase_code + cost_type group-by
+            // options so the timesheet report can balance by Job, Phase
+            // Code, and Cost Type.
+            'group_by' => 'nullable|in:employee,project,date,weekly,phase_code,cost_type',
             'week_ending' => 'nullable|date',
         ]);
 
@@ -512,7 +515,9 @@ class ReportController extends Controller
 
         // Include all timesheets (including drafts) — client needs to see
         // everything entered, regardless of approval status.
-        $query = Timesheet::with(['employee', 'project']);
+        // Eager-load costCode + costType so the phase-code / cost-type
+        // grouping views below don't N+1.
+        $query = Timesheet::with(['employee', 'project', 'costCode', 'costType']);
 
         if ($validated['employee_id'] ?? null) {
             $query->where('employee_id', $validated['employee_id']);
@@ -569,6 +574,42 @@ class ReportController extends Controller
                     $groupedData->push([
                         'group_name' => $projName,
                         'detail' => $empName . ' — ' . ($t->date?->format('M j, Y') ?? ''),
+                        'hours' => $t->total_hours,
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
+                    ]);
+                }
+            }
+        } elseif ($groupBy === 'phase_code') {
+            // 2026-05-31 (KH): balance by phase code — group rows under
+            // each phase code, detail = employee + project + date.
+            foreach ($timesheets->groupBy('cost_code_id') as $ccId => $group) {
+                $cc = $group->first()->costCode;
+                $ccLabel = $cc ? "{$cc->code} — {$cc->name}" : 'Unassigned';
+                foreach ($group as $t) {
+                    $emp = $t->employee;
+                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                    $groupedData->push([
+                        'group_name' => $ccLabel,
+                        'detail' => $empName . ' — ' . ($t->project->name ?? 'N/A') . ' — ' . ($t->date?->format('M j, Y') ?? ''),
+                        'hours' => $t->total_hours,
+                        'labor_cost' => $t->total_cost,
+                        'billable_amount' => (float) ($t->billable_amount ?? 0),
+                    ]);
+                }
+            }
+        } elseif ($groupBy === 'cost_type') {
+            // 2026-05-31 (KH): balance by cost type (Direct Labor,
+            // Indirect Labor, etc).
+            foreach ($timesheets->groupBy('cost_type_id') as $ctId => $group) {
+                $ct = $group->first()->costType;
+                $ctLabel = $ct ? "{$ct->code} — {$ct->name}" : 'Unassigned';
+                foreach ($group as $t) {
+                    $emp = $t->employee;
+                    $empName = $emp ? ($emp->first_name . ' ' . $emp->last_name) : 'Unknown';
+                    $groupedData->push([
+                        'group_name' => $ctLabel,
+                        'detail' => $empName . ' — ' . ($t->project->name ?? 'N/A') . ' — ' . ($t->date?->format('M j, Y') ?? ''),
                         'hours' => $t->total_hours,
                         'labor_cost' => $t->total_cost,
                         'billable_amount' => (float) ($t->billable_amount ?? 0),
@@ -1265,7 +1306,10 @@ class ReportController extends Controller
             'project_id' => 'nullable|exists:projects,id',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-            'group_by' => 'nullable|in:employee,project,date,weekly',
+            // 2026-05-31 (KH red tab): added phase_code + cost_type group-by
+            // options so the timesheet report can balance by Job, Phase
+            // Code, and Cost Type.
+            'group_by' => 'nullable|in:employee,project,date,weekly,phase_code,cost_type',
             'week_ending' => 'nullable|date',
         ]);
 

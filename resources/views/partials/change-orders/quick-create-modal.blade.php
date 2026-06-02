@@ -9,7 +9,7 @@
     Required props:
     - $allProjects   Collection<Project> — for the picker
 --}}
-<div id="quickCoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('quickCoModal')">
+<div id="quickCoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="quickCoModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div>

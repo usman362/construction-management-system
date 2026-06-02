@@ -33,7 +33,7 @@
 </div>
 
 <!-- Create Modal -->
-<div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('createModal')">
+<div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="createModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Add Billing Invoice</h3>
@@ -93,7 +93,7 @@
 </div>
 
 <!-- Edit Modal -->
-<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editModal')">
+<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="editModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Edit Billing Invoice</h3>
@@ -148,7 +148,7 @@
      POSTs to /billing/scan-photo then /billing/scan-commit. --}}
 <div id="invoiceScanModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay"
      x-data="snapInvoice()" x-init="init()"
-     onclick="if(event.target===this)closeModal('invoiceScanModal')">
+     data-modal-id="invoiceScanModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] overflow-hidden flex flex-col">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white">
             <div class="flex items-center gap-3">

@@ -11,7 +11,7 @@
     - Define `var table = ...` for DataTables, OR pass `null`/omit the param so
       submitForm() falls back to `window.location.reload()` after success
 --}}
-<div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('createModal')">
+<div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="createModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Add New Project</h3>

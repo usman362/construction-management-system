@@ -73,6 +73,17 @@
                             <input type="radio" name="group_by" value="date" {{ $groupBy === 'date' ? 'checked' : '' }} class="w-4 h-4">
                             <span class="ml-2 text-sm">By Date</span>
                         </label>
+                        {{-- 2026-05-31 (KH): added phase code + cost type
+                             groupings so the report can balance by
+                             Job / Phase Code / Cost Type. --}}
+                        <label class="flex items-center">
+                            <input type="radio" name="group_by" value="phase_code" {{ $groupBy === 'phase_code' ? 'checked' : '' }} class="w-4 h-4">
+                            <span class="ml-2 text-sm">By Phase Code</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="group_by" value="cost_type" {{ $groupBy === 'cost_type' ? 'checked' : '' }} class="w-4 h-4">
+                            <span class="ml-2 text-sm">By Cost Type</span>
+                        </label>
                     </div>
                 </div>
 

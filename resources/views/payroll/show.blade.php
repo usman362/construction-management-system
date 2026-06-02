@@ -96,6 +96,12 @@
                         <tr class="{{ $bgClass }} border border-gray-300">
                             <td class="border border-gray-300 px-4 py-2">{{ $empLabel }}</td>
                             <td class="border border-gray-300 px-4 py-2">{{ $entry->project->name ?? '—' }}</td>
+                            {{-- 2026-05-31 (KH): "The report is not pulling
+                                 the phase code and the per diem" — Phase
+                                 Code <th> existed but the matching <td> was
+                                 missing so every data column slid one left.
+                                 Now renders the cost code from the entry. --}}
+                            <td class="border border-gray-300 px-4 py-2 font-mono text-sm">{{ $entry->costCode?->code ?? '—' }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) ($entry->regular_hours ?? 0), 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) ($entry->overtime_hours ?? 0), 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) ($entry->double_time_hours ?? 0), 1) }}</td>
@@ -114,6 +120,9 @@
                     @endforelse
                     @if($entries->isNotEmpty())
                         <tr class="bg-blue-100 border border-gray-300 font-bold">
+                            {{-- Was colspan=3, but the table now has 4 leading
+                                 label columns (Employee + Project + Phase Code
+                                 + Reg Hrs becomes the first numeric). --}}
                             <td colspan="3" class="border border-gray-300 px-4 py-2">TOTALS</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) $entries->sum('regular_hours'), 1) }}</td>
                             <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format((float) $entries->sum('overtime_hours'), 1) }}</td>

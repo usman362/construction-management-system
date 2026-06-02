@@ -209,7 +209,7 @@
     </div>
 
     <!-- Add Certification Modal -->
-    <div id="addCertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('addCertModal')">
+    <div id="addCertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="addCertModal">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                 <h3 class="text-lg font-bold text-gray-900">Add Certification</h3>
@@ -238,7 +238,7 @@
     {{-- 2026-05-01 (Brenda): Edit Certification modal — same fields as Add,
          minus the file upload (file edits stay on the original create flow
          since they go through a different validation path). --}}
-    <div id="editCertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editCertModal')">
+    <div id="editCertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="editCertModal">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                 <h3 class="text-lg font-bold text-gray-900">Edit Certification</h3>
@@ -390,7 +390,7 @@
     </div>
 
     <!-- Add Project Rate Modal -->
-    <div id="addProjectRateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('addProjectRateModal')">
+    <div id="addProjectRateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="addProjectRateModal">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4">
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                 <h3 class="text-lg font-bold text-gray-900">Add Project-Specific Pay Rate</h3>

@@ -49,7 +49,7 @@
 
 {{-- Batch print modal — lets office pick a date range / project / employee and
      opens the print view in a new tab with those filters applied. --}}
-<div id="batchPrintModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('batchPrintModal')">
+<div id="batchPrintModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="batchPrintModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Print Timesheets for Billing</h3>
@@ -142,7 +142,7 @@
      Default range = this Mon–Sun week so the common "approve last
      week's payroll" flow is one click + Enter. --}}
 @if (auth()->user()?->canApproveTimesheets())
-<div id="bulkApproveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('bulkApproveModal')">
+<div id="bulkApproveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="bulkApproveModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-t-xl">
             <h3 class="text-lg font-bold">Bulk Approval — by Date Range</h3>
@@ -224,7 +224,7 @@
 --}}
 <div id="scanModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay"
      x-data="snapTimesheet()" x-init="init()"
-     onclick="if(event.target===this)closeModal('scanModal')">
+     data-modal-id="scanModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl mx-4 max-h-[92vh] overflow-hidden flex flex-col">
         {{-- Header --}}
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white">
@@ -427,7 +427,7 @@
 
 <!-- Create Modal — mirrors the Edit modal's UX so the add + edit flows feel
      identical (weekly OT split preview, Force OT, per-diem toggle). -->
-<div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('createModal')">
+<div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="createModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Add New Timesheet</h3>

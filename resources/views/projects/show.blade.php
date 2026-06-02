@@ -734,7 +734,7 @@
     </div>
 </div>
 <!-- Edit Modal -->
-<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editModal')">
+<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="editModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Edit Project</h3>
@@ -785,7 +785,7 @@
 </div>
 
 <!-- Lien Waiver Modal -->
-<div id="lienWaiverModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('lienWaiverModal')">
+<div id="lienWaiverModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="lienWaiverModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 id="lienWaiverModalTitle" class="text-lg font-bold text-gray-900">Add Lien Waiver</h3>
@@ -856,7 +856,7 @@
 </div>
 
 <!-- RFI Modal -->
-<div id="rfiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('rfiModal')">
+<div id="rfiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="rfiModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 id="rfiModalTitle" class="text-lg font-bold text-gray-900">New RFI</h3>

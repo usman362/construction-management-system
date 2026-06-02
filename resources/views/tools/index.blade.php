@@ -122,7 +122,7 @@
 </div>
 
 {{-- Add tool modal --}}
-<div id="addToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('addToolModal')">
+<div id="addToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="addToolModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[92vh] overflow-y-auto">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Add Tool</h3>
         <form id="addToolForm" class="space-y-3" enctype="multipart/form-data">
@@ -156,7 +156,7 @@
 </div>
 
 {{-- Edit tool modal --}}
-<div id="editToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('editToolModal')">
+<div id="editToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="editToolModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[92vh] overflow-y-auto">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Edit Tool</h3>
         <form id="editToolForm" class="space-y-3" enctype="multipart/form-data">
@@ -201,7 +201,7 @@
 </div>
 
 {{-- Issue tool modal --}}
-<div id="issueToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('issueToolModal')">
+<div id="issueToolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="issueToolModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Issue Tool</h3>
         <form id="issueToolForm" class="space-y-3">

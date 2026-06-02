@@ -273,6 +273,12 @@
                     <div class="flex items-center gap-4 text-sm">
                         <span class="text-gray-600">Cost: <strong>${{ number_format((float) $section->cost_amount, 2) }}</strong></span>
                         <span class="text-blue-700">Price: <strong>${{ number_format((float) $section->price_amount, 2) }}</strong></span>
+                        {{-- 2026-05-31 (KH red tab): "Total cost should also
+                             include the difference between Burden Cost and
+                             Billable rate." Show the margin $ (price - cost)
+                             inline so the spread is visible at a glance. --}}
+                        @php $sec_margin = (float) $section->price_amount - (float) $section->cost_amount; @endphp
+                        <span class="{{ $sec_margin >= 0 ? 'text-emerald-700' : 'text-red-600' }}">Margin: <strong>${{ number_format($sec_margin, 2) }}</strong></span>
                         <button type="button"
                                 onclick="event.preventDefault(); event.stopPropagation(); confirmDeleteSection({{ $section->id }})"
                                 class="text-red-600 hover:text-red-800 text-xs">Remove section</button>
@@ -616,7 +622,7 @@
         </div>
 
         <!-- Import Modal -->
-        <div id="importEstLinesModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('importEstLinesModal')">
+        <div id="importEstLinesModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="importEstLinesModal">
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                     <h3 class="text-lg font-bold text-gray-900">Import Estimate Lines</h3>

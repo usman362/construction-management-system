@@ -27,9 +27,13 @@
     .legacy-titlebar { background: linear-gradient(to right, #1e3a8a, #1e40af 50%, #3b82f6); color: #fff; padding: 6px 10px; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
     .legacy-titlebar .ctrls { display: flex; gap: 4px; }
     .legacy-titlebar .ctrls span { display: inline-block; width: 18px; height: 16px; background: #d1d5db; border: 1px solid #6b7280; text-align: center; line-height: 14px; font-size: 11px; color: #1f2937; }
-    .legacy-headerstrip { background: #1e3a8a; color: #fff; padding: 6px 10px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 12px; }
-    .legacy-headerstrip label { color: #cbd5e1; margin-right: 4px; font-weight: 600; }
-    .legacy-headerstrip input[type=date], .legacy-headerstrip input[type=text] { background: #fffbeb; border: 1px inset #94a3b8; padding: 2px 4px; font-size: 12px; }
+    /* 2026-05-31 (KH): "Please put Dates at top of form in Black" —
+       the date strip was dark blue with grey labels, making the dates
+       hard to scan when batching payroll. White background + bold
+       BLACK labels + bold BLACK date text reads cleanly as a header. */
+    .legacy-headerstrip { background: #ffffff; color: #000; padding: 10px 14px; display: flex; gap: 20px; flex-wrap: wrap; align-items: center; font-size: 13px; border-bottom: 2px solid #1f2937; }
+    .legacy-headerstrip label { color: #000; margin-right: 6px; font-weight: 700; }
+    .legacy-headerstrip input[type=date], .legacy-headerstrip input[type=text] { background: #fffbeb; border: 1px inset #94a3b8; padding: 4px 6px; font-size: 13px; color: #000; font-weight: 700; }
     .legacy-body { padding: 10px; display: grid; grid-template-columns: 1fr 220px; gap: 10px; }
     .legacy-fieldgrid { display: grid; grid-template-columns: 140px 1fr 140px 1fr; gap: 6px 10px; align-items: center; background: #ece9d8; padding: 8px; border: 1px solid #b8b3a0; }
     .legacy-fieldgrid label { font-size: 12px; font-weight: 600; color: #1f2937; text-align: right; }

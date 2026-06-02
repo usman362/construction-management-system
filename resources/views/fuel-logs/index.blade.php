@@ -100,7 +100,7 @@
 </div>
 
 {{-- Add fuel modal --}}
-<div id="addFuelModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('addFuelModal')">
+<div id="addFuelModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="addFuelModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Log Fuel Fill</h3>
         <form id="addFuelForm" class="space-y-3">

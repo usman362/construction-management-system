@@ -62,7 +62,7 @@
 </div>
 
 <!-- Import Modal -->
-<div id="importModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal('importModal')">
+<div id="importModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay" data-modal-id="importModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900">Import Employees from CSV</h3>
