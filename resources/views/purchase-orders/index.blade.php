@@ -439,7 +439,11 @@ function calculateItemTotal(row) {
     var qty = parseFloat(row.querySelector('.qty-input').value) || 0;
     var unitCost = parseFloat(row.querySelector('.unit-cost-input').value) || 0;
     var total = qty * unitCost;
-    row.querySelector('.item-total').value = '$' + total.toFixed(2);
+    // 2026-05-31 (Brenda bug — PO subtotal wrong): use the comma-formatted
+    // fmtMoney helper so the cell matches the format used on initial load
+    // from editPO(). calculateTotals() strips both $ and , when summing,
+    // so display + parse are now consistent.
+    row.querySelector('.item-total').value = window.fmtMoney(total);
     calculateTotals();
 }
 
@@ -448,34 +452,41 @@ function removeItemRow(btn) {
     calculateTotals();
 }
 
+// 2026-05-31 (Brenda bug): line totals are rendered with fmtMoney (e.g.
+// "$4,120.00") on initial load of the edit modal. The previous parser
+// only stripped "$" and left the comma, so parseFloat("4,120.00") = 4 —
+// the entire first line ($4,120) got booked as $4 and the PO subtotal
+// silently undercounted by thousands. parseMoney strips both $ and ,.
+function parseMoney(str) {
+    return parseFloat(String(str || '').replace(/[$,]/g, '')) || 0;
+}
+
 function calculateTotals() {
     var createItems = document.querySelectorAll('#createItemsBody tr');
     var createTotal = 0;
     createItems.forEach(function(row) {
-        var itemTotal = parseFloat(row.querySelector('.item-total').value.replace('$', '')) || 0;
-        createTotal += itemTotal;
+        createTotal += parseMoney(row.querySelector('.item-total').value);
     });
-    document.getElementById('createSubtotal').textContent = createTotal.toFixed(2);
+    document.getElementById('createSubtotal').textContent = window.fmtMoney(createTotal).replace('$', '');
     var createTaxRate = parseFloat(document.querySelector('#createForm [name="tax_rate"]')?.value) || 0;
     var createShipping = parseFloat(document.querySelector('#createForm [name="shipping_amount"]')?.value) || 0;
     var createTax = createTotal * (createTaxRate / 100);
     var createGrandTotal = createTotal + createTax + createShipping;
-    document.getElementById('createTax').textContent = createTax.toFixed(2);
-    document.getElementById('createGrandTotal').textContent = createGrandTotal.toFixed(2);
+    document.getElementById('createTax').textContent = window.fmtMoney(createTax).replace('$', '');
+    document.getElementById('createGrandTotal').textContent = window.fmtMoney(createGrandTotal).replace('$', '');
 
     var editItems = document.querySelectorAll('#editItemsBody tr');
     var editTotal = 0;
     editItems.forEach(function(row) {
-        var itemTotal = parseFloat(row.querySelector('.item-total').value.replace('$', '')) || 0;
-        editTotal += itemTotal;
+        editTotal += parseMoney(row.querySelector('.item-total').value);
     });
-    document.getElementById('editSubtotal').textContent = editTotal.toFixed(2);
+    document.getElementById('editSubtotal').textContent = window.fmtMoney(editTotal).replace('$', '');
     var editTaxRate = parseFloat(document.querySelector('#editForm [name="tax_rate"]')?.value) || 0;
     var editShipping = parseFloat(document.querySelector('#editForm [name="shipping_amount"]')?.value) || 0;
     var editTax = editTotal * (editTaxRate / 100);
     var editGrandTotal = editTotal + editTax + editShipping;
-    document.getElementById('editTax').textContent = editTax.toFixed(2);
-    document.getElementById('editGrandTotal').textContent = editGrandTotal.toFixed(2);
+    document.getElementById('editTax').textContent = window.fmtMoney(editTax).replace('$', '');
+    document.getElementById('editGrandTotal').textContent = window.fmtMoney(editGrandTotal).replace('$', '');
 }
 
 function submitCreateForm() {
