@@ -147,13 +147,18 @@
     {{-- Line Items --}}
     @if($changeOrder->items && $changeOrder->items->count() > 0)
     <div class="section-title">Cost Breakdown - Materials &amp; Equipment</div>
+    {{-- 2026-06-04 (Brenda): client copy hides Qty / Unit / Unit Cost.
+         The client only sees what they're being asked to sign for —
+         description + total billable. Internal copy keeps every column. --}}
     <table class="items-table" cellspacing="0">
         <thead>
             <tr>
                 <th style="text-align:left;">Description</th>
-                <th style="text-align:right;">Qty</th>
-                <th style="text-align:center;">Unit</th>
-                <th style="text-align:right;">Unit Cost</th>
+                @unless($isClientCopy ?? false)
+                    <th style="text-align:right;">Qty</th>
+                    <th style="text-align:center;">Unit</th>
+                    <th style="text-align:right;">Unit Cost</th>
+                @endunless
                 <th style="text-align:right;">Total</th>
             </tr>
         </thead>
@@ -163,14 +168,16 @@
             @php $lineTotal = ($item->quantity ?? 0) * ($item->unit_cost ?? 0); $itemsTotal += $lineTotal; @endphp
             <tr>
                 <td>{{ $item->description }}</td>
-                <td style="text-align:right;">{{ number_format($item->quantity ?? 0, 2) }}</td>
-                <td style="text-align:center;">{{ $item->unit_of_measure ?? 'EA' }}</td>
-                <td style="text-align:right;">${{ number_format($item->unit_cost ?? 0, 2) }}</td>
+                @unless($isClientCopy ?? false)
+                    <td style="text-align:right;">{{ number_format($item->quantity ?? 0, 2) }}</td>
+                    <td style="text-align:center;">{{ $item->unit_of_measure ?? 'EA' }}</td>
+                    <td style="text-align:right;">${{ number_format($item->unit_cost ?? 0, 2) }}</td>
+                @endunless
                 <td style="text-align:right;">${{ number_format($lineTotal, 2) }}</td>
             </tr>
             @endforeach
             <tr class="total-row">
-                <td colspan="4" style="text-align:right;">Materials/Equipment Subtotal</td>
+                <td colspan="{{ ($isClientCopy ?? false) ? 1 : 4 }}" style="text-align:right;">Materials/Equipment Subtotal</td>
                 <td style="text-align:right;">${{ number_format($itemsTotal, 2) }}</td>
             </tr>
         </tbody>
@@ -184,8 +191,10 @@
         <thead>
             <tr>
                 <th style="text-align:left;">Craft / Description</th>
-                <th style="text-align:right;">Hours</th>
-                <th style="text-align:right;">Rate</th>
+                @unless($isClientCopy ?? false)
+                    <th style="text-align:right;">Hours</th>
+                    <th style="text-align:right;">Rate</th>
+                @endunless
                 <th style="text-align:right;">Total</th>
             </tr>
         </thead>
@@ -195,13 +204,15 @@
             @php $labLine = ($labor->hours ?? 0) * ($labor->rate ?? 0); $laborTotal += $labLine; @endphp
             <tr>
                 <td>{{ $labor->description ?? ($labor->craft?->name ?? 'Labor') }}</td>
-                <td style="text-align:right;">{{ number_format($labor->hours ?? 0, 2) }}</td>
-                <td style="text-align:right;">${{ number_format($labor->rate ?? 0, 2) }}</td>
+                @unless($isClientCopy ?? false)
+                    <td style="text-align:right;">{{ number_format($labor->hours ?? 0, 2) }}</td>
+                    <td style="text-align:right;">${{ number_format($labor->rate ?? 0, 2) }}</td>
+                @endunless
                 <td style="text-align:right;">${{ number_format($labLine, 2) }}</td>
             </tr>
             @endforeach
             <tr class="total-row">
-                <td colspan="3" style="text-align:right;">Labor Subtotal</td>
+                <td colspan="{{ ($isClientCopy ?? false) ? 1 : 3 }}" style="text-align:right;">Labor Subtotal</td>
                 <td style="text-align:right;">${{ number_format($laborTotal, 2) }}</td>
             </tr>
         </tbody>

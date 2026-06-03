@@ -345,9 +345,17 @@ class ChangeOrderController extends Controller
     }
 
     /**
-     * Generate and download a Change Order PDF with signature lines
+     * Generate and download a Change Order PDF with signature lines.
+     *
+     * 2026-06-04 (Brenda): "when we print the change order for the Client
+     * to sign, they do not see the base wage or the markup%. Maybe we can
+     * have a client copy to print and an internal copy to print." — added
+     * a ?variant query param. variant=client hides unit-cost / rate / markup
+     * columns so the print-out shows just description + total billable.
+     * Default (no param or variant=internal) keeps every column visible
+     * for the team's own review.
      */
-    public function downloadPdf(Project $project, ChangeOrder $changeOrder)
+    public function downloadPdf(Request $request, Project $project, ChangeOrder $changeOrder)
     {
         $changeOrder->load(['items', 'laborDetails']);
         $project->load('client');
@@ -358,12 +366,17 @@ class ChangeOrderController extends Controller
             ->where('status', 'approved')
             ->sum('amount');
 
+        $variant = $request->query('variant') === 'client' ? 'client' : 'internal';
+        $isClientCopy = $variant === 'client';
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.change-order', [
             'project' => $project,
             'changeOrder' => $changeOrder,
             'previousCOTotal' => $previousCOTotal,
+            'isClientCopy' => $isClientCopy,
         ]);
 
-        return $pdf->download("CO-{$changeOrder->co_number}-{$project->project_number}.pdf");
+        $suffix = $isClientCopy ? 'CLIENT' : 'INTERNAL';
+        return $pdf->download("CO-{$changeOrder->co_number}-{$project->project_number}-{$suffix}.pdf");
     }
 }

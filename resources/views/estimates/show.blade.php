@@ -503,39 +503,72 @@
 
                     {{-- Labor-only fields --}}
                     <template x-if="lineDraft.line_type === 'labor'">
-                        <div class="md:col-span-2 grid grid-cols-3 gap-3">
+                        <div class="md:col-span-2 space-y-3">
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Craft</label>
-                                {{-- 2026-05-31 (Brenda): "I believe we need this to pull
-                                     the billable rate / can you make it pull the
-                                     percentage from the billable rates" — option now
-                                     also carries data-billable (from project_billable_rates,
-                                     falling back to craft master). onCraftChange()
-                                     reads both and auto-fills markup_percent so the
-                                     billable column matches what the rate sheet says. --}}
+                                {{-- 2026-05-31 (Brenda): option carries data-billable (from
+                                     project_billable_rates → craft master). onCraftChange()
+                                     auto-fills BOTH cost AND markup so the billable column
+                                     matches what the rate sheet says. --}}
                                 <select x-model="lineDraft.craft_id" @change="onCraftChange()"
                                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                                     <option value="">— pick —</option>
                                     @foreach($crafts as $c)
                                         <option value="{{ $c->id }}"
                                                 data-rate="{{ $c->base_hourly_rate }}"
-                                                data-billable="{{ $c->billable_rate ?? '' }}">{{ $c->name }}</option>
+                                                data-billable="{{ $c->billable_rate ?? '' }}"
+                                                data-ot-rate="{{ $c->base_ot_hourly_rate ?? '' }}"
+                                                data-ot-billable="{{ $c->ot_billable_rate ?? '' }}">{{ $c->name }}</option>
                                     @endforeach
                                 </select>
-                                <p class="text-[10px] text-gray-400 mt-1" x-show="lineDraft.line_type === 'labor' && lineDraft.craft_id">
+                                <p class="text-[10px] text-gray-400 mt-1" x-show="lineDraft.craft_id">
                                     Cost: $<span x-text="(parseFloat(lineDraft.hourly_cost_rate)||0).toFixed(2)"></span>/hr ·
-                                    Billable: $<span x-text="(parseFloat(lineDraft._billable_preview)||0).toFixed(2)"></span>/hr (from project rates)
+                                    Billable: $<span x-text="(parseFloat(lineDraft.hourly_billable_rate)||0).toFixed(2)"></span>/hr (from project rates)
                                 </p>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Hours</label>
-                                <input type="number" step="0.25" min="0" x-model="lineDraft.hours"
-                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+
+                            {{-- ST row --}}
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">ST Hours</label>
+                                    <input type="number" step="0.25" min="0" x-model="lineDraft.hours"
+                                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">ST Cost / hr</label>
+                                    <input type="number" step="0.01" min="0" x-model="lineDraft.hourly_cost_rate"
+                                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">ST Billable / hr</label>
+                                    <input type="number" step="0.01" min="0" x-model="lineDraft.hourly_billable_rate"
+                                           placeholder="0.00"
+                                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Cost Rate / hr</label>
-                                <input type="number" step="0.01" min="0" x-model="lineDraft.hourly_cost_rate"
-                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+
+                            {{-- OT row — 2026-06-04 (Brenda): "We need a spot on the pop
+                                 up for the over time. I added over time, but it is not
+                                 calculating and I am getting a little warning triangle."
+                                 Modal now has dedicated OT inputs that flow through the
+                                 same validateLine() the inline editor uses, so OT cost +
+                                 billable land on the saved row right away. --}}
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">OT Hours</label>
+                                    <input type="number" step="0.25" min="0" x-model="lineDraft.ot_hours" placeholder="0"
+                                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">OT Cost / hr</label>
+                                    <input type="number" step="0.01" min="0" x-model="lineDraft.ot_hourly_cost_rate" placeholder="0.00"
+                                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">OT Billable / hr</label>
+                                    <input type="number" step="0.01" min="0" x-model="lineDraft.ot_hourly_billable_rate" placeholder="0.00"
+                                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                </div>
                             </div>
                         </div>
                     </template>
@@ -1330,11 +1363,12 @@ function estimateBuilder(estimateId) {
         lineDraft: {
             line_type: 'other', section_id: null, description: '',
             cost_code_id: '', cost_type_id: '',
-            craft_id: '', hours: '', hourly_cost_rate: '',
+            craft_id: '',
+            hours: '', hourly_cost_rate: '', hourly_billable_rate: '',
+            ot_hours: '', ot_hourly_cost_rate: '', ot_hourly_billable_rate: '',
             material_id: '', equipment_id: '',
             quantity: '', unit: '', unit_cost: '',
             markup_percent: '', notes: '',
-            _billable_preview: 0, // 2026-05-31: display-only — set by onCraftChange()
         },
         totals: {
             total_cost:     {{ (float) $estimate->total_cost }},
@@ -1363,20 +1397,29 @@ function estimateBuilder(estimateId) {
             this.openLineModalFlag = true;
         },
 
-        // 2026-05-31 (Brenda): when a craft is picked, prefill BOTH the
-        // cost rate AND the markup so the resulting billable matches the
-        // project's rate sheet (project_billable_rates → craft master
-        // fallback). Math:
-        //   markup % = (billable - cost) / cost
-        // If the rate sheet has no billable for this craft, leave markup
-        // alone — the user can type their own.
+        // 2026-05-31 (Brenda): when a craft is picked, prefill cost rate +
+        // billable rate from the project rate sheet (craft master falls
+        // through if no PBR set). OT rates default to 1.5× when the rate
+        // sheet doesn't carry an explicit OT row. recalculate() then uses
+        // these billable rates directly to compute price = hrs × billable
+        // — no markup math needed for the user to land on the right
+        // billable total.
         onCraftChange() {
             const opt = document.querySelector('select[x-model="lineDraft.craft_id"] option[value="' + this.lineDraft.craft_id + '"]');
             if (!opt) return;
-            const cost     = parseFloat(opt.dataset.rate)     || 0;
-            const billable = parseFloat(opt.dataset.billable) || 0;
-            if (cost > 0) this.lineDraft.hourly_cost_rate = cost.toFixed(2);
-            this.lineDraft._billable_preview = billable;
+            const cost       = parseFloat(opt.dataset.rate)       || 0;
+            const billable   = parseFloat(opt.dataset.billable)   || 0;
+            const otCost     = parseFloat(opt.dataset.otRate)     || (cost * 1.5);
+            const otBillable = parseFloat(opt.dataset.otBillable) || (billable * 1.5);
+
+            if (cost > 0)     this.lineDraft.hourly_cost_rate        = cost.toFixed(2);
+            if (billable > 0) this.lineDraft.hourly_billable_rate    = billable.toFixed(2);
+            if (otCost > 0)   this.lineDraft.ot_hourly_cost_rate     = otCost.toFixed(2);
+            if (otBillable>0) this.lineDraft.ot_hourly_billable_rate = otBillable.toFixed(2);
+
+            // Backfill markup % from the spread — purely for legacy reports
+            // that still read markup_percent from the row. The recalc
+            // pipeline ignores it when explicit billable rates are stored.
             if (cost > 0 && billable > 0) {
                 this.lineDraft.markup_percent = ((billable - cost) / cost).toFixed(4);
             }

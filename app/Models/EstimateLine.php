@@ -144,9 +144,20 @@ class EstimateLine extends Model
                 $price  = ((float) ($this->hours ?? 0)    * $stBill)
                         + ((float) ($this->ot_hours ?? 0) * $otBill);
                 $markup = max(0.0, $price - $cost);
-                // Update the stored markup_percent so reports + the rate-
-                // sheet view stay consistent with the displayed billable.
-                $this->markup_percent = $cost > 0 ? round($markup / $cost, 4) : 0;
+                // 2026-06-04 (Brenda: "if i use just the billable rate,
+                // it is not showing the margins"). When cost is zero (the
+                // user typed billable but left cost blank) the
+                // markup-as-a-percent-of-cost ratio is undefined / infinite.
+                // Storing 0 made the row look like there was no margin at
+                // all. Treat that case as 100% (every dollar is margin)
+                // so the inline Mark-Up % column reads honestly.
+                if ($cost > 0) {
+                    $this->markup_percent = round($markup / $cost, 4);
+                } elseif ($price > 0) {
+                    $this->markup_percent = 1.0; // 100% margin
+                } else {
+                    $this->markup_percent = 0;
+                }
                 $this->cost_amount = round($cost, 2);
                 if ($this->is_billable === false) {
                     $this->markup_amount = 0;
