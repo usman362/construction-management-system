@@ -128,6 +128,36 @@ class EstimateLine extends Model
             $stCost = (float) ($this->hours ?? 0)    * (float) ($this->hourly_cost_rate ?? 0);
             $otCost = (float) ($this->ot_hours ?? 0) * (float) ($this->ot_hourly_cost_rate ?? 0);
             $cost = $stCost + $otCost;
+
+            // 2026-05-31 (Brenda: "we need this to pull the billable rate"):
+            // when explicit ST / OT billable rates are stored on the line
+            // (set by addLaborBundle from the project rate sheet, or the
+            // Recompute Rates action), the BILLABLE total comes from
+            // hours × billable rate directly — NOT cost × markup. The
+            // displayed markup % / markup $ becomes a derived view of
+            // the spread, so KH can still see it. If no billable rates
+            // are stored we fall back to the legacy cost × markup path
+            // below, which keeps non-labor lines and old data working.
+            $stBill = (float) ($this->hourly_billable_rate ?? 0);
+            $otBill = (float) ($this->ot_hourly_billable_rate ?? 0);
+            if ($stBill > 0 || $otBill > 0) {
+                $price  = ((float) ($this->hours ?? 0)    * $stBill)
+                        + ((float) ($this->ot_hours ?? 0) * $otBill);
+                $markup = max(0.0, $price - $cost);
+                // Update the stored markup_percent so reports + the rate-
+                // sheet view stay consistent with the displayed billable.
+                $this->markup_percent = $cost > 0 ? round($markup / $cost, 4) : 0;
+                $this->cost_amount = round($cost, 2);
+                if ($this->is_billable === false) {
+                    $this->markup_amount = 0;
+                    $this->price_amount  = 0;
+                } else {
+                    $this->markup_amount = round($markup, 2);
+                    $this->price_amount  = round($price, 2);
+                }
+                $this->amount = $this->cost_amount;
+                return;
+            }
         } else {
             // 2026-05-23 (KH WBS): if quote/freight/tax are populated they
             // win (cost = sum); otherwise fall back to legacy qty × unit_cost.

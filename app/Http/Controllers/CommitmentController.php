@@ -140,8 +140,11 @@ class CommitmentController extends Controller
 
     public function update(Request $request, Project $project, Commitment $commitment): JsonResponse
     {
+        // 2026-05-31 (Brenda): also null out empty cost_type_id so the
+        // Edit modal can clear the cost type back to "—" if needed.
         $request->merge([
             'cost_code_id' => $request->filled('cost_code_id') ? $request->cost_code_id : null,
+            'cost_type_id' => $request->filled('cost_type_id') ? $request->cost_type_id : null,
         ]);
 
         // Same updates as store() — see store() for context on commitment_number

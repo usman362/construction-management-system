@@ -279,13 +279,39 @@ class ProjectController extends Controller
             ];
         })->sortByDesc('total')->values();
 
+        // 2026-05-31 (Brenda): "Here we need the committed amount to reflect
+        // the amount charged to the cost type." — was summing commitments +
+        // labor by cost_code_id ONLY, so a project with two budget lines
+        // sharing the same phase code (e.g. 01.11 Direct Labor vs 01.11
+        // Indirect Labor) showed the SAME committed total on every row.
+        // Now each budget line filters commitments + timesheets by the
+        // (cost_code_id, cost_type_id) pair so Direct Labor and Indirect
+        // Labor land on their own row only. Lines that don't yet have a
+        // cost_type assigned still aggregate by cost_code_id so they don't
+        // go blank.
         foreach ($budgetLines as $line) {
-            $lineVendor = (float) ($commitmentsByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
-            $lineLabor  = (float) ($laborByCostCode[$line->cost_code_id] ?? collect())->sum('total_cost');
+            $codeCommitments = $commitmentsByCostCode[$line->cost_code_id] ?? collect();
+            $codeLabor       = $laborByCostCode[$line->cost_code_id] ?? collect();
+            $codeInvoices    = $invoicesByCostCode[$line->cost_code_id] ?? collect();
+
+            if ($line->cost_type_id) {
+                $codeCommitments = $codeCommitments->where('cost_type_id', $line->cost_type_id);
+                $codeLabor       = $codeLabor->where('cost_type_id', $line->cost_type_id);
+                // Invoice cost_type comes from its commitment (preferred) or
+                // the cost-code default — fall back so the line still shows
+                // historical invoice $.
+                $codeInvoices    = $codeInvoices->filter(function ($inv) use ($line) {
+                    $invCtId = $inv->commitment?->cost_type_id ?? $inv->costCode?->cost_type_id;
+                    return $invCtId === $line->cost_type_id;
+                });
+            }
+
+            $lineVendor = (float) $codeCommitments->sum('amount');
+            $lineLabor  = (float) $codeLabor->sum('total_cost');
             $line->committed_vendor = $lineVendor;
             $line->committed_labor  = $lineLabor;
             $line->committed = $lineVendor + $lineLabor;
-            $line->invoiced = ($invoicesByCostCode[$line->cost_code_id] ?? collect())->sum('amount');
+            $line->invoiced = (float) $codeInvoices->sum('amount');
             $revised = $line->revised_amount ?: $line->budget_amount;
             $line->percent_complete = $revised > 0 ? round(($line->committed / $revised) * 100, 1) : 0;
         }

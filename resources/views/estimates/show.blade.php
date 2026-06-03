@@ -370,14 +370,24 @@
                                                value="{{ $line->description }}"
                                                class="w-full border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 text-sm bg-transparent">
                                         @if($isLabor)
-                                            <div class="text-[10px] text-gray-500 mt-0.5 flex flex-wrap gap-x-3 px-2">
+                                            {{-- 2026-05-31 (Brenda: "need it to pull
+                                                 the billable rate"): added BILL inputs
+                                                 next to each cost rate so the rate
+                                                 sheet's billable flows in and is
+                                                 editable inline. When a billable rate
+                                                 is set, recalculate() uses it directly
+                                                 (price = hrs × billable) instead of
+                                                 cost × markup. --}}
+                                            <div class="text-[10px] text-gray-500 mt-0.5 flex flex-wrap gap-x-3 gap-y-1 px-2">
                                                 <span>ST:
                                                     <input type="number" step="0.25" min="0" x-model="row.hours" @blur="save()" value="{{ $line->hours }}" class="w-14 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
-                                                    hrs @ $<input type="number" step="0.01" min="0" x-model="row.hourly_cost_rate" @blur="save()" value="{{ $line->hourly_cost_rate }}" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">/hr
+                                                    hrs · cost $<input type="number" step="0.01" min="0" x-model="row.hourly_cost_rate" @blur="save()" value="{{ $line->hourly_cost_rate }}" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
+                                                    · bill $<input type="number" step="0.01" min="0" x-model="row.hourly_billable_rate" @blur="save()" value="{{ $line->hourly_billable_rate }}" placeholder="auto" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
                                                 </span>
                                                 <span>OT:
                                                     <input type="number" step="0.25" min="0" x-model="row.ot_hours" @blur="save()" value="{{ $line->ot_hours }}" class="w-14 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
-                                                    hrs @ $<input type="number" step="0.01" min="0" x-model="row.ot_hourly_cost_rate" @blur="save()" value="{{ $line->ot_hourly_cost_rate }}" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">/hr
+                                                    hrs · cost $<input type="number" step="0.01" min="0" x-model="row.ot_hourly_cost_rate" @blur="save()" value="{{ $line->ot_hourly_cost_rate }}" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
+                                                    · bill $<input type="number" step="0.01" min="0" x-model="row.ot_hourly_billable_rate" @blur="save()" value="{{ $line->ot_hourly_billable_rate }}" placeholder="auto" class="w-16 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1 text-right text-[11px] bg-transparent">
                                                 </span>
                                             </div>
                                         @endif
@@ -496,13 +506,26 @@
                         <div class="md:col-span-2 grid grid-cols-3 gap-3">
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Craft</label>
+                                {{-- 2026-05-31 (Brenda): "I believe we need this to pull
+                                     the billable rate / can you make it pull the
+                                     percentage from the billable rates" — option now
+                                     also carries data-billable (from project_billable_rates,
+                                     falling back to craft master). onCraftChange()
+                                     reads both and auto-fills markup_percent so the
+                                     billable column matches what the rate sheet says. --}}
                                 <select x-model="lineDraft.craft_id" @change="onCraftChange()"
                                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                                     <option value="">— pick —</option>
                                     @foreach($crafts as $c)
-                                        <option value="{{ $c->id }}" data-rate="{{ $c->base_hourly_rate }}">{{ $c->name }}</option>
+                                        <option value="{{ $c->id }}"
+                                                data-rate="{{ $c->base_hourly_rate }}"
+                                                data-billable="{{ $c->billable_rate ?? '' }}">{{ $c->name }}</option>
                                     @endforeach
                                 </select>
+                                <p class="text-[10px] text-gray-400 mt-1" x-show="lineDraft.line_type === 'labor' && lineDraft.craft_id">
+                                    Cost: $<span x-text="(parseFloat(lineDraft.hourly_cost_rate)||0).toFixed(2)"></span>/hr ·
+                                    Billable: $<span x-text="(parseFloat(lineDraft._billable_preview)||0).toFixed(2)"></span>/hr (from project rates)
+                                </p>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Hours</label>
@@ -1020,8 +1043,8 @@ function wbsRow(lineId) {
         row: {
             cost_code_id: null, cost_type_id: null, description: '',
             quote_amount: null, freight_amount: null, tax_amount: null,
-            hours: null, hourly_cost_rate: null,
-            ot_hours: null, ot_hourly_cost_rate: null,
+            hours: null, hourly_cost_rate: null, hourly_billable_rate: null,
+            ot_hours: null, ot_hourly_cost_rate: null, ot_hourly_billable_rate: null,
             is_billable: true, markup_percent_display: null,
         },
         status: '',  // '' | 'saving' | 'saved' | 'error'
@@ -1038,10 +1061,12 @@ function wbsRow(lineId) {
             this.row.quote_amount   = row.querySelector('[x-model="row.quote_amount"]')?.value   || '';
             this.row.freight_amount = row.querySelector('[x-model="row.freight_amount"]')?.value || '';
             this.row.tax_amount     = row.querySelector('[x-model="row.tax_amount"]')?.value     || '';
-            this.row.hours              = row.querySelector('[x-model="row.hours"]')?.value || '';
-            this.row.hourly_cost_rate   = row.querySelector('[x-model="row.hourly_cost_rate"]')?.value || '';
-            this.row.ot_hours           = row.querySelector('[x-model="row.ot_hours"]')?.value || '';
-            this.row.ot_hourly_cost_rate= row.querySelector('[x-model="row.ot_hourly_cost_rate"]')?.value || '';
+            this.row.hours                    = row.querySelector('[x-model="row.hours"]')?.value || '';
+            this.row.hourly_cost_rate         = row.querySelector('[x-model="row.hourly_cost_rate"]')?.value || '';
+            this.row.hourly_billable_rate     = row.querySelector('[x-model="row.hourly_billable_rate"]')?.value || '';
+            this.row.ot_hours                 = row.querySelector('[x-model="row.ot_hours"]')?.value || '';
+            this.row.ot_hourly_cost_rate      = row.querySelector('[x-model="row.ot_hourly_cost_rate"]')?.value || '';
+            this.row.ot_hourly_billable_rate  = row.querySelector('[x-model="row.ot_hourly_billable_rate"]')?.value || '';
             this.row.is_billable        = row.querySelector('[x-model="row.is_billable"]')?.checked ?? true;
             this.row.markup_percent_display = row.querySelector('[x-model="row.markup_percent_display"]')?.value || '0';
         },
@@ -1061,10 +1086,12 @@ function wbsRow(lineId) {
                 quote_amount:   blankToNull(this.row.quote_amount),
                 freight_amount: blankToNull(this.row.freight_amount),
                 tax_amount:     blankToNull(this.row.tax_amount),
-                hours:                   blankToNull(this.row.hours),
-                hourly_cost_rate:        blankToNull(this.row.hourly_cost_rate),
-                ot_hours:                blankToNull(this.row.ot_hours),
-                ot_hourly_cost_rate:     blankToNull(this.row.ot_hourly_cost_rate),
+                hours:                    blankToNull(this.row.hours),
+                hourly_cost_rate:         blankToNull(this.row.hourly_cost_rate),
+                hourly_billable_rate:     blankToNull(this.row.hourly_billable_rate),
+                ot_hours:                 blankToNull(this.row.ot_hours),
+                ot_hourly_cost_rate:      blankToNull(this.row.ot_hourly_cost_rate),
+                ot_hourly_billable_rate:  blankToNull(this.row.ot_hourly_billable_rate),
                 is_billable:  this.row.is_billable ? 1 : 0,
                 // User types markup as "10" → server expects 0.10
                 markup_percent: this.row.markup_percent_display !== ''
@@ -1307,6 +1334,7 @@ function estimateBuilder(estimateId) {
             material_id: '', equipment_id: '',
             quantity: '', unit: '', unit_cost: '',
             markup_percent: '', notes: '',
+            _billable_preview: 0, // 2026-05-31: display-only — set by onCraftChange()
         },
         totals: {
             total_cost:     {{ (float) $estimate->total_cost }},
@@ -1335,10 +1363,23 @@ function estimateBuilder(estimateId) {
             this.openLineModalFlag = true;
         },
 
-        // Pre-fill cost rate from craft selection (and similar for material/equipment).
+        // 2026-05-31 (Brenda): when a craft is picked, prefill BOTH the
+        // cost rate AND the markup so the resulting billable matches the
+        // project's rate sheet (project_billable_rates → craft master
+        // fallback). Math:
+        //   markup % = (billable - cost) / cost
+        // If the rate sheet has no billable for this craft, leave markup
+        // alone — the user can type their own.
         onCraftChange() {
             const opt = document.querySelector('select[x-model="lineDraft.craft_id"] option[value="' + this.lineDraft.craft_id + '"]');
-            if (opt && opt.dataset.rate) this.lineDraft.hourly_cost_rate = opt.dataset.rate;
+            if (!opt) return;
+            const cost     = parseFloat(opt.dataset.rate)     || 0;
+            const billable = parseFloat(opt.dataset.billable) || 0;
+            if (cost > 0) this.lineDraft.hourly_cost_rate = cost.toFixed(2);
+            this.lineDraft._billable_preview = billable;
+            if (cost > 0 && billable > 0) {
+                this.lineDraft.markup_percent = ((billable - cost) / cost).toFixed(4);
+            }
         },
         onMaterialChange() {
             const opt = document.querySelector('select[x-model="lineDraft.material_id"] option[value="' + this.lineDraft.material_id + '"]');

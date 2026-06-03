@@ -173,14 +173,29 @@
                     </select>
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
-                <select name="cost_code_id" id="edit_cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                    <option value="">Select Phase Code (optional)</option>
-                    @foreach($costCodes as $cc)
-                        <option value="{{ $cc->id }}">{{ $cc->code }} - {{ $cc->name }}</option>
-                    @endforeach
-                </select>
+            {{-- 2026-05-31 (Brenda): Cost Type was on Create but not on Edit,
+                 so existing commitments couldn't ever be tagged — the
+                 list column showed "—" forever. Added it here + wired
+                 up in editCommitment() below. --}}
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phase Code</label>
+                    <select name="cost_code_id" id="edit_cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">Select Phase Code (optional)</option>
+                        @foreach($costCodes as $cc)
+                            <option value="{{ $cc->id }}">{{ $cc->code }} - {{ $cc->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+                    <select name="cost_type_id" id="edit_cost_type_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">Select Cost Type (optional)</option>
+                        @foreach($costTypes ?? [] as $ct)
+                            <option value="{{ $ct->id }}">{{ $ct->code }} — {{ $ct->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
@@ -268,6 +283,7 @@ function editCommitment(id) {
         document.getElementById('edit_amount').value = d.amount || '';
         document.getElementById('edit_status').value = d.status || '';
         document.getElementById('edit_cost_code_id').value = d.cost_code_id || '';
+        document.getElementById('edit_cost_type_id').value = d.cost_type_id || '';
         document.getElementById('edit_po_number').value = d.po_number || '';
         document.getElementById('edit_notes').value = d.notes || '';
         document.getElementById('editSaveBtn').onclick = function() {
