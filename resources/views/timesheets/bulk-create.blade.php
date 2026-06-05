@@ -73,7 +73,9 @@
 
     <div class="legacy-frame">
         <div class="legacy-titlebar">
-            <div>BAK Construction · Payroll Batch Entry — Timesheet Records</div>
+            {{-- 2026-06-04 (Brenda): pull from company_name setting so
+                 changing branding clears everywhere. --}}
+            <div>{{ \App\Models\Setting::get('company_name', 'BuildTrack') }} · Payroll Batch Entry — Timesheet Records</div>
             <div class="ctrls"><span>_</span><span>□</span><span>×</span></div>
         </div>
 

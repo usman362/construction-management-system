@@ -1,3 +1,25 @@
+# 2026-06-04 (Brenda: 22 MB Rate Breakdown CSV upload was "tool large").
+# Bumped PHP upload + post limits to 60 MB so the import endpoints
+# (which now validate up to 50 MB at the Laravel layer) can actually
+# receive the body. Only takes effect with mod_php; for PHP-FPM /
+# LiteSpeed hosting these must be set via the host's MultiPHP INI
+# Editor instead.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 60M
+    php_value post_max_size       60M
+    php_value memory_limit        256M
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 60M
+    php_value post_max_size       60M
+    php_value memory_limit        256M
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 60M
+    php_value post_max_size       60M
+    php_value memory_limit        256M
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

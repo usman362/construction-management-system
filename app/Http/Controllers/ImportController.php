@@ -71,7 +71,7 @@ class ImportController extends Controller
 
     public function employeeImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -233,7 +233,7 @@ class ImportController extends Controller
 
     public function craftImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -389,7 +389,7 @@ class ImportController extends Controller
 
     public function billableRateImport(Request $request, Project $project): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -503,7 +503,7 @@ class ImportController extends Controller
 
     public function estimateLineImport(Request $request, Project $project, Estimate $estimate): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -595,7 +595,7 @@ class ImportController extends Controller
 
     public function vendorImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -689,7 +689,7 @@ class ImportController extends Controller
 
     public function clientImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -773,7 +773,7 @@ class ImportController extends Controller
 
     public function costCodeImport(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
 
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
