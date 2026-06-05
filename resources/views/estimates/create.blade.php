@@ -39,6 +39,23 @@
                 @enderror
             </div>
 
+            {{-- 2026-06-04 (Brenda): "I need to add a section for me to put
+                 the location and a job number." Both optional — the job
+                 number is separate from project_number so the same job can
+                 carry through multiple estimates / revisions with its own
+                 client-facing identifier. --}}
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="location" class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <input type="text" name="location" id="location" value="{{ old('location') }}" placeholder="e.g. Gramercy, LA" class="w-full border-gray-300 rounded-lg shadow-sm">
+                </div>
+                <div>
+                    <label for="job_number" class="block text-sm font-medium text-gray-700 mb-2">Job Number</label>
+                    <input type="text" name="job_number" id="job_number" value="{{ old('job_number', $project->project_number ?? '') }}" placeholder="e.g. BM-5413" class="w-full border-gray-300 rounded-lg shadow-sm">
+                    <p class="text-[11px] text-gray-400 mt-1">Defaults to the project number — override if needed.</p>
+                </div>
+            </div>
+
             <div class="mb-6">
                 <label for="status" class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
                 <select name="status" id="status" required class="w-full border-gray-300 rounded-lg shadow-sm @error('status') border-red-500 @enderror">

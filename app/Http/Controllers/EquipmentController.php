@@ -91,6 +91,9 @@ class EquipmentController extends Controller
             'daily_rate' => 'required|numeric|min:0',
             'weekly_rate' => 'nullable|numeric|min:0',
             'monthly_rate' => 'nullable|numeric|min:0',
+            // 2026-06-04 (Brenda): rental start + stop dates.
+            'rent_start_date' => 'nullable|date',
+            'rent_end_date'   => 'nullable|date|after_or_equal:rent_start_date',
             'vendor_id' => 'nullable|exists:vendors,id',
             'status' => 'nullable|in:available,in_use,maintenance,retired',
         ]);
@@ -136,6 +139,9 @@ class EquipmentController extends Controller
             'daily_rate' => 'required|numeric|min:0',
             'weekly_rate' => 'nullable|numeric|min:0',
             'monthly_rate' => 'nullable|numeric|min:0',
+            // 2026-06-04 (Brenda): rental start + stop dates.
+            'rent_start_date' => 'nullable|date',
+            'rent_end_date'   => 'nullable|date|after_or_equal:rent_start_date',
             'vendor_id' => 'nullable|exists:vendors,id',
             'status' => 'nullable|in:available,in_use,maintenance,retired',
         ]);

@@ -66,13 +66,66 @@
             </div>
         </div>
 
+        {{-- 2026-06-04 (Brenda): location + job number row. Falls back to
+             project number when the estimate doesn't have its own job
+             number set. Click any value to inline-edit. --}}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t" x-data="estimateHeaderEdit({{ $estimate->id }})">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-1">LOCATION</h3>
+                <input type="text" x-model="location" @blur="save()" placeholder="e.g. Gramercy, LA"
+                       value="{{ $estimate->location }}"
+                       class="text-lg font-semibold text-gray-900 w-full border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 bg-transparent">
+            </div>
+            <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-1">JOB NUMBER</h3>
+                <input type="text" x-model="job_number" @blur="save()" placeholder="—"
+                       value="{{ $estimate->job_number ?? $project->project_number }}"
+                       class="text-lg font-semibold text-gray-900 w-full border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-2 py-1 font-mono bg-transparent">
+            </div>
+            <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-1">CLIENT</h3>
+                <p class="text-lg font-semibold text-gray-900">{{ $estimate->client?->name ?? $project->client?->name ?? '—' }}</p>
+            </div>
+        </div>
+
         @if ($estimate->description)
-            <div class="pt-8 border-t">
+            <div class="pt-6 mt-4 border-t">
                 <h3 class="text-sm font-semibold text-gray-700 mb-2">DESCRIPTION</h3>
                 <p class="text-gray-700 whitespace-pre-wrap">{{ $estimate->description }}</p>
             </div>
         @endif
     </div>
+
+    {{-- 2026-06-04 (Brenda): inline header save. PUT to the existing
+         estimate update endpoint with just the fields we touch. --}}
+    <script>
+    function estimateHeaderEdit(estimateId) {
+        return {
+            location: '{{ addslashes($estimate->location ?? '') }}',
+            job_number: '{{ addslashes($estimate->job_number ?? $project->project_number ?? '') }}',
+            timer: null,
+            save() {
+                clearTimeout(this.timer);
+                this.timer = setTimeout(async () => {
+                    try {
+                        await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/' + estimateId, {
+                            method: 'PUT',
+                            headers: {
+                                'Accept':'application/json', 'Content-Type':'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            },
+                            body: JSON.stringify({
+                                name: {!! json_encode($estimate->name) !!},
+                                location: this.location,
+                                job_number: this.job_number,
+                            }),
+                        });
+                    } catch (e) { /* silent — header is best-effort */ }
+                }, 400);
+            },
+        };
+    }
+    </script>
 
     @if(session('import_result'))
         @php $result = session('import_result'); @endphp

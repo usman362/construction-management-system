@@ -78,12 +78,21 @@ class EstimateController extends Controller
             'end_date'             => 'nullable|date|after_or_equal:start_date',
             'terms_and_conditions' => 'nullable|string',
             'assumed_exclusions'   => 'nullable|string',
+            // 2026-06-04 (Brenda): job site location + job number on
+            // the estimate header.
+            'location'             => 'nullable|string|max:255',
+            'job_number'           => 'nullable|string|max:100',
         ]);
 
         // Default the client_id to the project's client when the estimate is
         // built against an existing project — saves a lookup later.
         if (empty($validated['client_id']) && $project->client_id) {
             $validated['client_id'] = $project->client_id;
+        }
+        // Default job_number to the project's project_number so the same
+        // job carries through unless the user types something else.
+        if (empty($validated['job_number']) && $project->project_number) {
+            $validated['job_number'] = $project->project_number;
         }
 
         // Auto-derive duration_days when both start/end are provided.
@@ -217,6 +226,9 @@ class EstimateController extends Controller
             'end_date'             => 'nullable|date|after_or_equal:start_date',
             'terms_and_conditions' => 'nullable|string',
             'assumed_exclusions'   => 'nullable|string',
+            // 2026-06-04 (Brenda): location + job number on estimate.
+            'location'             => 'nullable|string|max:255',
+            'job_number'           => 'nullable|string|max:100',
         ]);
 
         if (!empty($validated['start_date']) && !empty($validated['end_date'])) {

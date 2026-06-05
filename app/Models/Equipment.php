@@ -21,6 +21,11 @@ class Equipment extends Model
         'daily_rate',
         'weekly_rate',
         'monthly_rate',
+        // 2026-06-04 (Brenda): "I do not see where to put the start and
+        // stop rent date for the equipment. It is not in the set up, view,
+        // or edit tabs."
+        'rent_start_date',
+        'rent_end_date',
         'vendor_id',
         'status',
     ];
@@ -42,6 +47,8 @@ class Equipment extends Model
         'daily_rate' => 'decimal:2',
         'weekly_rate' => 'decimal:2',
         'monthly_rate' => 'decimal:2',
+        'rent_start_date' => 'date',
+        'rent_end_date'   => 'date',
     ];
 
     public function vendor(): BelongsTo

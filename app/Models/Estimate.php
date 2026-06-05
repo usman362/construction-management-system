@@ -48,6 +48,12 @@ class Estimate extends Model
         'converted_to_project_id',
         'terms_and_conditions',
         'assumed_exclusions',
+
+        // 2026-06-04 (Brenda): job site location + internal job number
+        // (separate from project_number — same job can have multiple
+        // estimates / revisions with the same job_number).
+        'location',
+        'job_number',
     ];
 
     protected $casts = [

@@ -49,6 +49,15 @@
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Month</label><input type="number" step="0.01" name="monthly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0.00"></div>
                 </div>
             </div>
+            {{-- 2026-06-04 (Brenda): Start + Stop rent date so the office
+                 can track when a rental piece is on / off the job. --}}
+            <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rental dates</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Rent Start</label><input type="date" name="rent_start_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Rent End</label><input type="date" name="rent_end_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                </div>
+            </div>
             {{-- 2026-04-28: vendor + description fields merged in from the deleted equipment/create.blade.php --}}
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="">Select...</option><option value="available">Available</option><option value="in_use">In Use</option><option value="maintenance">Maintenance</option><option value="retired">Retired</option></select></div>
@@ -129,6 +138,9 @@ function editEquipment(id){
         f.querySelector('[name="daily_rate"]').value=d.daily_rate;
         f.querySelector('[name="weekly_rate"]').value=d.weekly_rate != null ? d.weekly_rate : '';
         f.querySelector('[name="monthly_rate"]').value=d.monthly_rate != null ? d.monthly_rate : '';
+        // 2026-06-04 (Brenda): populate rent dates on edit too.
+        if(f.querySelector('[name="rent_start_date"]')) f.querySelector('[name="rent_start_date"]').value=d.rent_start_date || '';
+        if(f.querySelector('[name="rent_end_date"]'))   f.querySelector('[name="rent_end_date"]').value=d.rent_end_date || '';
         f.querySelector('[name="status"]').value=d.status;
         // 2026-04-28: populate the merged vendor + description fields
         if(f.querySelector('[name="vendor_id"]'))   f.querySelector('[name="vendor_id"]').value=d.vendor_id || '';
@@ -150,6 +162,7 @@ function viewEquipment(id){
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div><div><p class="text-xs text-gray-500 mb-1">Type</p><p class="text-sm">'+typeLabel+'</p></div></div>'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Model Number</p><p class="text-sm">'+(d.model_number||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Serial Number</p><p class="text-sm">'+(d.serial_number||'—')+'</p></div></div>'+
             '<div class="grid grid-cols-3 gap-3"><div><p class="text-xs text-gray-500 mb-1">Day</p><p class="text-sm font-semibold">$'+parseFloat(d.daily_rate||0).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Week</p><p class="text-sm font-semibold">$'+parseFloat(d.weekly_rate||0).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Month</p><p class="text-sm font-semibold">$'+parseFloat(d.monthly_rate||0).toFixed(2)+'</p></div></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Rent Start</p><p class="text-sm">'+(d.rent_start_date||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Rent End</p><p class="text-sm">'+(d.rent_end_date||'—')+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Status</p>'+statusBadge+'</div>'+
             '</div>';
         openModal('viewModal');
