@@ -50,9 +50,15 @@
                 </div>
             </div>
             {{-- 2026-06-04 (Brenda): Start + Stop rent date so the office
-                 can track when a rental piece is on / off the job. --}}
+                 can track when a rental piece is on / off the job.
+                 2026-06-07: + Job # and Location so the rental is tied
+                 to the right job and site. --}}
             <div>
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rental dates</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rental — job · location · dates</p>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Job Number</label><input type="text" name="job_number" placeholder="e.g. BM-5413" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Location</label><input type="text" name="location" placeholder="e.g. Gramercy, LA" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Rent Start</label><input type="date" name="rent_start_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Rent End</label><input type="date" name="rent_end_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
@@ -141,6 +147,9 @@ function editEquipment(id){
         // 2026-06-04 (Brenda): populate rent dates on edit too.
         if(f.querySelector('[name="rent_start_date"]')) f.querySelector('[name="rent_start_date"]').value=d.rent_start_date || '';
         if(f.querySelector('[name="rent_end_date"]'))   f.querySelector('[name="rent_end_date"]').value=d.rent_end_date || '';
+        // 2026-06-07 (Brenda): populate job # + location.
+        if(f.querySelector('[name="job_number"]')) f.querySelector('[name="job_number"]').value=d.job_number || '';
+        if(f.querySelector('[name="location"]'))   f.querySelector('[name="location"]').value=d.location || '';
         f.querySelector('[name="status"]').value=d.status;
         // 2026-04-28: populate the merged vendor + description fields
         if(f.querySelector('[name="vendor_id"]'))   f.querySelector('[name="vendor_id"]').value=d.vendor_id || '';
@@ -162,6 +171,7 @@ function viewEquipment(id){
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Name</p><p class="text-sm font-semibold">'+d.name+'</p></div><div><p class="text-xs text-gray-500 mb-1">Type</p><p class="text-sm">'+typeLabel+'</p></div></div>'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Model Number</p><p class="text-sm">'+(d.model_number||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Serial Number</p><p class="text-sm">'+(d.serial_number||'—')+'</p></div></div>'+
             '<div class="grid grid-cols-3 gap-3"><div><p class="text-xs text-gray-500 mb-1">Day</p><p class="text-sm font-semibold">$'+parseFloat(d.daily_rate||0).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Week</p><p class="text-sm font-semibold">$'+parseFloat(d.weekly_rate||0).toFixed(2)+'</p></div><div><p class="text-xs text-gray-500 mb-1">Month</p><p class="text-sm font-semibold">$'+parseFloat(d.monthly_rate||0).toFixed(2)+'</p></div></div>'+
+            '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Job Number</p><p class="text-sm font-mono">'+(d.job_number||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Location</p><p class="text-sm">'+(d.location||'—')+'</p></div></div>'+
             '<div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-500 mb-1">Rent Start</p><p class="text-sm">'+(d.rent_start_date||'—')+'</p></div><div><p class="text-xs text-gray-500 mb-1">Rent End</p><p class="text-sm">'+(d.rent_end_date||'—')+'</p></div></div>'+
             '<div><p class="text-xs text-gray-500 mb-1">Status</p>'+statusBadge+'</div>'+
             '</div>';

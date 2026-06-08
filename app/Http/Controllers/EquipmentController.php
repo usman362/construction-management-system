@@ -94,6 +94,9 @@ class EquipmentController extends Controller
             // 2026-06-04 (Brenda): rental start + stop dates.
             'rent_start_date' => 'nullable|date',
             'rent_end_date'   => 'nullable|date|after_or_equal:rent_start_date',
+            // 2026-06-07 (Brenda): job + location for the rental.
+            'job_number'      => 'nullable|string|max:100',
+            'location'        => 'nullable|string|max:255',
             'vendor_id' => 'nullable|exists:vendors,id',
             'status' => 'nullable|in:available,in_use,maintenance,retired',
         ]);
@@ -142,6 +145,9 @@ class EquipmentController extends Controller
             // 2026-06-04 (Brenda): rental start + stop dates.
             'rent_start_date' => 'nullable|date',
             'rent_end_date'   => 'nullable|date|after_or_equal:rent_start_date',
+            // 2026-06-07 (Brenda): job + location for the rental.
+            'job_number'      => 'nullable|string|max:100',
+            'location'        => 'nullable|string|max:255',
             'vendor_id' => 'nullable|exists:vendors,id',
             'status' => 'nullable|in:available,in_use,maintenance,retired',
         ]);

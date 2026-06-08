@@ -26,6 +26,10 @@ class Equipment extends Model
         // or edit tabs."
         'rent_start_date',
         'rent_end_date',
+        // 2026-06-07 (Brenda): job + location so we know WHICH job the
+        // rental is on and WHERE the piece sits.
+        'job_number',
+        'location',
         'vendor_id',
         'status',
     ];

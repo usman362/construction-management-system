@@ -29,9 +29,14 @@
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Month</label><input type="number" step="0.01" name="monthly_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                 </div>
             </div>
-            {{-- 2026-06-04 (Brenda): Start + Stop rent date on Edit too. --}}
+            {{-- 2026-06-04 (Brenda): Start + Stop rent date on Edit too.
+                 2026-06-07: + Job # and Location. --}}
             <div>
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rental dates</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rental — job · location · dates</p>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Job Number</label><input type="text" name="job_number" placeholder="e.g. BM-5413" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Location</label><input type="text" name="location" placeholder="e.g. Gramercy, LA" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Rent Start</label><input type="date" name="rent_start_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Rent End</label><input type="date" name="rent_end_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
