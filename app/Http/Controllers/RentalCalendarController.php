@@ -35,6 +35,47 @@ class RentalCalendarController extends Controller
             ->orderBy('expected_return_date')
             ->get();
 
+        // 2026-06-07 (Brenda: "I put rent dates in for the bus, but it is
+        // not showing on the calendar"). Equipment records carry their
+        // own rent_start_date / rent_end_date / job_number / location now;
+        // those should surface on the calendar even when no formal
+        // EquipmentAssignment row was created. Synthesize an assignment-
+        // shaped object for each equipment row that has rent_start_date
+        // set but is NOT already represented by an open assignment, so
+        // the rest of this method (positioning, urgency, summary) works
+        // unchanged.
+        $coveredEquipIds = $assignments->pluck('equipment_id')->filter()->unique();
+        $equipWithRent = \App\Models\Equipment::query()
+            ->whereNotNull('rent_start_date')
+            ->whereNotIn('id', $coveredEquipIds)
+            ->get(['id', 'name', 'model_number', 'type', 'daily_rate', 'rent_start_date', 'rent_end_date', 'job_number', 'location']);
+
+        $projectByNumber = \App\Models\Project::query()
+            ->whereIn('project_number', $equipWithRent->pluck('job_number')->filter()->unique())
+            ->get(['id', 'project_number', 'name'])
+            ->keyBy('project_number');
+
+        foreach ($equipWithRent as $eq) {
+            $synthetic = new EquipmentAssignment();
+            $synthetic->id                    = 'eq-' . $eq->id;  // string id, never collides with real numeric ids
+            $synthetic->equipment_id          = $eq->id;
+            $synthetic->assigned_date         = $eq->rent_start_date;
+            $synthetic->expected_return_date  = $eq->rent_end_date;
+            $synthetic->returned_date         = null;
+            $synthetic->notes                 = trim('Rental — ' . ($eq->location ?? ''), ' —');
+            // Set relations so the view renders without extra queries.
+            $synthetic->setRelation('equipment', $eq);
+            $proj = $eq->job_number ? $projectByNumber->get($eq->job_number) : null;
+            $synthetic->project_id = $proj?->id;
+            $synthetic->setRelation('project', $proj);
+            // Tag so the view can distinguish "synthesized from equipment
+            // record" vs. a real assignment (the formal assignment flow
+            // still drives QR check-in / check-out etc.).
+            $synthetic->is_synthetic = true;
+            $assignments->push($synthetic);
+        }
+        $assignments = $assignments->sortBy('expected_return_date')->values();
+
         // Filters
         if ($type = $request->input('type')) {
             $assignments = $assignments->filter(fn ($a) => $a->equipment?->type === $type);
