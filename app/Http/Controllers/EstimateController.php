@@ -195,6 +195,20 @@ class EstimateController extends Controller
             }
         }
 
+        // Group ALL lines by template section for the T&M view.
+        $allLines = $estimate->lines()->with(['costCode', 'craft', 'material', 'equipment'])->orderBy('sort_order')->get();
+        $laborByCategory = [];
+        foreach (EstimateLine::LABOR_CATEGORIES as $cat => $label) {
+            $laborByCategory[$cat] = $allLines->where('line_type', 'labor')->where('labor_category', $cat)->values();
+        }
+        $materialLines = $allLines->where('line_type', 'material')->values();
+        $equipmentLines3p  = $allLines->where('line_type', 'equipment')->where('equipment_category', '3rd_party')->values();
+        $equipmentLinesCoe = $allLines->where('line_type', 'equipment')->where('equipment_category', 'company_owned')->values();
+        $subcontractorLines = $allLines->where('line_type', 'subcontractor')->values();
+        $otherLines = $allLines->where('line_type', 'other')->values();
+        // Lines with no labor_category set (legacy data) — show in a fallback section
+        $uncategorizedLabor = $allLines->where('line_type', 'labor')->whereNull('labor_category')->values();
+
         return view('estimates.show', [
             'project'   => $project,
             'estimate'  => $estimate,
@@ -204,6 +218,14 @@ class EstimateController extends Controller
             'materials' => Material::orderBy('name')->get(['id', 'name', 'unit_of_measure', 'unit_cost']),
             'equipment' => Equipment::orderBy('name')->get(['id', 'name', 'daily_rate', 'weekly_rate', 'monthly_rate']),
             'lineTypes' => EstimateLine::TYPES,
+            'laborCategories'    => EstimateLine::LABOR_CATEGORIES,
+            'laborByCategory'    => $laborByCategory,
+            'materialLines'      => $materialLines,
+            'equipmentLines3p'   => $equipmentLines3p,
+            'equipmentLinesCoe'  => $equipmentLinesCoe,
+            'subcontractorLines' => $subcontractorLines,
+            'otherLines'         => $otherLines,
+            'uncategorizedLabor' => $uncategorizedLabor,
         ]);
     }
 
@@ -226,9 +248,11 @@ class EstimateController extends Controller
             'end_date'             => 'nullable|date|after_or_equal:start_date',
             'terms_and_conditions' => 'nullable|string',
             'assumed_exclusions'   => 'nullable|string',
-            // 2026-06-04 (Brenda): location + job number on estimate.
-            'location'             => 'nullable|string|max:255',
-            'job_number'           => 'nullable|string|max:100',
+            'location'                  => 'nullable|string|max:255',
+            'job_number'                => 'nullable|string|max:100',
+            'project_duration_weeks'    => 'nullable|integer|min:0|max:999',
+            'work_schedule'             => 'nullable|string|max:10',
+            'field_staff_duration_weeks'=> 'nullable|integer|min:0|max:999',
         ]);
 
         if (!empty($validated['start_date']) && !empty($validated['end_date'])) {
@@ -606,47 +630,55 @@ class EstimateController extends Controller
         // field names so they don't get silently dropped from validated().
         $rules = [
             'line_type'      => 'nullable|in:' . implode(',', array_keys(EstimateLine::TYPES)),
+            'labor_category' => 'nullable|in:' . implode(',', array_keys(EstimateLine::LABOR_CATEGORIES)),
             'section_id'     => 'nullable|exists:estimate_sections,id',
             'sort_order'     => 'nullable|integer',
             'description'    => 'required|string|max:500',
             'cost_code_id'   => 'nullable|exists:cost_codes,id',
             'cost_type_id'   => 'nullable|exists:cost_types,id',
 
-            // Labor fields (new schema)
+            // Labor crew-scheduling (T&M template)
+            'work_schedule'  => 'nullable|string|max:10',
+            'role'           => 'nullable|string|max:100',
+            'crew_size'      => 'nullable|integer|min:0|max:999',
+            'weeks'          => 'nullable|numeric|min:0|max:999',
+            'days_per_week'  => 'nullable|integer|min:0|max:7',
+            'hours_per_day'  => 'nullable|numeric|min:0|max:24',
+
             'craft_id'             => 'nullable|exists:crafts,id',
             'hours'                => 'nullable|numeric|min:0',
             'hourly_cost_rate'     => 'nullable|numeric|min:0',
             'hourly_billable_rate' => 'nullable|numeric|min:0',
-            // 2026-05-23 (Brenda): ST + OT on same row.
             'ot_hours'                => 'nullable|numeric|min:0',
             'ot_hourly_cost_rate'     => 'nullable|numeric|min:0',
             'ot_hourly_billable_rate' => 'nullable|numeric|min:0',
+            'premium_hours'                => 'nullable|numeric|min:0',
+            'premium_hourly_cost_rate'     => 'nullable|numeric|min:0',
+            'premium_hourly_billable_rate' => 'nullable|numeric|min:0',
 
-            // Material/equipment lookups
-            'material_id'  => 'nullable|exists:materials,id',
-            'equipment_id' => 'nullable|exists:equipment,id',
+            'material_id'        => 'nullable|exists:materials,id',
+            'vendor_name'        => 'nullable|string|max:255',
+            'subcontractor_name' => 'nullable|string|max:255',
+            'discipline'         => 'nullable|string|max:255',
+            'equipment_id'       => 'nullable|exists:equipment,id',
+            'equipment_category' => 'nullable|in:' . implode(',', array_keys(EstimateLine::EQUIPMENT_CATEGORIES)),
+            'duration_uom'       => 'nullable|in:daily,weekly,monthly',
+            'equipment_duration' => 'nullable|numeric|min:0',
+            'fuel_cost'          => 'nullable|numeric|min:0',
 
-            // Generic qty/unit-cost
             'quantity'  => 'nullable|numeric|min:0',
             'unit'      => 'nullable|string|max:50',
             'unit_cost' => 'nullable|numeric|min:0',
 
-            // 2026-05-23 (KH WBS): cost build-up fields. Cost = sum.
             'quote_amount'   => 'nullable|numeric|min:0',
             'freight_amount' => 'nullable|numeric|min:0',
             'tax_amount'     => 'nullable|numeric|min:0',
 
-            // Legacy fields that the simple "Add Line Item" modal sends.
-            // Mapped onto the new schema inside addLine() below.
             'amount'      => 'nullable|numeric|min:0',
             'labor_hours' => 'nullable|numeric|min:0',
 
-            // Pricing
             'markup_percent' => 'nullable|numeric|min:0|max:10',
             'notes'          => 'nullable|string|max:1000',
-
-            // 2026-05-23 (KH WBS): per-line BILLABLE flag. Defaults to true
-            // if not sent (most lines pass through to the client).
             'is_billable'    => 'nullable|boolean',
         ];
 

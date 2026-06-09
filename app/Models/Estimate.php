@@ -49,11 +49,13 @@ class Estimate extends Model
         'terms_and_conditions',
         'assumed_exclusions',
 
-        // 2026-06-04 (Brenda): job site location + internal job number
-        // (separate from project_number — same job can have multiple
-        // estimates / revisions with the same job_number).
         'location',
         'job_number',
+
+        // T&M template: project-level schedule defaults
+        'project_duration_weeks',
+        'work_schedule',
+        'field_staff_duration_weeks',
     ];
 
     protected $casts = [
@@ -61,7 +63,9 @@ class Estimate extends Model
         'total_cost'           => 'decimal:2',
         'total_price'          => 'decimal:2',
         'margin_percent'       => 'decimal:4',
-        'duration_days'        => 'integer',
+        'duration_days'              => 'integer',
+        'project_duration_weeks'     => 'integer',
+        'field_staff_duration_weeks' => 'integer',
         'valid_from'           => 'date',
         'valid_until'          => 'date',
         'start_date'           => 'date',

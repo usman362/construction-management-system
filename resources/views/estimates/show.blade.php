@@ -145,11 +145,15 @@
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════════════
-         ESTIMATING PHASE 1 — Sections + Typed Lines Builder
-         Lives above the legacy Line Items table so the existing CSV import
-         flow keeps working unchanged. New estimates should use this section.
+         T&M ESTIMATE BUILDER — template-driven layout (Phase 1 refactor)
          ═══════════════════════════════════════════════════════════════════ --}}
-    <div class="bg-white rounded-lg shadow p-6 mb-6" id="phase1Builder"
+    @include('estimates.partials.tm-estimate-builder')
+
+    {{-- ═══════════════════════════════════════════════════════════════════
+         LEGACY SECTIONS BUILDER — kept for existing data, hidden when
+         the T&M builder covers all section types. To remove in Phase 2.
+         ═══════════════════════════════════════════════════════════════════ --}}
+    <div class="bg-white rounded-lg shadow p-6 mb-6 hidden" id="phase1Builder"
          x-data="estimateBuilder({{ $estimate->id }})">
 
         {{-- ── Totals strip ──
@@ -1665,6 +1669,364 @@ function confirmDeleteLine(lineId) {
 // Paste scope → POST /projects/{p}/estimates/{e}/ai-suggest → render
 // sections/lines with checkboxes. Each checked line commits via the
 // existing addLine endpoint, optionally creating a new section first.
+/* ─── T&M Estimate Builder — Alpine components ──────────────────────
+   One parent (tmEstimate) owns section totals + summary. Each row type
+   (tmLaborRow, tmMaterialRow, tmEquipRow, tmSubRow) is its own component
+   that auto-saves via PUT to the existing updateLine endpoint.
+*/
+function tmEstimate() {
+    return {
+        schedule: {
+            project_duration_weeks: {{ (int) ($estimate->project_duration_weeks ?? 0) }},
+            work_schedule: @json($estimate->work_schedule ?? ''),
+            field_staff_duration_weeks: {{ (int) ($estimate->field_staff_duration_weeks ?? 0) }},
+        },
+        summary: {
+            totalCost:  {{ (float) $estimate->total_cost }},
+            totalPrice: {{ (float) $estimate->total_price }},
+        },
+        sectionTotals: {},
+        sectionCounts: {},
+
+        init() {
+            this.rebuildTotals();
+        },
+
+        fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        fmtN(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); },
+
+        rebuildTotals() {
+            const cats = ['direct_labor','indirect_field_labor','field_staff','material','equip_3p','equip_coe','subcontractor'];
+            const totals = {};
+            const counts = {};
+            cats.forEach(c => { totals[c] = { price: 0, cost: 0, totalHours: 0, stHours: 0, otHours: 0 }; counts[c] = 0; });
+            @foreach($laborCategories as $catKey => $catLabel)
+                @foreach($laborByCategory[$catKey] ?? [] as $line)
+                    totals['{{ $catKey }}'].price += {{ (float) $line->price_amount }};
+                    totals['{{ $catKey }}'].totalHours += {{ (float) ($line->hours + $line->ot_hours + $line->premium_hours) }};
+                    totals['{{ $catKey }}'].stHours += {{ (float) $line->hours }};
+                    totals['{{ $catKey }}'].otHours += {{ (float) $line->ot_hours }};
+                    counts['{{ $catKey }}']++;
+                @endforeach
+            @endforeach
+            @foreach($materialLines ?? [] as $line)
+                totals['material'].price += {{ (float) $line->price_amount }}; counts['material']++;
+            @endforeach
+            @foreach($equipmentLines3p ?? [] as $line)
+                totals['equip_3p'].price += {{ (float) $line->price_amount }}; counts['equip_3p']++;
+            @endforeach
+            @foreach($equipmentLinesCoe ?? [] as $line)
+                totals['equip_coe'].price += {{ (float) $line->price_amount }}; counts['equip_coe']++;
+            @endforeach
+            @foreach($subcontractorLines ?? [] as $line)
+                totals['subcontractor'].price += {{ (float) $line->price_amount }}; counts['subcontractor']++;
+            @endforeach
+            this.sectionTotals = totals;
+            this.sectionCounts = counts;
+        },
+
+        async saveSchedule() {
+            try {
+                await fetch(EST_BASE, {
+                    method: 'PUT',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json',
+                               'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify({
+                        name: @json($estimate->name),
+                        project_duration_weeks: this.schedule.project_duration_weeks || null,
+                        work_schedule: this.schedule.work_schedule || null,
+                        field_staff_duration_weeks: this.schedule.field_staff_duration_weeks || null,
+                    }),
+                });
+            } catch (e) { console.error('saveSchedule', e); }
+        },
+
+        async addLaborLine(category) {
+            const csrf = document.querySelector('meta[name=csrf-token]').content;
+            try {
+                const r = await fetch(EST_BASE + '/lines', {
+                    method: 'POST',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf },
+                    body: JSON.stringify({
+                        line_type: 'labor',
+                        labor_category: category,
+                        description: 'New labor line',
+                        work_schedule: this.schedule.work_schedule || null,
+                    }),
+                });
+                if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                location.reload();
+            } catch (e) { console.error(e); }
+        },
+
+        async addMaterialLine() {
+            const csrf = document.querySelector('meta[name=csrf-token]').content;
+            try {
+                const r = await fetch(EST_BASE + '/lines', {
+                    method: 'POST',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf },
+                    body: JSON.stringify({ line_type: 'material', description: 'New material' }),
+                });
+                if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                location.reload();
+            } catch (e) { console.error(e); }
+        },
+
+        async addEquipLine(category) {
+            const csrf = document.querySelector('meta[name=csrf-token]').content;
+            try {
+                const r = await fetch(EST_BASE + '/lines', {
+                    method: 'POST',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf },
+                    body: JSON.stringify({ line_type: 'equipment', equipment_category: category, description: 'New equipment', duration_uom: 'monthly' }),
+                });
+                if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                location.reload();
+            } catch (e) { console.error(e); }
+        },
+
+        async addSubLine() {
+            const csrf = document.querySelector('meta[name=csrf-token]').content;
+            try {
+                const r = await fetch(EST_BASE + '/lines', {
+                    method: 'POST',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf },
+                    body: JSON.stringify({ line_type: 'subcontractor', description: 'New subcontractor' }),
+                });
+                if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                location.reload();
+            } catch (e) { console.error(e); }
+        },
+    };
+}
+
+function tmLaborRow(data) {
+    return {
+        d: data,
+        timer: null,
+
+        totalHours() { return (this.d.hours || 0) + (this.d.ot_hours || 0) + (this.d.premium_hours || 0); },
+        rowTotal() {
+            return (this.d.hours * this.d.hourly_billable_rate)
+                 + (this.d.ot_hours * this.d.ot_hourly_billable_rate)
+                 + (this.d.premium_hours * this.d.premium_hourly_billable_rate);
+        },
+        fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        fmtN(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); },
+
+        recalc() {
+            const crew = this.d.crew_size || 0;
+            const wks = this.d.weeks || 0;
+            const dpw = this.d.days_per_week || 0;
+            const hpd = this.d.hours_per_day || 0;
+            if (crew > 0 && wks > 0 && dpw > 0 && hpd > 0) {
+                const stPerWeek = Math.min(dpw * hpd, dpw * 8);
+                const otPerWeek = Math.max(0, (dpw * hpd) - stPerWeek);
+                this.d.hours = Math.round(crew * wks * stPerWeek * 100) / 100;
+                this.d.ot_hours = Math.round(crew * wks * otPerWeek * 100) / 100;
+            }
+        },
+
+        onCraftPick() {
+            const sel = this.$el.querySelector('select[x-model="d.craft_id"]');
+            const opt = sel?.selectedOptions?.[0];
+            if (!opt) return;
+            const cost = parseFloat(opt.dataset.rate || 0);
+            const bill = parseFloat(opt.dataset.billable || 0);
+            const otCost = parseFloat(opt.dataset.otRate || 0) || (cost * 1.5);
+            const otBill = parseFloat(opt.dataset.otBillable || 0) || (bill * 1.5);
+            if (cost > 0) this.d.hourly_billable_rate = bill || cost;
+            if (otCost > 0) this.d.ot_hourly_billable_rate = otBill || otCost;
+        },
+
+        save() {
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this._doSave(), 400);
+        },
+        async _doSave() {
+            const b2n = v => (v === '' || v === null || v === undefined) ? null : v;
+            const payload = {
+                line_type: 'labor',
+                labor_category: this.d.labor_category,
+                description: this.d.description || this.d.role || 'Labor',
+                cost_code_id: b2n(this.d.cost_code_id),
+                craft_id: b2n(this.d.craft_id),
+                work_schedule: b2n(this.d.work_schedule),
+                role: b2n(this.d.role),
+                crew_size: b2n(this.d.crew_size),
+                weeks: b2n(this.d.weeks),
+                days_per_week: b2n(this.d.days_per_week),
+                hours_per_day: b2n(this.d.hours_per_day),
+                hours: b2n(this.d.hours),
+                hourly_billable_rate: b2n(this.d.hourly_billable_rate),
+                ot_hours: b2n(this.d.ot_hours),
+                ot_hourly_billable_rate: b2n(this.d.ot_hourly_billable_rate),
+                premium_hours: b2n(this.d.premium_hours),
+                premium_hourly_billable_rate: b2n(this.d.premium_hourly_billable_rate),
+            };
+            try {
+                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                    method: 'PUT',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json',
+                               'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify(payload),
+                });
+                clearTimeout(window.__tmReload);
+                window.__tmReload = setTimeout(() => location.reload(), 1500);
+            } catch (e) { console.error(e); }
+        },
+
+        async removeLine() {
+            if (!confirm('Delete this line?')) return;
+            await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                method: 'DELETE',
+                headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+            });
+            location.reload();
+        },
+    };
+}
+
+function tmMaterialRow(data) {
+    return {
+        d: data,
+        timer: null,
+        fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        matTotal() {
+            const cost = (this.d.quote_amount || 0) + (this.d.freight_amount || 0) + (this.d.tax_amount || 0);
+            return cost + cost * (this.d.markup_percent || 0);
+        },
+        save() {
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this._doSave(), 400);
+        },
+        async _doSave() {
+            const b2n = v => (v === '' || v === null || v === undefined) ? null : v;
+            const payload = {
+                line_type: 'material',
+                description: this.d.description || 'Material',
+                cost_code_id: b2n(this.d.cost_code_id),
+                vendor_name: b2n(this.d.vendor_name),
+                quote_amount: b2n(this.d.quote_amount),
+                freight_amount: b2n(this.d.freight_amount),
+                tax_amount: b2n(this.d.tax_amount),
+                markup_percent: b2n(this.d.markup_percent),
+            };
+            try {
+                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                    method: 'PUT', headers: { 'Accept':'application/json','Content-Type':'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify(payload),
+                });
+                clearTimeout(window.__tmReload);
+                window.__tmReload = setTimeout(() => location.reload(), 1500);
+            } catch (e) { console.error(e); }
+        },
+        async removeLine() {
+            if (!confirm('Delete this line?')) return;
+            await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                method: 'DELETE', headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+            });
+            location.reload();
+        },
+    };
+}
+
+function tmEquipRow(data) {
+    return {
+        d: data,
+        timer: null,
+        fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        equipTotal() {
+            const base = (this.d.unit_cost || 0) * (this.d.quantity || 1) * (this.d.equipment_duration || 0);
+            const extras = (this.d.freight_amount || 0) + (this.d.fuel_cost || 0);
+            const cost = base + extras;
+            return cost + cost * (this.d.markup_percent || 0);
+        },
+        save() {
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this._doSave(), 400);
+        },
+        async _doSave() {
+            const b2n = v => (v === '' || v === null || v === undefined) ? null : v;
+            const payload = {
+                line_type: 'equipment',
+                equipment_category: this.d.equipment_category,
+                description: this.d.description || 'Equipment',
+                cost_code_id: b2n(this.d.cost_code_id),
+                quantity: b2n(this.d.quantity),
+                equipment_duration: b2n(this.d.equipment_duration),
+                duration_uom: b2n(this.d.duration_uom),
+                unit_cost: b2n(this.d.unit_cost),
+                freight_amount: b2n(this.d.freight_amount),
+                fuel_cost: b2n(this.d.fuel_cost),
+                markup_percent: b2n(this.d.markup_percent),
+            };
+            try {
+                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                    method: 'PUT', headers: { 'Accept':'application/json','Content-Type':'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify(payload),
+                });
+                clearTimeout(window.__tmReload);
+                window.__tmReload = setTimeout(() => location.reload(), 1500);
+            } catch (e) { console.error(e); }
+        },
+        async removeLine() {
+            if (!confirm('Delete this line?')) return;
+            await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                method: 'DELETE', headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+            });
+            location.reload();
+        },
+    };
+}
+
+function tmSubRow(data) {
+    return {
+        d: data,
+        timer: null,
+        fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        subTotal() {
+            const cost = this.d.quote_amount || 0;
+            return cost + cost * (this.d.markup_percent || 0);
+        },
+        save() {
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this._doSave(), 400);
+        },
+        async _doSave() {
+            const b2n = v => (v === '' || v === null || v === undefined) ? null : v;
+            const payload = {
+                line_type: 'subcontractor',
+                description: this.d.description || 'Subcontractor',
+                cost_code_id: b2n(this.d.cost_code_id),
+                discipline: b2n(this.d.discipline),
+                subcontractor_name: b2n(this.d.subcontractor_name),
+                quote_amount: b2n(this.d.quote_amount),
+                markup_percent: b2n(this.d.markup_percent),
+            };
+            try {
+                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                    method: 'PUT', headers: { 'Accept':'application/json','Content-Type':'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify(payload),
+                });
+                clearTimeout(window.__tmReload);
+                window.__tmReload = setTimeout(() => location.reload(), 1500);
+            } catch (e) { console.error(e); }
+        },
+        async removeLine() {
+            if (!confirm('Delete this line?')) return;
+            await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                method: 'DELETE', headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+            });
+            location.reload();
+        },
+    };
+}
+
+// ─── AI Estimate Builder (Brenda — Phase 6, 2026-05-12) ──────────────
 function aiEstimateBuilder() {
     return {
         stage: 'scope',
