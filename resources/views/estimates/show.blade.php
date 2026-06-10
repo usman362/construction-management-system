@@ -1688,8 +1688,51 @@ function tmEstimate() {
         sectionTotals: {},
         sectionCounts: {},
 
+        // 2026-06-10 (Brenda): row-level Edit modal — KH likes a deliberate
+        // "edit → form → save" flow alongside the inline cells. Modal adapts
+        // to line_type so labor / material / equipment / sub each get the
+        // right fields in a roomy 2-column layout.
+        editOpen: false,
+        edit: {},
+
         init() {
             this.rebuildTotals();
+            // 2026-06-10 (Brenda): restore scroll after the auto-reload so
+            // entering an equipment row doesn't yank you back to the top.
+            const y = sessionStorage.getItem('tmEstScroll');
+            if (y !== null) {
+                sessionStorage.removeItem('tmEstScroll');
+                window.scrollTo(0, parseInt(y, 10));
+            }
+        },
+
+        openEdit(data) {
+            this.edit = JSON.parse(JSON.stringify(data));
+            this.editOpen = true;
+        },
+        async saveEdit() {
+            const b2n = v => (v === '' || v === null || v === undefined) ? null : v;
+            const payload = {};
+            const keys = ['line_type','labor_category','equipment_category','cost_code_id','description',
+                          'work_schedule','craft_id','role','crew_size','weeks','days_per_week','hours_per_day',
+                          'hours','hourly_billable_rate','ot_hours','ot_hourly_billable_rate',
+                          'vendor_name','quote_amount','freight_amount','tax_amount',
+                          'quantity','equipment_duration','duration_uom','unit_cost','fuel_cost',
+                          'subcontractor_name','discipline','markup_percent'];
+            keys.forEach(k => { if (k in this.edit) payload[k] = b2n(this.edit[k]); });
+            payload.description = payload.description || 'Line';
+            try {
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.edit.id, {
+                    method: 'PUT',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json',
+                               'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify(payload),
+                });
+                if (!r.ok) { Toast.fire({icon:'error', title:'Could not save line'}); return; }
+                this.editOpen = false;
+                sessionStorage.setItem('tmEstScroll', window.scrollY);
+                location.reload();
+            } catch (e) { console.error(e); Toast.fire({icon:'error', title:'Network error'}); }
         },
 
         fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
@@ -1755,6 +1798,7 @@ function tmEstimate() {
                     }),
                 });
                 if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                sessionStorage.setItem('tmEstScroll', window.scrollY);
                 location.reload();
             } catch (e) { console.error(e); }
         },
@@ -1768,6 +1812,7 @@ function tmEstimate() {
                     body: JSON.stringify({ line_type: 'material', description: 'New material' }),
                 });
                 if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                sessionStorage.setItem('tmEstScroll', window.scrollY);
                 location.reload();
             } catch (e) { console.error(e); }
         },
@@ -1781,6 +1826,7 @@ function tmEstimate() {
                     body: JSON.stringify({ line_type: 'equipment', equipment_category: category, description: 'New equipment', duration_uom: 'monthly' }),
                 });
                 if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                sessionStorage.setItem('tmEstScroll', window.scrollY);
                 location.reload();
             } catch (e) { console.error(e); }
         },
@@ -1794,6 +1840,7 @@ function tmEstimate() {
                     body: JSON.stringify({ line_type: 'subcontractor', description: 'New subcontractor' }),
                 });
                 if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                sessionStorage.setItem('tmEstScroll', window.scrollY);
                 location.reload();
             } catch (e) { console.error(e); }
         },
@@ -1871,7 +1918,7 @@ function tmLaborRow(data) {
                     body: JSON.stringify(payload),
                 });
                 clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => location.reload(), 1500);
+                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
             } catch (e) { console.error(e); }
         },
 
@@ -1881,6 +1928,7 @@ function tmLaborRow(data) {
                 method: 'DELETE',
                 headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
             });
+            sessionStorage.setItem('tmEstScroll', window.scrollY);
             location.reload();
         },
     };
@@ -1918,7 +1966,7 @@ function tmMaterialRow(data) {
                     body: JSON.stringify(payload),
                 });
                 clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => location.reload(), 1500);
+                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
             } catch (e) { console.error(e); }
         },
         async removeLine() {
@@ -1926,6 +1974,7 @@ function tmMaterialRow(data) {
             await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
                 method: 'DELETE', headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
             });
+            sessionStorage.setItem('tmEstScroll', window.scrollY);
             location.reload();
         },
     };
@@ -1968,7 +2017,7 @@ function tmEquipRow(data) {
                     body: JSON.stringify(payload),
                 });
                 clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => location.reload(), 1500);
+                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
             } catch (e) { console.error(e); }
         },
         async removeLine() {
@@ -1976,6 +2025,7 @@ function tmEquipRow(data) {
             await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
                 method: 'DELETE', headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
             });
+            sessionStorage.setItem('tmEstScroll', window.scrollY);
             location.reload();
         },
     };
@@ -2012,7 +2062,7 @@ function tmSubRow(data) {
                     body: JSON.stringify(payload),
                 });
                 clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => location.reload(), 1500);
+                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
             } catch (e) { console.error(e); }
         },
         async removeLine() {
@@ -2020,6 +2070,7 @@ function tmSubRow(data) {
             await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
                 method: 'DELETE', headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
             });
+            sessionStorage.setItem('tmEstScroll', window.scrollY);
             location.reload();
         },
     };

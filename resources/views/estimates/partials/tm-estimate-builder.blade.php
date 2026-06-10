@@ -1,7 +1,7 @@
 {{-- T&M Estimate Builder — mirrors Brenda's Estimate_Template.xlsx layout.
      Replaces the free-form sections builder with fixed template sections:
      3 labor categories + materials + equipment + subcontractors + summary. --}}
-<div class="bg-white rounded-lg shadow mb-6" x-data="tmEstimate()" x-init="init()">
+<div class="bg-white rounded-lg shadow mb-6" x-data="tmEstimate()" x-init="init()" @tm-edit.window="openEdit($event.detail)">
 
     {{-- ── Estimate Schedule Header ── --}}
     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
@@ -141,9 +141,12 @@
                             <td class="px-1 py-1 bg-amber-50/50 text-right font-semibold text-amber-800" x-text="'$' + fmtM(d.ot_hours * d.ot_hourly_billable_rate)"></td>
                             {{-- Row total --}}
                             <td class="px-1 py-1 text-right font-bold text-gray-900 border-l border-gray-200" x-text="'$' + fmtM(rowTotal())"></td>
-                            <td class="px-1 py-1 text-center">
+                            <td class="px-1 py-1 text-center whitespace-nowrap">
+                                <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line">
+                                    <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                                </button>
                                 <button @click="removeLine()" class="text-red-400 hover:text-red-600" title="Delete">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </td>
                         </tr>
@@ -227,7 +230,10 @@
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.tax_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" max="10" x-model.number="d.markup_percent" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(matTotal())"></td>
-                            <td class="px-1 py-1 text-center"><button @click="removeLine()" class="text-red-400 hover:text-red-600"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button></td>
+                            <td class="px-1 py-1 text-center whitespace-nowrap">
+                                <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                                <button @click="removeLine()" class="text-red-400 hover:text-red-600" title="Delete"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -296,7 +302,10 @@
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.fuel_cost" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" max="10" x-model.number="d.markup_percent" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(equipTotal())"></td>
-                            <td class="px-1 py-1 text-center"><button @click="removeLine()" class="text-red-400 hover:text-red-600"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button></td>
+                            <td class="px-1 py-1 text-center whitespace-nowrap">
+                                <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                                <button @click="removeLine()" class="text-red-400 hover:text-red-600" title="Delete"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -363,7 +372,10 @@
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.freight_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.fuel_cost" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(equipTotal())"></td>
-                            <td class="px-1 py-1 text-center"><button @click="removeLine()" class="text-red-400 hover:text-red-600"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button></td>
+                            <td class="px-1 py-1 text-center whitespace-nowrap">
+                                <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                                <button @click="removeLine()" class="text-red-400 hover:text-red-600" title="Delete"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -422,7 +434,10 @@
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.quote_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" max="10" x-model.number="d.markup_percent" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(subTotal())"></td>
-                            <td class="px-1 py-1 text-center"><button @click="removeLine()" class="text-red-400 hover:text-red-600"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button></td>
+                            <td class="px-1 py-1 text-center whitespace-nowrap">
+                                <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                                <button @click="removeLine()" class="text-red-400 hover:text-red-600" title="Delete"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -456,6 +471,193 @@
                     <tr class="border-t-2 border-gray-400 bg-blue-50"><td class="py-2 font-bold text-blue-900 text-base">Total T&M Budgetary Quote</td><td class="py-2 text-right font-bold text-blue-900 text-base" x-text="'$' + fmtM(summary.totalPrice)"></td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    {{-- ═══════ EDIT LINE MODAL ═══════
+         Opens when any row's pencil icon is clicked ($dispatch('tm-edit', d)).
+         Form adapts to the line's type — labor / material / equipment / sub. --}}
+    <div x-show="editOpen" x-cloak @keydown.escape.window="editOpen = false" style="display:none"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div @click.outside="editOpen = false" class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+                <h3 class="text-lg font-bold text-gray-900">
+                    Edit Line —
+                    <span x-text="(edit.line_type || '').replace('_',' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
+                </h3>
+                <button @click="editOpen = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                {{-- Common fields --}}
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Cost Code</label>
+                        <select x-model="edit.cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="">—</option>
+                            @foreach($costCodes as $cc)<option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>@endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Description</label>
+                        <input type="text" x-model="edit.description" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+
+                {{-- LABOR fields --}}
+                <template x-if="edit.line_type === 'labor'">
+                    <div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Work Schedule</label>
+                                <input type="text" x-model="edit.work_schedule" placeholder="5-10" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Craft</label>
+                                <select x-model="edit.craft_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <option value="">—</option>
+                                    @foreach($crafts as $c)<option value="{{ $c->id }}" data-rate="{{ $c->base_hourly_rate }}" data-billable="{{ $c->billable_rate ?? '' }}" data-ot-billable="{{ $c->ot_billable_rate ?? '' }}">{{ $c->name }}</option>@endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Role</label>
+                                <input type="text" x-model="edit.role" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-4 mt-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Crew Size</label>
+                                <input type="number" min="0" x-model.number="edit.crew_size" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Weeks</label>
+                                <input type="number" min="0" step="0.5" x-model.number="edit.weeks" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Days/Week</label>
+                                <input type="number" min="0" max="7" x-model.number="edit.days_per_week" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Hours/Day</label>
+                                <input type="number" min="0" max="24" step="0.5" x-model.number="edit.hours_per_day" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-4 p-3 bg-blue-50 rounded-lg">
+                            <div>
+                                <label class="block text-xs font-semibold text-blue-700 uppercase mb-1">ST Hours</label>
+                                <input type="number" min="0" step="0.01" x-model.number="edit.hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-blue-700 uppercase mb-1">ST Billable Rate</label>
+                                <input type="number" min="0" step="0.01" x-model.number="edit.hourly_billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-3 p-3 bg-amber-50 rounded-lg">
+                            <div>
+                                <label class="block text-xs font-semibold text-amber-700 uppercase mb-1">OT Hours</label>
+                                <input type="number" min="0" step="0.01" x-model.number="edit.ot_hours" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-amber-700 uppercase mb-1">OT Billable Rate</label>
+                                <input type="number" min="0" step="0.01" x-model.number="edit.ot_hourly_billable_rate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                {{-- MATERIAL fields --}}
+                <template x-if="edit.line_type === 'material'">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Vendor</label>
+                            <input type="text" x-model="edit.vendor_name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Cost</label>
+                            <input type="number" min="0" step="0.01" x-model.number="edit.quote_amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Freight</label>
+                            <input type="number" min="0" step="0.01" x-model.number="edit.freight_amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Tax</label>
+                            <input type="number" min="0" step="0.01" x-model.number="edit.tax_amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Markup %</label>
+                            <input type="number" min="0" step="0.01" max="10" x-model.number="edit.markup_percent" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                </template>
+
+                {{-- EQUIPMENT fields --}}
+                <template x-if="edit.line_type === 'equipment'">
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Quantity</label>
+                            <input type="number" min="0" x-model.number="edit.quantity" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Duration</label>
+                            <input type="number" min="0" step="0.5" x-model.number="edit.equipment_duration" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">UOM</label>
+                            <select x-model="edit.duration_uom" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Unit Rate</label>
+                            <input type="number" min="0" step="0.01" x-model.number="edit.unit_cost" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Freight</label>
+                            <input type="number" min="0" step="0.01" x-model.number="edit.freight_amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Fuel</label>
+                            <input type="number" min="0" step="0.01" x-model.number="edit.fuel_cost" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Markup %</label>
+                            <input type="number" min="0" step="0.01" max="10" x-model.number="edit.markup_percent" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                </template>
+
+                {{-- SUBCONTRACTOR fields --}}
+                <template x-if="edit.line_type === 'subcontractor'">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Discipline</label>
+                            <input type="text" x-model="edit.discipline" placeholder="e.g. Electrical" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Subcontractor Name</label>
+                            <input type="text" x-model="edit.subcontractor_name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Cost</label>
+                            <input type="number" min="0" step="0.01" x-model.number="edit.quote_amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Markup %</label>
+                            <input type="number" min="0" step="0.01" max="10" x-model.number="edit.markup_percent" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 sticky bottom-0 bg-white">
+                <button @click="editOpen = false" class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
+                <button @click="saveEdit()" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">Save Line</button>
+            </div>
         </div>
     </div>
 
