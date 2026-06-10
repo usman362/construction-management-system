@@ -1805,11 +1805,10 @@ function tmLaborRow(data) {
         d: data,
         timer: null,
 
-        totalHours() { return (this.d.hours || 0) + (this.d.ot_hours || 0) + (this.d.premium_hours || 0); },
+        totalHours() { return (this.d.hours || 0) + (this.d.ot_hours || 0); },
         rowTotal() {
             return (this.d.hours * this.d.hourly_billable_rate)
-                 + (this.d.ot_hours * this.d.ot_hourly_billable_rate)
-                 + (this.d.premium_hours * this.d.premium_hourly_billable_rate);
+                 + (this.d.ot_hours * this.d.ot_hourly_billable_rate);
         },
         fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
         fmtN(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); },

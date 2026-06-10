@@ -87,13 +87,10 @@
                             <th class="px-1.5 py-1.5 text-right font-semibold text-blue-700 w-14 border-l border-blue-200 bg-blue-50">ST Hrs</th>
                             <th class="px-1.5 py-1.5 text-right font-semibold text-blue-700 w-14 bg-blue-50">ST Rate</th>
                             <th class="px-1.5 py-1.5 text-right font-semibold text-blue-700 w-20 bg-blue-50">ST Total</th>
-                            <th class="px-1.5 py-1.5 text-right font-semibold text-amber-700 w-14 border-l border-amber-200 bg-amber-50">OT Hrs</th>
-                            <th class="px-1.5 py-1.5 text-right font-semibold text-amber-700 w-14 bg-amber-50">OT Rate</th>
-                            <th class="px-1.5 py-1.5 text-right font-semibold text-amber-700 w-20 bg-amber-50">OT Total</th>
-                            <th class="px-1.5 py-1.5 text-right font-semibold text-purple-700 w-14 border-l border-purple-200 bg-purple-50">Prem Hrs</th>
-                            <th class="px-1.5 py-1.5 text-right font-semibold text-purple-700 w-14 bg-purple-50">Prem Rate</th>
-                            <th class="px-1.5 py-1.5 text-right font-semibold text-purple-700 w-20 bg-purple-50">Prem Total</th>
-                            <th class="px-1.5 py-1.5 text-right font-bold text-gray-900 w-24 border-l border-gray-300">Total $</th>
+                            <th class="px-1.5 py-1.5 text-right font-semibold text-amber-700 w-16 border-l border-amber-200 bg-amber-50">OT Hrs</th>
+                            <th class="px-1.5 py-1.5 text-right font-semibold text-amber-700 w-16 bg-amber-50">OT Rate</th>
+                            <th class="px-1.5 py-1.5 text-right font-semibold text-amber-700 w-24 bg-amber-50">OT Total</th>
+                            <th class="px-1.5 py-1.5 text-right font-bold text-gray-900 w-28 border-l border-gray-300">Total $</th>
                             <th class="px-1.5 py-1.5 w-8"></th>
                         </tr>
                     </thead>
@@ -142,10 +139,6 @@
                             <td class="px-1 py-1 bg-amber-50/50 border-l border-amber-100"><input type="number" min="0" step="1" x-model.number="d.ot_hours" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1 bg-amber-50/50"><input type="number" min="0" step="0.01" x-model.number="d.ot_hourly_billable_rate" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1 bg-amber-50/50 text-right font-semibold text-amber-800" x-text="'$' + fmtM(d.ot_hours * d.ot_hourly_billable_rate)"></td>
-                            {{-- Premium --}}
-                            <td class="px-1 py-1 bg-purple-50/50 border-l border-purple-100"><input type="number" min="0" step="1" x-model.number="d.premium_hours" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1 bg-purple-50/50"><input type="number" min="0" step="0.01" x-model.number="d.premium_hourly_billable_rate" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1 bg-purple-50/50 text-right font-semibold text-purple-800" x-text="'$' + fmtM(d.premium_hours * d.premium_hourly_billable_rate)"></td>
                             {{-- Row total --}}
                             <td class="px-1 py-1 text-right font-bold text-gray-900 border-l border-gray-200" x-text="'$' + fmtM(rowTotal())"></td>
                             <td class="px-1 py-1 text-center">
@@ -165,7 +158,6 @@
                             <td class="px-1.5 py-2 bg-blue-50/50"></td>
                             <td class="px-1.5 py-2 text-right font-bold text-amber-900 bg-amber-50/50 border-l border-amber-100" x-text="fmtN(sectionTotals['{{ $catKey }}']?.otHours || 0)"></td>
                             <td class="px-1.5 py-2 bg-amber-50/50" colspan="2"></td>
-                            <td class="px-1.5 py-2 bg-purple-50/50 border-l border-purple-100" colspan="3"></td>
                             <td class="px-1.5 py-2 text-right font-bold text-gray-900 border-l border-gray-200" x-text="'$' + fmtM(sectionTotals['{{ $catKey }}']?.price || 0)"></td>
                             <td></td>
                         </tr>
