@@ -13,6 +13,22 @@ class ProjectController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
+            // 2026-06-12 (Brenda): same fix as VendorController — dropdown
+            // AJAX calls don't send DataTables params, return all active
+            // projects when no `draw` param is present.
+            if (! $request->has('draw')) {
+                $projects = Project::where(function ($q) {
+                        $q->whereNull('status')->orWhereNotIn('status', ['archived', 'closed']);
+                    })
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'project_number']);
+                return response()->json([
+                    'data' => $projects->map(fn ($p) => [
+                        'id'   => $p->id,
+                        'name' => $p->project_number ? $p->project_number . ' — ' . $p->name : $p->name,
+                    ]),
+                ]);
+            }
             return $this->dataTable($request);
         }
         return view('projects.index');

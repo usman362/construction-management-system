@@ -23,6 +23,22 @@ class VendorController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
+            // 2026-06-12 (Brenda): "vendor selection dropdown not working" on
+            // Add Invoice — turned out the AJAX call from the dropdown was
+            // hitting the DataTables path which caps at 15 rows. When the
+            // call has no `draw` param it's a dropdown, return ALL active
+            // vendors with just id+name (cheap payload).
+            if (! $request->has('draw')) {
+                $vendors = Vendor::where('is_active', true)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'vendor_code']);
+                return response()->json([
+                    'data' => $vendors->map(fn ($v) => [
+                        'id'   => $v->id,
+                        'name' => $v->vendor_code ? $v->name . ' (' . $v->vendor_code . ')' : $v->name,
+                    ]),
+                ]);
+            }
             return $this->dataTable($request);
         }
         return view('vendors.index');
