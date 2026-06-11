@@ -225,6 +225,16 @@ Route::middleware('auth')->group(function () {
             Route::post('lien-waivers/{lienWaiver}/sign', [\App\Http\Controllers\LienWaiverController::class, 'sign'])->name('lien-waivers.sign');
         });
 
+        // Drawings (project-scoped) — Admin, PM, Field
+        Route::middleware('role:admin,project_manager,field_user')->group(function () {
+            Route::get('drawings', [\App\Http\Controllers\DrawingController::class, 'index'])->name('drawings.index');
+            Route::post('drawings', [\App\Http\Controllers\DrawingController::class, 'store'])->name('drawings.store');
+            Route::get('drawings/{drawing}', [\App\Http\Controllers\DrawingController::class, 'show'])->name('drawings.show');
+            Route::get('drawings/{drawing}/download', [\App\Http\Controllers\DrawingController::class, 'download'])->name('drawings.download');
+            Route::get('drawings/{drawing}/preview', [\App\Http\Controllers\DrawingController::class, 'preview'])->name('drawings.preview');
+            Route::delete('drawings/{drawing}', [\App\Http\Controllers\DrawingController::class, 'destroy'])->name('drawings.destroy');
+        });
+
         // RFIs (project-scoped) — Admin, PM, Field (field users can submit + view)
         Route::middleware('role:admin,project_manager,field_user')->group(function () {
             Route::get('rfis', [\App\Http\Controllers\RfiController::class, 'projectIndex'])->name('rfis.index');
