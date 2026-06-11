@@ -13,6 +13,19 @@ class CostCodeController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
+            // 2026-06-12: dropdown call (no DataTables `draw`) — return all
+            // active cost codes with just id/code/name so the Invoice form
+            // and other modals don't hit the 15-row paginated DataTable.
+            if (! $request->has('draw')) {
+                $codes = CostCode::orderBy('code')->get(['id', 'code', 'name']);
+                return response()->json([
+                    'data' => $codes->map(fn ($c) => [
+                        'id'   => $c->id,
+                        'code' => $c->code,
+                        'name' => $c->name,
+                    ]),
+                ]);
+            }
             return $this->dataTable($request);
         }
         $costTypes = CostType::active()->orderBy('sort_order')->get();

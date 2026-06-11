@@ -54,6 +54,7 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label><input type="number" step="0.01" name="amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label><input type="date" name="due_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Cost Code <span class="text-xs text-gray-400">(optional)</span></label><select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" id="createCostCodeId"></select></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="approved">Approved</option><option value="paid">Paid</option></select></div>
         </form>
@@ -85,6 +86,7 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Amount *</label><input type="number" step="0.01" name="amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label><input type="date" name="due_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
             </div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Cost Code <span class="text-xs text-gray-400">(optional)</span></label><select name="cost_code_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" id="editCostCodeId"></select></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Status *</label><select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="approved">Approved</option><option value="paid">Paid</option></select></div>
         </form>
@@ -317,6 +319,15 @@ function loadDropdowns() {
             $('#createVendorId, #editVendorId').html(opts);
         }
     });
+    // 2026-06-12 (Brenda): cost_code_id was required at DB level but never
+    // exposed on the basic Add Invoice modal — caused HY000 1364 on save.
+    // Made nullable + added an optional dropdown here.
+    $.get(window.BASE_URL+'/cost-codes', function(data) {
+        var rows = (data && data.data) ? data.data : (Array.isArray(data) ? data : []);
+        var opts = '<option value="">— None —</option>';
+        rows.forEach(function(c) { opts += '<option value="'+c.id+'">'+(c.code ? c.code+' — ' : '')+(c.name||'')+'</option>'; });
+        $('#createCostCodeId, #editCostCodeId').html(opts);
+    });
 }
 loadDropdowns();
 
@@ -330,6 +341,7 @@ function editInvoice(id){
         f.querySelector('[name="invoice_date"]').value = d.invoice_date||'';
         f.querySelector('[name="project_id"]').value = d.project_id||'';
         f.querySelector('[name="vendor_id"]').value = d.vendor_id||'';
+        f.querySelector('[name="cost_code_id"]').value = d.cost_code_id||'';
         f.querySelector('[name="amount"]').value = d.amount;
         f.querySelector('[name="description"]').value = d.description||'';
         f.querySelector('[name="due_date"]').value = d.due_date||'';
