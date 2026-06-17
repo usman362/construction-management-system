@@ -225,6 +225,14 @@ Route::middleware('auth')->group(function () {
             Route::post('lien-waivers/{lienWaiver}/sign', [\App\Http\Controllers\LienWaiverController::class, 'sign'])->name('lien-waivers.sign');
         });
 
+        // Project Cost Codes (project-scoped phase codes — Brenda 2026-06-17)
+        Route::middleware('role:admin,project_manager,accountant')->group(function () {
+            Route::get('cost-codes', [\App\Http\Controllers\ProjectCostCodeController::class, 'index'])->name('cost-codes.index');
+            Route::post('cost-codes/sync', [\App\Http\Controllers\ProjectCostCodeController::class, 'sync'])->name('cost-codes.sync');
+            Route::post('cost-codes/copy-from', [\App\Http\Controllers\ProjectCostCodeController::class, 'copyFrom'])->name('cost-codes.copy-from');
+            Route::get('cost-codes/list', [\App\Http\Controllers\ProjectCostCodeController::class, 'list'])->name('cost-codes.list');
+        });
+
         // Drawings (project-scoped) — Admin, PM, Field
         Route::middleware('role:admin,project_manager,field_user')->group(function () {
             Route::get('drawings', [\App\Http\Controllers\DrawingController::class, 'index'])->name('drawings.index');

@@ -212,7 +212,9 @@ class EstimateController extends Controller
         return view('estimates.show', [
             'project'   => $project,
             'estimate'  => $estimate,
-            'costCodes' => CostCode::orderBy('code')->get(['id', 'code', 'name']),
+            // 2026-06-17 (Brenda): project-scoped phase codes. effectiveCostCodes()
+            // returns the project's enabled list, or full library if nothing's set.
+            'costCodes' => $project->effectiveCostCodes(),
             'costTypes' => \App\Models\CostType::active()->orderBy('sort_order')->get(['id', 'code', 'name']),
             'crafts'    => $crafts,
             'materials' => Material::orderBy('name')->get(['id', 'name', 'unit_of_measure', 'unit_cost']),

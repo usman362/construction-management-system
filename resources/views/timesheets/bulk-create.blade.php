@@ -153,10 +153,16 @@
                 <label>Cost Code:</label>
                 <select x-model="entry.cost_code_id">
                     <option value="">— None —</option>
-                    @foreach ($costCodes as $cc)
-                        <option value="{{ $cc->id }}">{{ $cc->code }} — {{ $cc->name }}</option>
-                    @endforeach
+                    {{-- 2026-06-17 (Brenda): list is project-scoped when a job is
+                         picked. Falls back to the full library if the project
+                         has no codes assigned yet. --}}
+                    <template x-for="cc in filteredCostCodes" :key="cc.id">
+                        <option :value="cc.id" x-text="cc.code + ' — ' + cc.name"></option>
+                    </template>
                 </select>
+                <template x-if="entry.project_id && !costCodesLoading && projectCostCodes && projectCostCodes.length === 0">
+                    <p class="text-xs text-amber-600 col-span-2" style="grid-column: span 2">No phase codes set for this job yet — showing all codes. <a href="#" @click.prevent="window.open('/projects/' + entry.project_id + '/cost-codes','_blank')" class="underline">Set them up</a></p>
+                </template>
 
                 <label>Cost Type:</label>
                 <select x-model="entry.cost_type_id">
@@ -382,6 +388,12 @@
             savedRecords: [],
             saving: false,
             banner: { text: '', kind: 'success' },
+            // 2026-06-17 (Brenda): project-scoped phase codes. When a Job is
+            // picked we fetch its enabled codes from the project; if the
+            // project has none assigned, fall back to the global library.
+            allCostCodes: @json($costCodes->map(fn($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name])),
+            projectCostCodes: null,
+            costCodesLoading: false,
             showAddEmployee: false,
             newEmp: { employee_number: '', first_name: '', last_name: '', craft_id: '', hourly_rate: '' },
             newEmpSaving: false,
@@ -519,6 +531,35 @@
                 if (this.entry.work_order_number && !cos.some(co => co.co_number === this.entry.work_order_number)) {
                     this.entry.work_order_number = '';
                 }
+                this.loadProjectCostCodes();
+            },
+
+            // 2026-06-17 (Brenda): pull this project's enabled cost codes;
+            // clear the picked code if it's no longer in the filtered list.
+            get filteredCostCodes() {
+                if (this.entry.project_id && this.projectCostCodes && this.projectCostCodes.length > 0) {
+                    return this.projectCostCodes;
+                }
+                return this.allCostCodes;
+            },
+            async loadProjectCostCodes() {
+                if (!this.entry.project_id) { this.projectCostCodes = null; return; }
+                this.costCodesLoading = true;
+                try {
+                    const r = await fetch(window.BASE_URL + '/projects/' + this.entry.project_id + '/cost-codes/list', {
+                        headers: { 'Accept':'application/json' },
+                    });
+                    if (r.ok) {
+                        const body = await r.json();
+                        this.projectCostCodes = body.project_scoped ? body.data : [];
+                        // Clear stale cost_code_id if not in new list
+                        if (this.entry.cost_code_id && this.projectCostCodes.length > 0) {
+                            const inList = this.projectCostCodes.some(c => String(c.id) === String(this.entry.cost_code_id));
+                            if (!inList) this.entry.cost_code_id = '';
+                        }
+                    }
+                } catch (e) { console.error('loadProjectCostCodes', e); }
+                finally { this.costCodesLoading = false; }
             },
 
             fmt(d) {

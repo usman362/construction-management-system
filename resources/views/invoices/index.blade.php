@@ -322,14 +322,32 @@ function loadDropdowns() {
     // 2026-06-12 (Brenda): cost_code_id was required at DB level but never
     // exposed on the basic Add Invoice modal — caused HY000 1364 on save.
     // Made nullable + added an optional dropdown here.
-    $.get(window.BASE_URL+'/cost-codes', function(data) {
+    loadCostCodes(null, '#createCostCodeId, #editCostCodeId');
+}
+loadDropdowns();
+
+// 2026-06-17 (Brenda): project-scoped phase codes. When a project is picked,
+// reload the cost code dropdown filtered to that project (with global fallback
+// when the project has none assigned yet).
+function loadCostCodes(projectId, selectorList) {
+    var url = projectId
+        ? (window.BASE_URL + '/projects/' + projectId + '/cost-codes/list')
+        : (window.BASE_URL + '/cost-codes');
+    $.get(url, function(data) {
         var rows = (data && data.data) ? data.data : (Array.isArray(data) ? data : []);
         var opts = '<option value="">— None —</option>';
         rows.forEach(function(c) { opts += '<option value="'+c.id+'">'+(c.code ? c.code+' — ' : '')+(c.name||'')+'</option>'; });
-        $('#createCostCodeId, #editCostCodeId').html(opts);
+        $(selectorList).html(opts);
     });
 }
-loadDropdowns();
+
+// Refresh cost code dropdown when project changes (both Add + Edit modals)
+$(document).on('change', '#createProjectId', function() {
+    loadCostCodes($(this).val() || null, '#createCostCodeId');
+});
+$(document).on('change', '#editProjectId', function() {
+    loadCostCodes($(this).val() || null, '#editCostCodeId');
+});
 
 function openCreateModal(){ document.getElementById('createForm').reset(); openModal('createModal'); }
 
@@ -341,7 +359,9 @@ function editInvoice(id){
         f.querySelector('[name="invoice_date"]').value = d.invoice_date||'';
         f.querySelector('[name="project_id"]').value = d.project_id||'';
         f.querySelector('[name="vendor_id"]').value = d.vendor_id||'';
-        f.querySelector('[name="cost_code_id"]').value = d.cost_code_id||'';
+        // 2026-06-17: load project-scoped cost codes first, then set value
+        loadCostCodes(d.project_id || null, '#editCostCodeId');
+        setTimeout(() => { f.querySelector('[name="cost_code_id"]').value = d.cost_code_id||''; }, 200);
         f.querySelector('[name="amount"]').value = d.amount;
         f.querySelector('[name="description"]').value = d.description||'';
         f.querySelector('[name="due_date"]').value = d.due_date||'';

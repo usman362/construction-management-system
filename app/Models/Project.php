@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -82,6 +83,31 @@ class Project extends Model
     public function phases(): HasMany
     {
         return $this->hasMany(ProjectPhase::class);
+    }
+
+    /**
+     * Cost codes enabled for this project (Brenda 2026-06-17 — project-scoped
+     * phase codes). When this is empty for a project, callers should fall
+     * back to the full global library so legacy jobs don't break.
+     */
+    public function costCodes(): BelongsToMany
+    {
+        return $this->belongsToMany(CostCode::class, 'project_cost_codes')
+            ->withPivot(['is_active', 'sort_order', 'notes'])
+            ->withTimestamps()
+            ->orderBy('cost_codes.code');
+    }
+
+    /**
+     * The cost-code list the UI pickers should use: project-scoped when
+     * configured, full global library when not. Pass to dropdowns.
+     */
+    public function effectiveCostCodes()
+    {
+        if ($this->costCodes()->wherePivot('is_active', true)->exists()) {
+            return $this->costCodes()->wherePivot('is_active', true)->get();
+        }
+        return CostCode::orderBy('code')->get();
     }
 
     public function budgetLines(): HasMany

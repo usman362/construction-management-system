@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CostCode extends Model
@@ -74,5 +75,13 @@ class CostCode extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /** Projects this cost code is enabled on (project-scoped phase codes). */
+    public function projects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_cost_codes')
+            ->withPivot(['is_active', 'sort_order', 'notes'])
+            ->withTimestamps();
     }
 }
