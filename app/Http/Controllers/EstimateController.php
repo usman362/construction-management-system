@@ -724,6 +724,38 @@ class EstimateController extends Controller
     {
         if (!$estimate) return [];
         $estimate = $estimate->fresh();
+
+        // 2026-06-18 (Brenda): T&M builder needs section-level totals so cells
+        // can be saved without a full page reload. Group lines by the same
+        // buckets the show view uses.
+        $lines = $estimate->lines()->get();
+        $tm = [
+            'direct_labor'         => ['price' => 0.0, 'totalHours' => 0.0, 'stHours' => 0.0, 'otHours' => 0.0, 'count' => 0],
+            'indirect_field_labor' => ['price' => 0.0, 'totalHours' => 0.0, 'stHours' => 0.0, 'otHours' => 0.0, 'count' => 0],
+            'field_staff'          => ['price' => 0.0, 'totalHours' => 0.0, 'stHours' => 0.0, 'otHours' => 0.0, 'count' => 0],
+            'material'             => ['price' => 0.0, 'count' => 0],
+            'equip_3p'             => ['price' => 0.0, 'count' => 0],
+            'equip_coe'            => ['price' => 0.0, 'count' => 0],
+            'subcontractor'        => ['price' => 0.0, 'count' => 0],
+        ];
+        foreach ($lines as $l) {
+            $price = (float) $l->price_amount;
+            if ($l->line_type === 'labor' && in_array($l->labor_category, array_keys(EstimateLine::LABOR_CATEGORIES))) {
+                $tm[$l->labor_category]['price']      += $price;
+                $tm[$l->labor_category]['stHours']    += (float) $l->hours;
+                $tm[$l->labor_category]['otHours']    += (float) $l->ot_hours;
+                $tm[$l->labor_category]['totalHours'] += (float) $l->hours + (float) $l->ot_hours + (float) $l->premium_hours;
+                $tm[$l->labor_category]['count']++;
+            } elseif ($l->line_type === 'material') {
+                $tm['material']['price'] += $price; $tm['material']['count']++;
+            } elseif ($l->line_type === 'equipment') {
+                $key = $l->equipment_category === 'company_owned' ? 'equip_coe' : 'equip_3p';
+                $tm[$key]['price'] += $price; $tm[$key]['count']++;
+            } elseif ($l->line_type === 'subcontractor') {
+                $tm['subcontractor']['price'] += $price; $tm['subcontractor']['count']++;
+            }
+        }
+
         return [
             'total_cost'     => (float) $estimate->total_cost,
             'total_price'    => (float) $estimate->total_price,
@@ -733,6 +765,7 @@ class EstimateController extends Controller
                 'cost_amount'  => (float) $s->cost_amount,
                 'price_amount' => (float) $s->price_amount,
             ])->all(),
+            'tm_sections'    => $tm,
         ];
     }
 }

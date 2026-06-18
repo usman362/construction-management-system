@@ -1,7 +1,9 @@
 {{-- T&M Estimate Builder — mirrors Brenda's Estimate_Template.xlsx layout.
      Replaces the free-form sections builder with fixed template sections:
      3 labor categories + materials + equipment + subcontractors + summary. --}}
-<div class="bg-white rounded-lg shadow mb-6" x-data="tmEstimate()" x-init="init()" @tm-edit.window="openEdit($event.detail)">
+<div class="bg-white rounded-lg shadow mb-6" x-data="tmEstimate()" x-init="init()"
+     @tm-edit.window="openEdit($event.detail)"
+     @tm-totals-updated.window="applyServerTotals($event.detail)">
 
     {{-- ── Estimate Schedule Header ── --}}
     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
@@ -228,7 +230,7 @@
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.quote_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.freight_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.tax_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1"><input type="number" min="0" step="0.01" max="10" x-model.number="d.markup_percent" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="1" max="1000" :value="Math.round((d.markup_percent||0)*100)" @change="d.markup_percent = (parseFloat($event.target.value)||0)/100; save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded" title="Enter as percent (30 = 30%)"></td>
                             <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(matTotal())"></td>
                             <td class="px-1 py-1 text-center whitespace-nowrap">
                                 <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
@@ -300,7 +302,7 @@
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.unit_cost" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.freight_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.fuel_cost" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1"><input type="number" min="0" step="0.01" max="10" x-model.number="d.markup_percent" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="1" max="1000" :value="Math.round((d.markup_percent||0)*100)" @change="d.markup_percent = (parseFloat($event.target.value)||0)/100; save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded" title="Enter as percent (30 = 30%)"></td>
                             <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(equipTotal())"></td>
                             <td class="px-1 py-1 text-center whitespace-nowrap">
                                 <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
@@ -432,7 +434,7 @@
                             <td class="px-1 py-1"><input type="text" x-model="d.description" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="text" x-model="d.subcontractor_name" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.quote_amount" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1"><input type="number" min="0" step="0.01" max="10" x-model.number="d.markup_percent" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="1" max="1000" :value="Math.round((d.markup_percent||0)*100)" @change="d.markup_percent = (parseFloat($event.target.value)||0)/100; save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded" title="Enter as percent (30 = 30%)"></td>
                             <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(subTotal())"></td>
                             <td class="px-1 py-1 text-center whitespace-nowrap">
                                 <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
@@ -588,7 +590,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Markup %</label>
-                            <input type="number" min="0" step="0.01" max="10" x-model.number="edit.markup_percent" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <input type="number" min="0" step="1" max="1000" :value="Math.round((edit.markup_percent||0)*100)" @change="edit.markup_percent = (parseFloat($event.target.value)||0)/100" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="30 = 30%">
                         </div>
                     </div>
                 </template>
@@ -626,7 +628,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Markup %</label>
-                            <input type="number" min="0" step="0.01" max="10" x-model.number="edit.markup_percent" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <input type="number" min="0" step="1" max="1000" :value="Math.round((edit.markup_percent||0)*100)" @change="edit.markup_percent = (parseFloat($event.target.value)||0)/100" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="30 = 30%">
                         </div>
                     </div>
                 </template>
@@ -648,7 +650,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Markup %</label>
-                            <input type="number" min="0" step="0.01" max="10" x-model.number="edit.markup_percent" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <input type="number" min="0" step="1" max="1000" :value="Math.round((edit.markup_percent||0)*100)" @change="edit.markup_percent = (parseFloat($event.target.value)||0)/100" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="30 = 30%">
                         </div>
                     </div>
                 </template>

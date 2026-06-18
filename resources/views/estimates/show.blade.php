@@ -1738,6 +1738,22 @@ function tmEstimate() {
         fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
         fmtN(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); },
 
+        // 2026-06-18 (Brenda): server's PUT response carries fresh totals so
+        // we can update the running totals + section subtotals WITHOUT
+        // reloading the page mid-edit.
+        applyServerTotals(t) {
+            if (!t) return;
+            if (typeof t.total_cost === 'number')  this.summary.totalCost  = t.total_cost;
+            if (typeof t.total_price === 'number') this.summary.totalPrice = t.total_price;
+            if (t.tm_sections) {
+                Object.keys(t.tm_sections).forEach(k => {
+                    if (!this.sectionTotals[k]) this.sectionTotals[k] = {};
+                    Object.assign(this.sectionTotals[k], t.tm_sections[k]);
+                    if (typeof t.tm_sections[k].count === 'number') this.sectionCounts[k] = t.tm_sections[k].count;
+                });
+            }
+        },
+
         rebuildTotals() {
             const cats = ['direct_labor','indirect_field_labor','field_staff','material','equip_3p','equip_coe','subcontractor'];
             const totals = {};
@@ -1911,14 +1927,25 @@ function tmLaborRow(data) {
                 premium_hourly_billable_rate: b2n(this.d.premium_hourly_billable_rate),
             };
             try {
-                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                // 2026-06-18 (Brenda): no more auto-reload. Cells stay where
+                // they are; totals come back in the PUT response and the
+                // parent updates them via the tm-totals-updated event.
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
                     method: 'PUT',
                     headers: { 'Accept':'application/json','Content-Type':'application/json',
                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
                     body: JSON.stringify(payload),
                 });
-                clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
+                if (r.ok) {
+                    const body = await r.json();
+                    if (body.totals) window.dispatchEvent(new CustomEvent('tm-totals-updated', { detail: body.totals }));
+                    if (body.line) {
+                        // sync server-recomputed fields (price_amount, etc.) back into the row
+                        ['price_amount','cost_amount','markup_amount','hours','ot_hours'].forEach(k => {
+                            if (body.line[k] !== undefined && body.line[k] !== null) this.d[k] = parseFloat(body.line[k]);
+                        });
+                    }
+                }
             } catch (e) { console.error(e); }
         },
 
@@ -1960,13 +1987,16 @@ function tmMaterialRow(data) {
                 markup_percent: b2n(this.d.markup_percent),
             };
             try {
-                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
                     method: 'PUT', headers: { 'Accept':'application/json','Content-Type':'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
                     body: JSON.stringify(payload),
                 });
-                clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
+                if (r.ok) {
+                    const body = await r.json();
+                    if (body.totals) window.dispatchEvent(new CustomEvent('tm-totals-updated', { detail: body.totals }));
+                    if (body.line && body.line.price_amount !== undefined) this.d.price_amount = parseFloat(body.line.price_amount);
+                }
             } catch (e) { console.error(e); }
         },
         async removeLine() {
@@ -2011,13 +2041,16 @@ function tmEquipRow(data) {
                 markup_percent: b2n(this.d.markup_percent),
             };
             try {
-                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
                     method: 'PUT', headers: { 'Accept':'application/json','Content-Type':'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
                     body: JSON.stringify(payload),
                 });
-                clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
+                if (r.ok) {
+                    const body = await r.json();
+                    if (body.totals) window.dispatchEvent(new CustomEvent('tm-totals-updated', { detail: body.totals }));
+                    if (body.line && body.line.price_amount !== undefined) this.d.price_amount = parseFloat(body.line.price_amount);
+                }
             } catch (e) { console.error(e); }
         },
         async removeLine() {
@@ -2056,13 +2089,16 @@ function tmSubRow(data) {
                 markup_percent: b2n(this.d.markup_percent),
             };
             try {
-                await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
                     method: 'PUT', headers: { 'Accept':'application/json','Content-Type':'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
                     body: JSON.stringify(payload),
                 });
-                clearTimeout(window.__tmReload);
-                window.__tmReload = setTimeout(() => { sessionStorage.setItem('tmEstScroll', window.scrollY); location.reload(); }, 1500);
+                if (r.ok) {
+                    const body = await r.json();
+                    if (body.totals) window.dispatchEvent(new CustomEvent('tm-totals-updated', { detail: body.totals }));
+                    if (body.line && body.line.price_amount !== undefined) this.d.price_amount = parseFloat(body.line.price_amount);
+                }
             } catch (e) { console.error(e); }
         },
         async removeLine() {
