@@ -122,7 +122,7 @@
                                 <option value="">—</option>
                                 @foreach($costCodes as $cc)<option value="{{ $cc->id }}">{{ $cc->code }}</option>@endforeach
                             </select></td>
-                            <td class="px-1 py-1"><input type="text" x-model="d.work_schedule" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded" placeholder="5-10"></td>
+                            <td class="px-1 py-1"><input type="text" x-model="d.work_schedule" @change="parseWorkSchedule(); recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded" placeholder="5-10" title="e.g. 5-10 = 5 days/week × 10 hours/day. Auto-fills D/W and H/D."></td>
                             <td class="px-1 py-1"><select x-model="d.craft_id" @change="onCraftPick(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded">
                                 <option value="">—</option>
                                 @foreach($crafts as $c)<option value="{{ $c->id }}" data-rate="{{ $c->base_hourly_rate }}" data-billable="{{ $c->billable_rate ?? '' }}" data-ot-rate="{{ $c->base_ot_hourly_rate ?? '' }}" data-ot-billable="{{ $c->ot_billable_rate ?? '' }}">{{ $c->name }}</option>@endforeach

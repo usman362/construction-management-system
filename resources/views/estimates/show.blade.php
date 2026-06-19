@@ -1876,6 +1876,19 @@ function tmLaborRow(data) {
         fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
         fmtN(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); },
 
+        // 2026-06-19 (Brenda): parse "5-10" → days_per_week=5, hours_per_day=10
+        // so she doesn't have to type those two fields separately.
+        parseWorkSchedule() {
+            const ws = (this.d.work_schedule || '').trim();
+            const m = ws.match(/^(\d+)\s*-\s*(\d+)$/);
+            if (m) {
+                const dpw = parseInt(m[1], 10);
+                const hpd = parseInt(m[2], 10);
+                if (dpw > 0 && dpw <= 7) this.d.days_per_week = dpw;
+                if (hpd > 0 && hpd <= 24) this.d.hours_per_day = hpd;
+            }
+        },
+
         recalc() {
             const crew = this.d.crew_size || 0;
             const wks = this.d.weeks || 0;

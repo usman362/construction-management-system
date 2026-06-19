@@ -356,14 +356,58 @@ class EstimateController extends Controller
     public function downloadPdf(Project $project, Estimate $estimate)
     {
         $this->assertEstimateBelongsToProject($project, $estimate);
-        $estimate->load(['client', 'sections.lines.craft', 'sections.lines.material', 'sections.lines.equipment',
-                         'lines' => fn ($q) => $q->whereNull('section_id')]);
+        $estimate->load(['client']);
         $project->load('client');
+
+        // 2026-06-19 (Brenda): PDF rebuilt to match the on-screen T&M template
+        // sections. Pull all lines with their refs so we can group server-side.
+        $allLines = $estimate->lines()->with(['craft', 'material', 'equipment', 'costCode'])
+            ->orderBy('sort_order')->get();
+
+        $groups = [
+            'direct_labor'         => ['title' => 'Direct Labor',           'lines' => collect()],
+            'indirect_field_labor' => ['title' => 'Indirect Field Labor',   'lines' => collect()],
+            'field_staff'          => ['title' => 'Field Staff Labor',      'lines' => collect()],
+            'material'             => ['title' => 'Direct Materials',       'lines' => collect()],
+            'equip_3p'             => ['title' => '3rd Party Equipment',    'lines' => collect()],
+            'equip_coe'            => ['title' => 'Company Owned Equipment','lines' => collect()],
+            'subcontractor'        => ['title' => 'Subcontractors',         'lines' => collect()],
+            'other'                => ['title' => 'Other',                  'lines' => collect()],
+        ];
+        foreach ($allLines as $l) {
+            // Hide empty rows: no description filled in AND no money / no hours
+            $hasMoney = (float) $l->price_amount > 0 || (float) $l->cost_amount > 0
+                || (float) $l->quote_amount > 0 || (float) $l->unit_cost > 0
+                || (float) $l->hours > 0 || (float) $l->ot_hours > 0;
+            $hasMeaningfulDesc = $l->description && trim($l->description) !== '' && $l->description !== 'New labor line'
+                && !str_starts_with($l->description, 'New ');
+            if (!$hasMoney && !$hasMeaningfulDesc) continue;
+
+            if ($l->line_type === 'labor' && in_array($l->labor_category, ['direct_labor','indirect_field_labor','field_staff'])) {
+                $groups[$l->labor_category]['lines']->push($l);
+            } elseif ($l->line_type === 'labor') {
+                $groups['direct_labor']['lines']->push($l);
+            } elseif ($l->line_type === 'material') {
+                $groups['material']['lines']->push($l);
+            } elseif ($l->line_type === 'equipment') {
+                $key = $l->equipment_category === 'company_owned' ? 'equip_coe' : 'equip_3p';
+                $groups[$key]['lines']->push($l);
+            } elseif ($l->line_type === 'subcontractor') {
+                $groups['subcontractor']['lines']->push($l);
+            } else {
+                $groups['other']['lines']->push($l);
+            }
+        }
+        // Subtotals per group
+        foreach ($groups as $k => $g) {
+            $groups[$k]['total'] = (float) $g['lines']->sum('price_amount');
+        }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.estimate', [
             'project'  => $project,
             'estimate' => $estimate,
             'company'  => \App\Models\Setting::get('company_name', 'BuildTrack'),
+            'groups'   => $groups,
         ]);
 
         $filename = 'estimate-' . ($estimate->estimate_number ?? $estimate->id) . '.pdf';
@@ -457,6 +501,27 @@ class EstimateController extends Controller
         // default for this line type (set in ClientDefaultMarkup).
         $data['markup_percent'] = $this->resolveMarkup($data, $estimate);
 
+        // 2026-06-19 (Brenda): "Cost type is only populating if I use the
+        // add a line button" — the T&M builder didn't send cost_type_id, so
+        // new lines landed with no cost type. Auto-set it from line_type +
+        // labor_category / equipment_category when caller didn't pick one.
+        if (empty($data['cost_type_id'])) {
+            $data['cost_type_id'] = $this->defaultCostTypeId($data);
+        }
+
+        // 2026-06-19 (Brenda): if the caller sent work_schedule like "5-10"
+        // (5 days/week × 10 hrs/day) and didn't set the discrete fields,
+        // parse it so the labor row computes hours on first save.
+        if (($data['line_type'] ?? null) === 'labor' && !empty($data['work_schedule'])
+            && empty($data['days_per_week']) && empty($data['hours_per_day'])) {
+            if (preg_match('/^\s*(\d+)\s*-\s*(\d+)\s*$/', $data['work_schedule'], $m)) {
+                $dpw = (int) $m[1];
+                $hpd = (int) $m[2];
+                if ($dpw > 0 && $dpw <= 7)  $data['days_per_week'] = $dpw;
+                if ($hpd > 0 && $hpd <= 24) $data['hours_per_day'] = $hpd;
+            }
+        }
+
         $line = EstimateLine::create($data);
         return response()->json([
             'message' => 'Line added.',
@@ -468,6 +533,12 @@ class EstimateController extends Controller
     public function updateLine(Request $request, Project $project, EstimateLine $estimateLine): JsonResponse
     {
         $data = $this->validateLine($request);
+        // Fill cost_type_id if still empty after this update — same rule
+        // as addLine so legacy / T&M-builder rows pick up the right type.
+        if (empty($data['cost_type_id']) && empty($estimateLine->cost_type_id)) {
+            $merged = array_merge($estimateLine->toArray(), $data);
+            $data['cost_type_id'] = $this->defaultCostTypeId($merged);
+        }
         $estimateLine->update($data);
         return response()->json([
             'message' => 'Line updated.',
@@ -720,6 +791,31 @@ class EstimateController extends Controller
     /**
      * Bundle the live totals so the client UI can update without a full reload.
      */
+    /**
+     * Map a line's line_type / labor_category / equipment_category to the
+     * appropriate CostType ID. Used when the caller didn't pick one.
+     *
+     * Cost types in this app (from cost_types):
+     *   01 Direct Labor · 02 Materials · 03 3rd Party Rental Equipment ·
+     *   04 Company Owned · 06 Subcontractors · 11 Indirect Labor.
+     */
+    private function defaultCostTypeId(array $data): ?int
+    {
+        $code = match (true) {
+            ($data['line_type'] ?? null) === 'labor' && ($data['labor_category'] ?? null) === 'direct_labor'         => '01',
+            ($data['line_type'] ?? null) === 'labor' && ($data['labor_category'] ?? null) === 'indirect_field_labor' => '11',
+            ($data['line_type'] ?? null) === 'labor' && ($data['labor_category'] ?? null) === 'field_staff'          => '11',
+            ($data['line_type'] ?? null) === 'labor'                                                                  => '01',
+            ($data['line_type'] ?? null) === 'material'                                                               => '02',
+            ($data['line_type'] ?? null) === 'equipment' && ($data['equipment_category'] ?? null) === 'company_owned' => '04',
+            ($data['line_type'] ?? null) === 'equipment'                                                              => '03',
+            ($data['line_type'] ?? null) === 'subcontractor'                                                          => '06',
+            default                                                                                                   => null,
+        };
+        if (!$code) return null;
+        return \App\Models\CostType::where('code', $code)->value('id');
+    }
+
     private function totalsFor(?Estimate $estimate): array
     {
         if (!$estimate) return [];
