@@ -542,20 +542,35 @@ class EstimateController extends Controller
 
         // 2026-06-19 (Ali — Brenda's 60% phantom margin): labor rows often
         // came in with hourly_billable_rate set but hourly_cost_rate empty,
-        // so cost_amount stayed at $0 and margin looked huge. If the row
-        // has a craft and no cost rate, pull from the craft master.
+        // so cost_amount stayed at $0 and margin looked huge. Check project
+        // billable rates first (Setup tab "Base ST"), then craft master.
         $effectiveCraftId = $data['craft_id'] ?? $estimateLine->craft_id;
         if (($data['line_type'] ?? $estimateLine->line_type) === 'labor' && $effectiveCraftId) {
+            $stCost = 0; $otCost = 0;
+            $projectId = $estimateLine->estimate?->project_id;
+            if ($projectId) {
+                $pbr = \App\Models\ProjectBillableRate::where('project_id', $projectId)
+                    ->where('craft_id', $effectiveCraftId)
+                    ->whereNull('employee_id')
+                    ->orderByDesc('effective_date')->first();
+                if ($pbr) {
+                    if ($pbr->base_hourly_rate)    $stCost = (float) $pbr->base_hourly_rate;
+                    if ($pbr->base_ot_hourly_rate) $otCost = (float) $pbr->base_ot_hourly_rate;
+                }
+            }
             $craft = \App\Models\Craft::find($effectiveCraftId);
             if ($craft) {
-                if (empty($data['hourly_cost_rate']) && empty($estimateLine->hourly_cost_rate) && $craft->base_hourly_rate) {
-                    $data['hourly_cost_rate'] = $craft->base_hourly_rate;
-                }
-                if (empty($data['ot_hourly_cost_rate']) && empty($estimateLine->ot_hourly_cost_rate)) {
+                if ($stCost <= 0 && $craft->base_hourly_rate) $stCost = (float) $craft->base_hourly_rate;
+                if ($otCost <= 0) {
                     $otMult = $craft->overtime_multiplier ?? 1.5;
-                    $otBase = $craft->base_ot_hourly_rate ?? (($craft->base_hourly_rate ?? 0) * $otMult);
-                    if ($otBase > 0) $data['ot_hourly_cost_rate'] = $otBase;
+                    $otCost = (float) ($craft->base_ot_hourly_rate ?? ($stCost * $otMult));
                 }
+            }
+            if (empty($data['hourly_cost_rate']) && empty($estimateLine->hourly_cost_rate) && $stCost > 0) {
+                $data['hourly_cost_rate'] = $stCost;
+            }
+            if (empty($data['ot_hourly_cost_rate']) && empty($estimateLine->ot_hourly_cost_rate) && $otCost > 0) {
+                $data['ot_hourly_cost_rate'] = $otCost;
             }
         }
 
