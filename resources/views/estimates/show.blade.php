@@ -1906,12 +1906,18 @@ function tmLaborRow(data) {
             const sel = this.$el.querySelector('select[x-model="d.craft_id"]');
             const opt = sel?.selectedOptions?.[0];
             if (!opt) return;
-            const cost = parseFloat(opt.dataset.rate || 0);
-            const bill = parseFloat(opt.dataset.billable || 0);
-            const otCost = parseFloat(opt.dataset.otRate || 0) || (cost * 1.5);
+            const cost   = parseFloat(opt.dataset.rate || 0);
+            const bill   = parseFloat(opt.dataset.billable || 0);
+            const otCost = parseFloat(opt.dataset.otRate || 0)     || (cost * 1.5);
             const otBill = parseFloat(opt.dataset.otBillable || 0) || (bill * 1.5);
-            if (cost > 0) this.d.hourly_billable_rate = bill || cost;
-            if (otCost > 0) this.d.ot_hourly_billable_rate = otBill || otCost;
+            // 2026-06-19 (Ali — Brenda's 60% phantom margin): the T&M builder
+            // used to set ONLY the billable rate, so the labor cost stayed at
+            // $0 and the margin looked artificially high. Set both rates from
+            // the craft master so cost_amount is computed correctly.
+            if (cost > 0)   this.d.hourly_cost_rate        = cost;
+            if (bill > 0)   this.d.hourly_billable_rate    = bill || cost;
+            if (otCost > 0) this.d.ot_hourly_cost_rate     = otCost;
+            if (otBill > 0) this.d.ot_hourly_billable_rate = otBill || otCost;
         },
 
         save() {
@@ -1933,10 +1939,13 @@ function tmLaborRow(data) {
                 days_per_week: b2n(this.d.days_per_week),
                 hours_per_day: b2n(this.d.hours_per_day),
                 hours: b2n(this.d.hours),
+                hourly_cost_rate: b2n(this.d.hourly_cost_rate),
                 hourly_billable_rate: b2n(this.d.hourly_billable_rate),
                 ot_hours: b2n(this.d.ot_hours),
+                ot_hourly_cost_rate: b2n(this.d.ot_hourly_cost_rate),
                 ot_hourly_billable_rate: b2n(this.d.ot_hourly_billable_rate),
                 premium_hours: b2n(this.d.premium_hours),
+                premium_hourly_cost_rate: b2n(this.d.premium_hourly_cost_rate),
                 premium_hourly_billable_rate: b2n(this.d.premium_hourly_billable_rate),
             };
             try {

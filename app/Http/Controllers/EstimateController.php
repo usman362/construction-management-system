@@ -539,6 +539,26 @@ class EstimateController extends Controller
             $merged = array_merge($estimateLine->toArray(), $data);
             $data['cost_type_id'] = $this->defaultCostTypeId($merged);
         }
+
+        // 2026-06-19 (Ali — Brenda's 60% phantom margin): labor rows often
+        // came in with hourly_billable_rate set but hourly_cost_rate empty,
+        // so cost_amount stayed at $0 and margin looked huge. If the row
+        // has a craft and no cost rate, pull from the craft master.
+        $effectiveCraftId = $data['craft_id'] ?? $estimateLine->craft_id;
+        if (($data['line_type'] ?? $estimateLine->line_type) === 'labor' && $effectiveCraftId) {
+            $craft = \App\Models\Craft::find($effectiveCraftId);
+            if ($craft) {
+                if (empty($data['hourly_cost_rate']) && empty($estimateLine->hourly_cost_rate) && $craft->base_hourly_rate) {
+                    $data['hourly_cost_rate'] = $craft->base_hourly_rate;
+                }
+                if (empty($data['ot_hourly_cost_rate']) && empty($estimateLine->ot_hourly_cost_rate)) {
+                    $otMult = $craft->overtime_multiplier ?? 1.5;
+                    $otBase = $craft->base_ot_hourly_rate ?? (($craft->base_hourly_rate ?? 0) * $otMult);
+                    if ($otBase > 0) $data['ot_hourly_cost_rate'] = $otBase;
+                }
+            }
+        }
+
         $estimateLine->update($data);
         return response()->json([
             'message' => 'Line updated.',
