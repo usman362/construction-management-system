@@ -353,6 +353,97 @@ class EstimateController extends Controller
     /**
      * Phase 3: Stream a styled PDF of the estimate (sections, totals, terms).
      */
+    /**
+     * 2026-06-19 (Brenda LAMELA Excel): Internal Schedule of Values summary.
+     * Rolls every line up by cost type and shows EST / COST / GP / GPM / Markup
+     * per bucket — the format Brenda uses to compare estimate margin to job
+     * profitability targets. Separate from the line-item client-facing PDF.
+     */
+    public function downloadSovPdf(Project $project, Estimate $estimate)
+    {
+        $this->assertEstimateBelongsToProject($project, $estimate);
+        $estimate->load(['client']);
+        $project->load('client');
+
+        $lines = $estimate->lines()->get();
+
+        // SOV row layout — matches LAMELA spreadsheet (cost types as buckets).
+        // Brenda's "01 DIRECT" combines our direct_labor + indirect_field_labor;
+        // "010 INDIRECT" is just field_staff (supervisors / QA).
+        $sov = [
+            '01 - DIRECT'                       => ['est' => 0.0, 'cost' => 0.0],
+            '010 - INDIRECT'                    => ['est' => 0.0, 'cost' => 0.0],
+            '02 - MATERIAL'                     => ['est' => 0.0, 'cost' => 0.0],
+            '03 - 3RD PARTY EQUIP'              => ['est' => 0.0, 'cost' => 0.0],
+            '04 - COMPANY EQUIP'                => ['est' => 0.0, 'cost' => 0.0],
+            '05 - CONSUMABLES TOOLS & SUPPLIES' => ['est' => 0.0, 'cost' => 0.0],
+            '06 - SUBCONTRACTOR'                => ['est' => 0.0, 'cost' => 0.0],
+            '08 - PER DIEM'                     => ['est' => 0.0, 'cost' => 0.0],
+            '09 - NON-REIM'                     => ['est' => 0.0, 'cost' => 0.0],
+            '12 - FREIGHT'                      => ['est' => 0.0, 'cost' => 0.0],
+            '13 - SALES TAX'                    => ['est' => 0.0, 'cost' => 0.0],
+            '14 - TRAVEL FEE'                   => ['est' => 0.0, 'cost' => 0.0],
+        ];
+
+        $bucketFor = function ($l) {
+            if ($l->line_type === 'labor') {
+                return $l->labor_category === 'field_staff' ? '010 - INDIRECT' : '01 - DIRECT';
+            }
+            if ($l->line_type === 'material')     return '02 - MATERIAL';
+            if ($l->line_type === 'equipment')    return $l->equipment_category === 'company_owned' ? '04 - COMPANY EQUIP' : '03 - 3RD PARTY EQUIP';
+            if ($l->line_type === 'subcontractor') return '06 - SUBCONTRACTOR';
+
+            // "Other" line type — route by cost_type when set (Per Diem, Freight, etc.)
+            $code = $l->costType?->code;
+            return match ($code) {
+                '07' => '08 - PER DIEM', // some installs code per diem as 07
+                '08' => '08 - PER DIEM',
+                '05' => '05 - CONSUMABLES TOOLS & SUPPLIES',
+                '09' => '09 - NON-REIM',
+                '12' => '12 - FREIGHT',
+                '13' => '13 - SALES TAX',
+                '14' => '14 - TRAVEL FEE',
+                default => '08 - PER DIEM',
+            };
+        };
+
+        // Cost amount per line — labor uses hours × cost rate; others use the
+        // stored cost_amount (already computed by EstimateLine::recalculate()).
+        foreach ($lines as $l) {
+            $bucket = $bucketFor($l->loadMissing('costType'));
+            $sov[$bucket]['est']  += (float) $l->price_amount;
+            $sov[$bucket]['cost'] += (float) $l->cost_amount;
+        }
+
+        // Derive GP / GPM / Markup per row + grand totals.
+        $totalEst = 0.0; $totalCost = 0.0;
+        foreach ($sov as $k => $row) {
+            $sov[$k]['gp']     = $row['est'] - $row['cost'];
+            $sov[$k]['gpm']    = $row['est']  > 0 ? ($sov[$k]['gp'] / $row['est'])  : null;
+            $sov[$k]['markup'] = $row['cost'] > 0 ? ($sov[$k]['gp'] / $row['cost']) : null;
+            $totalEst  += $row['est'];
+            $totalCost += $row['cost'];
+        }
+        $totalGp     = $totalEst - $totalCost;
+        $totalMargin = $totalEst  > 0 ? $totalGp / $totalEst  : null;
+        $totalMarkup = $totalCost > 0 ? $totalGp / $totalCost : null;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.estimate-sov', [
+            'project'      => $project,
+            'estimate'     => $estimate,
+            'company'      => \App\Models\Setting::get('company_name', 'BuildTrack'),
+            'sov'          => $sov,
+            'totalEst'     => $totalEst,
+            'totalCost'    => $totalCost,
+            'totalGp'      => $totalGp,
+            'totalMargin'  => $totalMargin,
+            'totalMarkup'  => $totalMarkup,
+        ]);
+
+        $filename = 'estimate-sov-' . ($estimate->estimate_number ?? $estimate->id) . '.pdf';
+        return $pdf->download($filename);
+    }
+
     public function downloadPdf(Project $project, Estimate $estimate)
     {
         $this->assertEstimateBelongsToProject($project, $estimate);

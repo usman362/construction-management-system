@@ -8,9 +8,13 @@
         <a href="{{ route('projects.estimates.index', $project) }}" class="text-blue-600 hover:text-blue-900">&larr; Back to Estimates</a>
         <div class="flex items-center gap-2 flex-wrap">
             {{-- Phase 3: PDF + Send to Client + Accept/Reject --}}
-            <a href="{{ route('projects.estimates.pdf', [$project, $estimate]) }}" class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-lg border border-gray-200" title="Download PDF">
+            <a href="{{ route('projects.estimates.pdf', [$project, $estimate]) }}" class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-lg border border-gray-200" title="Download client-facing line-item PDF">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 PDF
+            </a>
+            <a href="{{ route('projects.estimates.sov', [$project, $estimate]) }}" class="inline-flex items-center gap-2 bg-white hover:bg-blue-50 text-blue-700 text-sm font-semibold px-3 py-2 rounded-lg border border-blue-200" title="Internal Schedule of Values — cost type summary with GPM / Markup">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v4H3V3zm0 7h18v4H3v-4zm0 7h18v4H3v-4z"/></svg>
+                SOV
             </a>
 
             @if($estimate->status === 'draft' || $estimate->status === 'submitted')
