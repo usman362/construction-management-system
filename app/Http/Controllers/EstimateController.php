@@ -188,10 +188,15 @@ class EstimateController extends Controller
         foreach ($crafts as $c) {
             $row = $pbrByCraft->get($c->id);
             if ($row) {
-                if ($row->base_hourly_rate)     $c->base_hourly_rate    = $row->base_hourly_rate;
-                if ($row->base_ot_hourly_rate)  $c->setAttribute('base_ot_hourly_rate', $row->base_ot_hourly_rate);
-                if ($row->straight_time_rate)   $c->billable_rate       = $row->straight_time_rate;
-                if ($row->overtime_rate)        $c->ot_billable_rate    = $row->overtime_rate;
+                // 2026-06-20 (Brenda): cost rate now burden-loaded
+                // (base × (1 + payroll tax + burden + insurance)) so the
+                // estimate's cost reflects what BCR actually pays per hour.
+                $stCost = $row->loadedCostRate();
+                $otCost = $row->loadedOtCostRate();
+                if ($stCost > 0) $c->base_hourly_rate = $stCost;
+                if ($otCost > 0) $c->setAttribute('base_ot_hourly_rate', $otCost);
+                if ($row->straight_time_rate)  $c->billable_rate    = $row->straight_time_rate;
+                if ($row->overtime_rate)       $c->ot_billable_rate = $row->overtime_rate;
             }
         }
 
@@ -645,8 +650,10 @@ class EstimateController extends Controller
                     ->whereNull('employee_id')
                     ->orderByDesc('effective_date')->first();
                 if ($pbr) {
-                    if ($pbr->base_hourly_rate)    $stCost = (float) $pbr->base_hourly_rate;
-                    if ($pbr->base_ot_hourly_rate) $otCost = (float) $pbr->base_ot_hourly_rate;
+                    // 2026-06-20 (Brenda): apply burden so cost rate reflects
+                    // payroll tax + SUTA + WC, not just bare wage.
+                    $stCost = $pbr->loadedCostRate();
+                    $otCost = $pbr->loadedOtCostRate();
                 }
             }
             $craft = \App\Models\Craft::find($effectiveCraftId);

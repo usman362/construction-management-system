@@ -154,6 +154,33 @@ class ProjectBillableRate extends Model
     }
 
     /**
+     * 2026-06-20 (Brenda): cost burden = mandatory employer expenses per
+     * labor hour. ST = payroll tax (FICA) + burden (SUTA) + insurance (WC).
+     * Excludes job expenses / consumables / overhead / profit which are
+     * markup, not cost.
+     */
+    public function loadedCostRate(): float
+    {
+        $base = (float) $this->base_hourly_rate;
+        if ($base <= 0) return 0.0;
+        $burdenSum = (float) $this->payroll_tax_rate
+                   + (float) $this->burden_rate
+                   + (float) $this->insurance_rate;
+        return round($base * (1 + $burdenSum), 4);
+    }
+
+    public function loadedOtCostRate(): float
+    {
+        $hasExplicitOt = $this->base_ot_hourly_rate !== null && (float) $this->base_ot_hourly_rate > 0;
+        $otBase = $hasExplicitOt ? (float) $this->base_ot_hourly_rate : ((float) $this->base_hourly_rate * 1.5);
+        if ($otBase <= 0) return 0.0;
+        $burdenSum = (float) $this->payroll_tax_ot_rate
+                   + (float) $this->burden_ot_rate
+                   + (float) $this->insurance_ot_rate;
+        return round($otBase * (1 + $burdenSum), 4);
+    }
+
+    /**
      * Get the total markup percentage as an attribute
      *
      * Returns the sum of all markup rates (excluding base) as a percentage.

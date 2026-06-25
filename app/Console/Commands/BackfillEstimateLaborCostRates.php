@@ -16,19 +16,22 @@ use Illuminate\Console\Command;
  */
 class BackfillEstimateLaborCostRates extends Command
 {
-    protected $signature = 'estimates:backfill-labor-cost-rates {--dry-run : Show what would change without writing}';
+    protected $signature = 'estimates:backfill-labor-cost-rates {--dry-run : Show what would change without writing} {--force : Also re-lookup lines that already have a cost rate (use after burden formula change)}';
     protected $description = 'Fill in hourly_cost_rate on labor estimate lines that have a craft but no cost rate (so margin is computed correctly)';
 
     public function handle(): int
     {
-        $dry = $this->option('dry-run');
-        $rows = EstimateLine::where('line_type', 'labor')
+        $dry   = $this->option('dry-run');
+        $force = $this->option('force');
+        $q = EstimateLine::where('line_type', 'labor')
             ->whereNotNull('craft_id')
-            ->where(function ($q) {
-                $q->whereNull('hourly_cost_rate')->orWhere('hourly_cost_rate', 0);
-            })
-            ->with('estimate:id,project_id')
-            ->get();
+            ->with('estimate:id,project_id');
+        if (!$force) {
+            $q->where(function ($w) {
+                $w->whereNull('hourly_cost_rate')->orWhere('hourly_cost_rate', 0);
+            });
+        }
+        $rows = $q->get();
 
         $this->info("Found {$rows->count()} labor lines missing cost rates.");
         $patched = 0; $skippedNoRate = []; $skippedNoCraft = 0;
@@ -50,8 +53,10 @@ class BackfillEstimateLaborCostRates extends Command
                     ->orderByDesc('effective_date')
                     ->first();
                 if ($pbr) {
-                    if ($pbr->base_hourly_rate)    $stCost = (float) $pbr->base_hourly_rate;
-                    if ($pbr->base_ot_hourly_rate) $otCost = (float) $pbr->base_ot_hourly_rate;
+                    // 2026-06-20 (Brenda): burden-loaded (base + FICA + SUTA + WC),
+                    // not bare wage. Matches her Excel SOV cost column.
+                    $stCost = $pbr->loadedCostRate();
+                    $otCost = $pbr->loadedOtCostRate();
                 }
             }
             // Fall back to craft master if PBR didn't cover it.
@@ -70,8 +75,8 @@ class BackfillEstimateLaborCostRates extends Command
             $this->line("  Line #{$line->id} (est {$line->estimate_id}, {$craft->name}): ST cost \$" . number_format($stCost, 2) . ", OT cost \$" . number_format($otCost, 2));
 
             if (!$dry) {
-                $line->hourly_cost_rate    = $stCost;
-                if (empty($line->ot_hourly_cost_rate)) $line->ot_hourly_cost_rate = $otCost;
+                $line->hourly_cost_rate = $stCost;
+                if ($force || empty($line->ot_hourly_cost_rate)) $line->ot_hourly_cost_rate = $otCost;
                 $line->save();  // triggers observer → recalculate → roll-up
             }
             $patched++;
