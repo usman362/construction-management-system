@@ -202,6 +202,24 @@ class EstimateController extends Controller
 
         // Group ALL lines by template section for the T&M view.
         $allLines = $estimate->lines()->with(['costCode', 'craft', 'material', 'equipment'])->orderBy('sort_order')->get();
+
+        // 2026-06-27 (Ali): live cost-rate health check. Surfaces missing cost
+        // rates on screen so Brenda catches it BEFORE the PDF/SOV stage.
+        $rateHealth = [];
+        $seenCrafts = [];
+        foreach ($allLines->where('line_type', 'labor') as $line) {
+            $craftId = $line->craft_id;
+            if (!$craftId || isset($seenCrafts[$craftId])) continue;
+            $seenCrafts[$craftId] = true;
+            $costRate = (float) $line->hourly_cost_rate;
+            $billRate = (float) $line->hourly_billable_rate;
+            if ($costRate <= 0 && $billRate > 0) {
+                $rateHealth[] = [
+                    'craft_id'   => $craftId,
+                    'craft_name' => $line->craft?->name ?? 'Unknown craft',
+                ];
+            }
+        }
         $laborByCategory = [];
         foreach (EstimateLine::LABOR_CATEGORIES as $cat => $label) {
             $laborByCategory[$cat] = $allLines->where('line_type', 'labor')->where('labor_category', $cat)->values();
@@ -233,6 +251,7 @@ class EstimateController extends Controller
             'subcontractorLines' => $subcontractorLines,
             'otherLines'         => $otherLines,
             'uncategorizedLabor' => $uncategorizedLabor,
+            'rateHealth'         => $rateHealth,
         ]);
     }
 

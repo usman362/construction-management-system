@@ -148,6 +148,37 @@
         </div>
     @endif
 
+    {{-- ── Cost rate health banner (Ali 2026-06-27) ──
+         Surfaces missing labor cost rates BEFORE the PDF/SOV stage so
+         Brenda can fix them on the spot instead of generating a wrong
+         margin downstream. --}}
+    @if(!empty($rateHealth))
+        <div class="bg-amber-50 border-l-4 border-amber-400 rounded-lg shadow-sm p-4 mb-4">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                </svg>
+                <div class="flex-1">
+                    <h3 class="text-sm font-bold text-amber-900">
+                        {{ count($rateHealth) }} {{ Str::plural('craft', count($rateHealth)) }} on this estimate {{ count($rateHealth) === 1 ? 'has' : 'have' }} a billable rate but no cost rate
+                    </h3>
+                    <p class="text-xs text-amber-800 mt-1">
+                        Cost is treated as $0 for these, which makes the SOV margin look artificially high.
+                        Open <a href="{{ route('projects.billable-rates.index', $project) }}" class="underline font-semibold">Billable Rates</a>
+                        and fill in <strong>Base ST</strong> + the burden fields (Payroll Tax, Burden, Insurance) for:
+                    </p>
+                    <ul class="mt-2 flex flex-wrap gap-1.5">
+                        @foreach($rateHealth as $rh)
+                            <li class="text-xs font-semibold bg-white text-amber-800 border border-amber-300 rounded px-2 py-0.5">
+                                {{ $rh['craft_name'] }}
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- ═══════════════════════════════════════════════════════════════════
          T&M ESTIMATE BUILDER — template-driven layout (Phase 1 refactor)
          ═══════════════════════════════════════════════════════════════════ --}}
