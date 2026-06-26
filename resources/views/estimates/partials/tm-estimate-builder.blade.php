@@ -457,6 +457,130 @@
         </details>
     </div>
 
+    {{-- ═══════ TRAVEL / PER DIEM (Brenda Phase 2) ═══════ --}}
+    <div class="px-4 pt-4 pb-2">
+        <details class="group">
+            <summary class="flex items-center justify-between cursor-pointer py-2 px-3 bg-teal-50 hover:bg-teal-100 rounded-lg border border-teal-200">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-teal-500 transition group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    <h3 class="text-sm font-bold text-teal-900 uppercase tracking-wide">Travel / Per Diem</h3>
+                    <span class="text-xs text-teal-600" x-text="'(' + (sectionCounts['per_diem'] || 0) + ' lines)'"></span>
+                </div>
+                <span class="text-xs text-gray-600">Total: <strong class="text-gray-900" x-text="'$' + fmtM(sectionTotals['per_diem']?.price || 0)"></strong></span>
+            </summary>
+            <div class="mt-2 overflow-x-auto">
+                <table class="w-full text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 border-b border-gray-300">
+                            <th class="px-2 py-1.5 text-left font-semibold w-24">Cost Code</th>
+                            <th class="px-2 py-1.5 text-left font-semibold min-w-[180px]">Description (Per Diem / Mileage / Travel)</th>
+                            <th class="px-2 py-1.5 text-center font-semibold w-16">Qty</th>
+                            <th class="px-2 py-1.5 text-left font-semibold w-24">UOM</th>
+                            <th class="px-2 py-1.5 text-right font-semibold w-24">Unit Cost</th>
+                            <th class="px-2 py-1.5 text-right font-semibold w-16">Markup %</th>
+                            <th class="px-2 py-1.5 text-right font-bold w-24">Total $</th>
+                            <th class="px-2 py-1.5 w-8"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($perDiemLines ?? [] as $line)
+                        <tr class="border-b border-gray-100 hover:bg-gray-50" x-data="tmOtherRow({{ json_encode([
+                            'id' => $line->id,
+                            'cost_code_id' => $line->cost_code_id,
+                            'description' => $line->description,
+                            'quantity' => (float) $line->quantity,
+                            'unit' => $line->unit,
+                            'unit_cost' => (float) $line->unit_cost,
+                            'markup_percent' => (float) $line->markup_percent,
+                            'price_amount' => (float) $line->price_amount,
+                            'subtype' => 'per_diem',
+                        ]) }})">
+                            <td class="px-1 py-1"><select x-model="d.cost_code_id" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded"><option value="">—</option>@foreach($costCodes as $cc)<option value="{{ $cc->id }}">{{ $cc->code }}</option>@endforeach</select></td>
+                            <td class="px-1 py-1"><input type="text" x-model="d.description" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded" placeholder="e.g. Per Diem - Foreman"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.quantity" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="text" x-model="d.unit" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded" placeholder="day / mi / trip"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.unit_cost" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="1" max="1000" :value="Math.round((d.markup_percent||0)*100)" @change="d.markup_percent = (parseFloat($event.target.value)||0)/100; save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded" title="Enter as percent (10 = 10%)"></td>
+                            <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(otherTotal())"></td>
+                            <td class="px-1 py-1 text-center whitespace-nowrap">
+                                <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                                <button @click="removeLine()" class="text-red-400 hover:text-red-600" title="Delete"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <div class="py-2 px-3">
+                <button @click="addOtherLine('per_diem')" class="text-xs font-semibold text-teal-600 hover:text-teal-800 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    Add Travel / Per Diem Line
+                </button>
+            </div>
+        </details>
+    </div>
+
+    {{-- ═══════ MISCELLANEOUS COSTS (Brenda Phase 2 — drug test / welder testing / fit test / training) ═══════ --}}
+    <div class="px-4 pt-4 pb-2">
+        <details class="group">
+            <summary class="flex items-center justify-between cursor-pointer py-2 px-3 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide">Miscellaneous Costs</h3>
+                    <span class="text-xs text-slate-600" x-text="'(' + (sectionCounts['misc'] || 0) + ' lines)'"></span>
+                </div>
+                <span class="text-xs text-gray-600">Total: <strong class="text-gray-900" x-text="'$' + fmtM(sectionTotals['misc']?.price || 0)"></strong></span>
+            </summary>
+            <div class="mt-2 overflow-x-auto">
+                <table class="w-full text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 border-b border-gray-300">
+                            <th class="px-2 py-1.5 text-left font-semibold w-24">Cost Code</th>
+                            <th class="px-2 py-1.5 text-left font-semibold min-w-[180px]">Description (Drug Test / Welder Test / Fit Test / Training)</th>
+                            <th class="px-2 py-1.5 text-center font-semibold w-20"># Workers</th>
+                            <th class="px-2 py-1.5 text-right font-semibold w-24">$/Worker</th>
+                            <th class="px-2 py-1.5 text-right font-semibold w-16">Markup %</th>
+                            <th class="px-2 py-1.5 text-right font-bold w-24">Total $</th>
+                            <th class="px-2 py-1.5 w-8"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($miscLines ?? [] as $line)
+                        <tr class="border-b border-gray-100 hover:bg-gray-50" x-data="tmOtherRow({{ json_encode([
+                            'id' => $line->id,
+                            'cost_code_id' => $line->cost_code_id,
+                            'description' => $line->description,
+                            'quantity' => (float) $line->quantity,
+                            'unit' => $line->unit,
+                            'unit_cost' => (float) $line->unit_cost,
+                            'markup_percent' => (float) $line->markup_percent,
+                            'price_amount' => (float) $line->price_amount,
+                            'subtype' => 'misc',
+                        ]) }})">
+                            <td class="px-1 py-1"><select x-model="d.cost_code_id" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded"><option value="">—</option>@foreach($costCodes as $cc)<option value="{{ $cc->id }}">{{ $cc->code }}</option>@endforeach</select></td>
+                            <td class="px-1 py-1"><input type="text" x-model="d.description" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded" placeholder="e.g. Drug Testing"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="1" x-model.number="d.quantity" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="0.01" x-model.number="d.unit_cost" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="1" max="1000" :value="Math.round((d.markup_percent||0)*100)" @change="d.markup_percent = (parseFloat($event.target.value)||0)/100; save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded" title="Enter as percent (10 = 10%)"></td>
+                            <td class="px-1 py-1 text-right font-bold text-gray-900" x-text="'$' + fmtM(otherTotal())"></td>
+                            <td class="px-1 py-1 text-center whitespace-nowrap">
+                                <button @click="$dispatch('tm-edit', d)" class="text-indigo-500 hover:text-indigo-700 mr-1" title="Edit line"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                                <button @click="removeLine()" class="text-red-400 hover:text-red-600" title="Delete"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <div class="py-2 px-3">
+                <button @click="addOtherLine('misc')" class="text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    Add Misc Cost Line
+                </button>
+            </div>
+        </details>
+    </div>
+
     {{-- ═══════ COST SUMMARY ═══════ --}}
     <div class="px-4 pt-6 pb-6">
         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -472,6 +596,8 @@
                     <tr class="border-b border-gray-100"><td class="py-1.5 text-gray-700">Total 3rd Party Equipment</td><td class="py-1.5 text-right font-semibold" x-text="'$' + fmtM(sectionTotals['equip_3p']?.price || 0)"></td></tr>
                     <tr class="border-b border-gray-100"><td class="py-1.5 text-gray-700">Total Company Owned Equipment</td><td class="py-1.5 text-right font-semibold" x-text="'$' + fmtM(sectionTotals['equip_coe']?.price || 0)"></td></tr>
                     <tr class="border-b border-gray-100"><td class="py-1.5 text-gray-700">Total Subcontractors</td><td class="py-1.5 text-right font-semibold" x-text="'$' + fmtM(sectionTotals['subcontractor']?.price || 0)"></td></tr>
+                    <tr class="border-b border-gray-100"><td class="py-1.5 text-gray-700">Total Travel / Per Diem</td><td class="py-1.5 text-right font-semibold" x-text="'$' + fmtM(sectionTotals['per_diem']?.price || 0)"></td></tr>
+                    <tr class="border-b border-gray-100"><td class="py-1.5 text-gray-700">Total Miscellaneous Costs</td><td class="py-1.5 text-right font-semibold" x-text="'$' + fmtM(sectionTotals['misc']?.price || 0)"></td></tr>
                     <tr><td colspan="2" class="py-1"></td></tr>
                     <tr class="border-t-2 border-gray-400 bg-blue-50"><td class="py-2 font-bold text-blue-900 text-base">Total T&M Budgetary Quote</td><td class="py-2 text-right font-bold text-blue-900 text-base" x-text="'$' + fmtM(summary.totalPrice)"></td></tr>
                 </tbody>

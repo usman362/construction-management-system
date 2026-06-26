@@ -228,7 +228,15 @@ class EstimateController extends Controller
         $equipmentLines3p  = $allLines->where('line_type', 'equipment')->where('equipment_category', '3rd_party')->values();
         $equipmentLinesCoe = $allLines->where('line_type', 'equipment')->where('equipment_category', 'company_owned')->values();
         $subcontractorLines = $allLines->where('line_type', 'subcontractor')->values();
-        $otherLines = $allLines->where('line_type', 'other')->values();
+        // 2026-06-27 (Brenda Phase 2): split "other" line_type by cost type
+        // code so Per Diem (07/08) and Misc/Consumables (05) get their own
+        // sections in the T&M builder.
+        $perDiemCostTypeIds = \App\Models\CostType::whereIn('code', ['07', '08'])->pluck('id')->all();
+        $miscCostTypeIds    = \App\Models\CostType::whereIn('code', ['05', '14'])->pluck('id')->all();
+        $otherAll           = $allLines->where('line_type', 'other');
+        $perDiemLines       = $otherAll->whereIn('cost_type_id', $perDiemCostTypeIds)->values();
+        $miscLines          = $otherAll->whereIn('cost_type_id', $miscCostTypeIds)->values();
+        $otherLines         = $otherAll->filter(fn($l) => !in_array($l->cost_type_id, array_merge($perDiemCostTypeIds, $miscCostTypeIds)))->values();
         // Lines with no labor_category set (legacy data) — show in a fallback section
         $uncategorizedLabor = $allLines->where('line_type', 'labor')->whereNull('labor_category')->values();
 
@@ -249,6 +257,8 @@ class EstimateController extends Controller
             'equipmentLines3p'   => $equipmentLines3p,
             'equipmentLinesCoe'  => $equipmentLinesCoe,
             'subcontractorLines' => $subcontractorLines,
+            'perDiemLines'       => $perDiemLines,
+            'miscLines'          => $miscLines,
             'otherLines'         => $otherLines,
             'uncategorizedLabor' => $uncategorizedLabor,
             'rateHealth'         => $rateHealth,
@@ -627,6 +637,20 @@ class EstimateController extends Controller
         // default for this line type (set in ClientDefaultMarkup).
         $data['markup_percent'] = $this->resolveMarkup($data, $estimate);
 
+        // 2026-06-27 (Brenda Phase 2): line_subtype ('per_diem' / 'misc' / 'travel')
+        // is a UI-only hint that maps to the right CostType code so the SOV
+        // bucket lands correctly. Drop it from $data before persisting since
+        // there's no column for it.
+        $subtype = $data['line_subtype'] ?? null;
+        unset($data['line_subtype']);
+        if (empty($data['cost_type_id']) && $subtype) {
+            $codeMap = ['per_diem' => '08', 'travel' => '14', 'misc' => '05'];
+            $code = $codeMap[$subtype] ?? null;
+            if ($code) {
+                $data['cost_type_id'] = \App\Models\CostType::where('code', $code)->value('id');
+            }
+        }
+
         // 2026-06-19 (Brenda): "Cost type is only populating if I use the
         // add a line button" — the T&M builder didn't send cost_type_id, so
         // new lines landed with no cost type. Auto-set it from line_type +
@@ -659,6 +683,9 @@ class EstimateController extends Controller
     public function updateLine(Request $request, Project $project, EstimateLine $estimateLine): JsonResponse
     {
         $data = $this->validateLine($request);
+        // line_subtype is a UI-only hint (Brenda Phase 2 — Per Diem / Misc).
+        // Drop before persist; cost_type_id was already chosen on creation.
+        unset($data['line_subtype']);
         // Fill cost_type_id if still empty after this update — same rule
         // as addLine so legacy / T&M-builder rows pick up the right type.
         if (empty($data['cost_type_id']) && empty($estimateLine->cost_type_id)) {
@@ -866,6 +893,7 @@ class EstimateController extends Controller
         // field names so they don't get silently dropped from validated().
         $rules = [
             'line_type'      => 'nullable|in:' . implode(',', array_keys(EstimateLine::TYPES)),
+            'line_subtype'   => 'nullable|in:per_diem,misc,travel',
             'labor_category' => 'nullable|in:' . implode(',', array_keys(EstimateLine::LABOR_CATEGORIES)),
             'section_id'     => 'nullable|exists:estimate_sections,id',
             'sort_order'     => 'nullable|integer',
@@ -996,7 +1024,11 @@ class EstimateController extends Controller
             'equip_3p'             => ['price' => 0.0, 'count' => 0],
             'equip_coe'            => ['price' => 0.0, 'count' => 0],
             'subcontractor'        => ['price' => 0.0, 'count' => 0],
+            'per_diem'             => ['price' => 0.0, 'count' => 0],
+            'misc'                 => ['price' => 0.0, 'count' => 0],
         ];
+        $perDiemCostTypeIds = \App\Models\CostType::whereIn('code', ['07', '08'])->pluck('id')->all();
+        $miscCostTypeIds    = \App\Models\CostType::whereIn('code', ['05', '14'])->pluck('id')->all();
         foreach ($lines as $l) {
             $price = (float) $l->price_amount;
             if ($l->line_type === 'labor' && in_array($l->labor_category, array_keys(EstimateLine::LABOR_CATEGORIES))) {
@@ -1012,6 +1044,12 @@ class EstimateController extends Controller
                 $tm[$key]['price'] += $price; $tm[$key]['count']++;
             } elseif ($l->line_type === 'subcontractor') {
                 $tm['subcontractor']['price'] += $price; $tm['subcontractor']['count']++;
+            } elseif ($l->line_type === 'other') {
+                if (in_array($l->cost_type_id, $perDiemCostTypeIds)) {
+                    $tm['per_diem']['price'] += $price; $tm['per_diem']['count']++;
+                } elseif (in_array($l->cost_type_id, $miscCostTypeIds)) {
+                    $tm['misc']['price'] += $price; $tm['misc']['count']++;
+                }
             }
         }
 

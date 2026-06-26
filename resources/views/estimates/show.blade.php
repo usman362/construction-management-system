@@ -1790,7 +1790,7 @@ function tmEstimate() {
         },
 
         rebuildTotals() {
-            const cats = ['direct_labor','indirect_field_labor','field_staff','material','equip_3p','equip_coe','subcontractor'];
+            const cats = ['direct_labor','indirect_field_labor','field_staff','material','equip_3p','equip_coe','subcontractor','per_diem','misc'];
             const totals = {};
             const counts = {};
             cats.forEach(c => { totals[c] = { price: 0, cost: 0, totalHours: 0, stHours: 0, otHours: 0 }; counts[c] = 0; });
@@ -1814,6 +1814,12 @@ function tmEstimate() {
             @endforeach
             @foreach($subcontractorLines ?? [] as $line)
                 totals['subcontractor'].price += {{ (float) $line->price_amount }}; counts['subcontractor']++;
+            @endforeach
+            @foreach($perDiemLines ?? [] as $line)
+                totals['per_diem'].price += {{ (float) $line->price_amount }}; counts['per_diem']++;
+            @endforeach
+            @foreach($miscLines ?? [] as $line)
+                totals['misc'].price += {{ (float) $line->price_amount }}; counts['misc']++;
             @endforeach
             this.sectionTotals = totals;
             this.sectionCounts = counts;
@@ -1889,6 +1895,29 @@ function tmEstimate() {
                     method: 'POST',
                     headers: { 'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf },
                     body: JSON.stringify({ line_type: 'subcontractor', description: 'New subcontractor' }),
+                });
+                if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
+                sessionStorage.setItem('tmEstScroll', window.scrollY);
+                location.reload();
+            } catch (e) { console.error(e); }
+        },
+
+        // 2026-06-27 (Brenda Phase 2): Travel/Per Diem + Misc Cost rows. Same
+        // line_type=other under the hood; subtype is mapped to a cost_type
+        // code server-side ('08' for per diem, '05' for misc) so the SOV
+        // buckets correctly.
+        async addOtherLine(subtype) {
+            const csrf = document.querySelector('meta[name=csrf-token]').content;
+            const isPerDiem = subtype === 'per_diem';
+            try {
+                const r = await fetch(EST_BASE + '/lines', {
+                    method: 'POST',
+                    headers: { 'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf },
+                    body: JSON.stringify({
+                        line_type: 'other',
+                        description: isPerDiem ? 'New per diem / travel' : 'New misc cost',
+                        line_subtype: subtype,
+                    }),
                 });
                 if (!r.ok) { Toast.fire({icon:'error',title:'Could not add line'}); return; }
                 sessionStorage.setItem('tmEstScroll', window.scrollY);
@@ -2143,6 +2172,58 @@ function tmSubRow(data) {
                 discipline: b2n(this.d.discipline),
                 subcontractor_name: b2n(this.d.subcontractor_name),
                 quote_amount: b2n(this.d.quote_amount),
+                markup_percent: b2n(this.d.markup_percent),
+            };
+            try {
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                    method: 'PUT', headers: { 'Accept':'application/json','Content-Type':'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify(payload),
+                });
+                if (r.ok) {
+                    const body = await r.json();
+                    if (body.totals) window.dispatchEvent(new CustomEvent('tm-totals-updated', { detail: body.totals }));
+                    if (body.line && body.line.price_amount !== undefined) this.d.price_amount = parseFloat(body.line.price_amount);
+                }
+            } catch (e) { console.error(e); }
+        },
+        async removeLine() {
+            if (!confirm('Delete this line?')) return;
+            await fetch(window.BASE_URL + '/projects/{{ $project->id }}/estimates/lines/' + this.d.id, {
+                method: 'DELETE', headers: { 'Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+            });
+            sessionStorage.setItem('tmEstScroll', window.scrollY);
+            location.reload();
+        },
+    };
+}
+
+// 2026-06-27 (Brenda Phase 2): Travel/Per Diem + Misc Cost rows. Stored as
+// line_type='other' with a cost_type that routes the line to the right
+// SOV bucket. UI is Qty × Unit Cost × Markup — fits both shapes cleanly.
+function tmOtherRow(data) {
+    return {
+        d: data,
+        timer: null,
+        fmtM(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        otherTotal() {
+            const cost = (this.d.quantity || 0) * (this.d.unit_cost || 0);
+            return cost + cost * (this.d.markup_percent || 0);
+        },
+        save() {
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this._doSave(), 400);
+        },
+        async _doSave() {
+            const b2n = v => (v === '' || v === null || v === undefined) ? null : v;
+            const payload = {
+                line_type: 'other',
+                line_subtype: this.d.subtype || null,
+                description: this.d.description || 'Cost',
+                cost_code_id: b2n(this.d.cost_code_id),
+                quantity: b2n(this.d.quantity),
+                unit: b2n(this.d.unit),
+                unit_cost: b2n(this.d.unit_cost),
                 markup_percent: b2n(this.d.markup_percent),
             };
             try {
