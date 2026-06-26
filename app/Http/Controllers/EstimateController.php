@@ -370,7 +370,7 @@ class EstimateController extends Controller
         $estimate->load(['client']);
         $project->load('client');
 
-        $lines = $estimate->lines()->get();
+        $lines = $estimate->lines()->with('craft:id,name', 'costType:id,code,name')->get();
 
         // SOV row layout — matches LAMELA spreadsheet (cost types as buckets).
         // Brenda's "01 DIRECT" combines our direct_labor + indirect_field_labor;
@@ -415,7 +415,7 @@ class EstimateController extends Controller
         // Cost amount per line — labor uses hours × cost rate; others use the
         // stored cost_amount (already computed by EstimateLine::recalculate()).
         foreach ($lines as $l) {
-            $bucket = $bucketFor($l->loadMissing('costType'));
+            $bucket = $bucketFor($l);
             $sov[$bucket]['est']  += (float) $l->price_amount;
             $sov[$bucket]['cost'] += (float) $l->cost_amount;
         }
@@ -433,16 +433,27 @@ class EstimateController extends Controller
         $totalMargin = $totalEst  > 0 ? $totalGp / $totalEst  : null;
         $totalMarkup = $totalCost > 0 ? $totalGp / $totalCost : null;
 
+        // 2026-06-26 (Brenda): when labor lines have cost rate = 0 the SOV
+        // shows blank COST and the margin looks impossibly high. Call out
+        // which crafts need Base ST rates entered on Setup → Billable Rates.
+        $missingCostCrafts = $lines
+            ->filter(fn ($l) => $l->line_type === 'labor' && (float) $l->price_amount > 0 && (float) $l->cost_amount <= 0)
+            ->map(fn ($l) => $l->craft?->name ?? 'Labor (no craft)')
+            ->unique()
+            ->values()
+            ->all();
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.estimate-sov', [
-            'project'      => $project,
-            'estimate'     => $estimate,
-            'company'      => \App\Models\Setting::get('company_name', 'BuildTrack'),
-            'sov'          => $sov,
-            'totalEst'     => $totalEst,
-            'totalCost'    => $totalCost,
-            'totalGp'      => $totalGp,
-            'totalMargin'  => $totalMargin,
-            'totalMarkup'  => $totalMarkup,
+            'project'           => $project,
+            'estimate'          => $estimate,
+            'company'           => \App\Models\Setting::get('company_name', 'BuildTrack'),
+            'sov'               => $sov,
+            'totalEst'          => $totalEst,
+            'totalCost'         => $totalCost,
+            'totalGp'           => $totalGp,
+            'totalMargin'       => $totalMargin,
+            'totalMarkup'       => $totalMarkup,
+            'missingCostCrafts' => $missingCostCrafts,
         ]);
 
         $filename = 'estimate-sov-' . ($estimate->estimate_number ?? $estimate->id) . '.pdf';

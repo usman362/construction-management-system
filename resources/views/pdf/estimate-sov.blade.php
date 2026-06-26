@@ -32,6 +32,8 @@
     .sov-table tr.margin-row td.label { text-align: right; color: #111827; }
 
     .footer-note { margin-top: 12px; font-size: 8pt; color: #6b7280; font-style: italic; }
+    .warn-box { margin-top: 10px; padding: 10px 12px; background: #fef3c7; border-left: 4px solid #d97706; font-size: 9pt; color: #78350f; }
+    .warn-box strong { color: #78350f; }
 </style>
 </head>
 <body>
@@ -100,6 +102,17 @@
         </tr>
     </tbody>
 </table>
+
+@if(!empty($missingCostCrafts))
+<div class="warn-box">
+    <strong>Heads up — labor cost column is incomplete.</strong>
+    These crafts have a billable rate but no cost rate yet, so the system is treating them as $0 cost
+    (which is why Margin looks higher than it should):
+    <strong>{{ implode(', ', $missingCostCrafts) }}</strong>.
+    Open this project → <strong>Setup → Billable Rates</strong> and enter the <em>Base ST</em>
+    + burden fields (Payroll Tax, Burden, Insurance) for each one, then regenerate this SOV.
+</div>
+@endif
 
 <div class="footer-note">
     Internal Schedule of Values · generated from estimate {{ $estimate->estimate_number ?? '#'.$estimate->id }}.
