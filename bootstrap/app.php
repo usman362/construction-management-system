@@ -66,6 +66,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', [
             \App\Http\Middleware\CheckActiveUser::class,
         ]);
+
+        // Site-wide gate (Ali 2026-06-27) — runs FIRST on every web request
+        // when SITE_GATE_ENABLED=true. Used to password-protect the whole
+        // site during pre-launch / staging without touching .htaccess.
+        $middleware->prependToGroup('web', [
+            \App\Http\Middleware\SiteGate::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
