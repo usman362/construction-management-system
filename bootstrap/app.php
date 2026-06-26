@@ -67,12 +67,14 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\CheckActiveUser::class,
         ]);
 
-        // Site-wide gate (Ali 2026-06-27) — runs FIRST on every web request
+        // Site-wide gate (Ali 2026-06-27) — runs FIRST on every request
         // when SITE_GATE_ENABLED=true. Used to password-protect the whole
         // site during pre-launch / staging without touching .htaccess.
-        $middleware->prependToGroup('web', [
-            \App\Http\Middleware\SiteGate::class,
-        ]);
+        //
+        // GLOBAL (not web-group) so it intercepts the form POST BEFORE the
+        // router checks if the URL allows POST — otherwise hitting "/"
+        // returns 405 Method Not Allowed before the gate can validate.
+        $middleware->prepend(\App\Http\Middleware\SiteGate::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
