@@ -388,6 +388,66 @@ class EstimateController extends Controller
      * Phase 3: Stream a styled PDF of the estimate (sections, totals, terms).
      */
     /**
+     * 2026-06-28 (Brenda): "The billable craft / rates and markups are on the
+     * project billable rates, but the estimate sheet is not reading them."
+     *
+     * Existing labor lines keep whatever rates were stored when they were
+     * originally created. If Brenda added lines BEFORE setting up Project
+     * Billable Rates (or updated rates afterwards), the lines have stale
+     * values. Re-pull every labor line's rates from the current PBR for
+     * its craft+project.
+     */
+    public function refreshRatesFromProject(Project $project, Estimate $estimate): JsonResponse
+    {
+        $this->assertEstimateBelongsToProject($project, $estimate);
+
+        $lines = $estimate->lines()->where('line_type', 'labor')->whereNotNull('craft_id')->get();
+        $touched = 0; $skipped = 0;
+
+        foreach ($lines as $line) {
+            $pbr = \App\Models\ProjectBillableRate::where('project_id', $project->id)
+                ->where('craft_id', $line->craft_id)
+                ->whereNull('employee_id')
+                ->orderByDesc('effective_date')
+                ->first();
+
+            if (!$pbr) { $skipped++; continue; }
+
+            $changed = false;
+            $stCost = $pbr->loadedCostRate();
+            $otCost = $pbr->loadedOtCostRate();
+            $stBill = (float) ($pbr->straight_time_rate ?? 0);
+            $otBill = (float) ($pbr->overtime_rate ?? 0);
+
+            if ($stCost > 0 && (float) $line->hourly_cost_rate !== $stCost) {
+                $line->hourly_cost_rate = $stCost; $changed = true;
+            }
+            if ($otCost > 0 && (float) $line->ot_hourly_cost_rate !== $otCost) {
+                $line->ot_hourly_cost_rate = $otCost; $changed = true;
+            }
+            if ($stBill > 0 && (float) $line->hourly_billable_rate !== $stBill) {
+                $line->hourly_billable_rate = $stBill; $changed = true;
+            }
+            if ($otBill > 0 && (float) $line->ot_hourly_billable_rate !== $otBill) {
+                $line->ot_hourly_billable_rate = $otBill; $changed = true;
+            }
+
+            if ($changed) {
+                $line->save(); // observer recalculates cost / price / markup
+                $touched++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Refreshed {$touched} labor line(s) from project rates." . ($skipped > 0 ? " {$skipped} skipped (no PBR for that craft)." : ''),
+            'touched' => $touched,
+            'skipped' => $skipped,
+            'totals'  => $this->totalsFor($estimate->fresh()),
+        ]);
+    }
+
+    /**
      * 2026-06-19 (Brenda LAMELA Excel): Internal Schedule of Values summary.
      * Rolls every line up by cost type and shows EST / COST / GP / GPM / Markup
      * per bucket — the format Brenda uses to compare estimate margin to job

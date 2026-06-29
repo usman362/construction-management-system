@@ -206,6 +206,7 @@ Route::middleware('auth')->group(function () {
             Route::post('estimates/{estimate}/response', [EstimateController::class, 'recordResponse'])->name('estimates.response');
             Route::get('estimates/{estimate}/pdf', [EstimateController::class, 'downloadPdf'])->name('estimates.pdf');
             Route::get('estimates/{estimate}/sov', [EstimateController::class, 'downloadSovPdf'])->name('estimates.sov');
+            Route::post('estimates/{estimate}/refresh-rates', [EstimateController::class, 'refreshRatesFromProject'])->name('estimates.refresh-rates');
             Route::get('estimates/{estimate}/lines/import/template', [ImportController::class, 'estimateLineTemplate'])->name('estimates.lines.import.template');
             Route::post('estimates/{estimate}/lines/import', [ImportController::class, 'estimateLineImport'])->name('estimates.lines.import');
         });

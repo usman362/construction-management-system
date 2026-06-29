@@ -16,6 +16,10 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v4H3V3zm0 7h18v4H3v-4zm0 7h18v4H3v-4z"/></svg>
                 SOV
             </a>
+            <button type="button" onclick="refreshRatesFromProject()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow-sm" title="Re-pull labor cost + billable rates from this project's Billable Rates page">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                Refresh Rates
+            </button>
 
             @if($estimate->status === 'draft' || $estimate->status === 'submitted')
                 <button type="button" onclick="markEstimateSent()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3 py-2 rounded-lg">
@@ -1608,6 +1612,25 @@ async function reportAjaxError(response, fallbackTitle) {
         || (bodyText && bodyText.length < 400 ? bodyText : null)
         || ('HTTP ' + response.status + ' — check the server logs.');
     Swal.fire({ icon: 'error', title: fallbackTitle, text: msg });
+}
+
+// 2026-06-28 (Brenda): "estimate sheet is not reading project billable rates"
+// — existing labor lines keep stale rates because onCraftPick only fills on
+// new pick. This button re-pulls current PBR rates into every labor line.
+async function refreshRatesFromProject() {
+    try {
+        const r = await fetch(EST_BASE + '/refresh-rates', {
+            method: 'POST',
+            headers: { 'Accept':'application/json','Content-Type':'application/json',
+                       'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+        });
+        if (!r.ok) { await reportAjaxError(r, 'Could not refresh rates'); return; }
+        const b = await r.json();
+        Toast.fire({ icon: 'success', title: b.message });
+        setTimeout(() => location.reload(), 800);
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Network error', text: e.message });
+    }
 }
 
 async function markEstimateSent() {
