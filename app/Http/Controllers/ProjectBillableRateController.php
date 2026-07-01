@@ -104,6 +104,7 @@ class ProjectBillableRateController extends Controller
             'payroll_tax_rate' => 'nullable|numeric|min:0|max:1',
             'burden_rate' => 'nullable|numeric|min:0|max:1',
             'insurance_rate' => 'nullable|numeric|min:0|max:1',
+            'benefits_rate' => 'nullable|numeric|min:0|max:1',
             'job_expenses_rate' => 'nullable|numeric|min:0|max:1',
             'consumables_rate' => 'nullable|numeric|min:0|max:1',
             'overhead_rate' => 'nullable|numeric|min:0|max:1',
@@ -111,6 +112,7 @@ class ProjectBillableRateController extends Controller
             'payroll_tax_ot_rate' => 'nullable|numeric|min:0|max:1',
             'burden_ot_rate' => 'nullable|numeric|min:0|max:1',
             'insurance_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'benefits_ot_rate' => 'nullable|numeric|min:0|max:1',
             'job_expenses_ot_rate' => 'nullable|numeric|min:0|max:1',
             'consumables_ot_rate' => 'nullable|numeric|min:0|max:1',
             'overhead_ot_rate' => 'nullable|numeric|min:0|max:1',
@@ -123,6 +125,7 @@ class ProjectBillableRateController extends Controller
         $validated['payroll_tax_rate'] = $validated['payroll_tax_rate'] ?? 0;
         $validated['burden_rate'] = $validated['burden_rate'] ?? 0;
         $validated['insurance_rate'] = $validated['insurance_rate'] ?? 0;
+        $validated['benefits_rate'] = $validated['benefits_rate'] ?? 0;
         $validated['job_expenses_rate'] = $validated['job_expenses_rate'] ?? 0;
         $validated['consumables_rate'] = $validated['consumables_rate'] ?? 0;
         $validated['overhead_rate'] = $validated['overhead_rate'] ?? 0;
@@ -152,6 +155,7 @@ class ProjectBillableRateController extends Controller
             'payroll_tax_rate' => 'nullable|numeric|min:0|max:1',
             'burden_rate' => 'nullable|numeric|min:0|max:1',
             'insurance_rate' => 'nullable|numeric|min:0|max:1',
+            'benefits_rate' => 'nullable|numeric|min:0|max:1',
             'job_expenses_rate' => 'nullable|numeric|min:0|max:1',
             'consumables_rate' => 'nullable|numeric|min:0|max:1',
             'overhead_rate' => 'nullable|numeric|min:0|max:1',
@@ -159,6 +163,7 @@ class ProjectBillableRateController extends Controller
             'payroll_tax_ot_rate' => 'nullable|numeric|min:0|max:1',
             'burden_ot_rate' => 'nullable|numeric|min:0|max:1',
             'insurance_ot_rate' => 'nullable|numeric|min:0|max:1',
+            'benefits_ot_rate' => 'nullable|numeric|min:0|max:1',
             'job_expenses_ot_rate' => 'nullable|numeric|min:0|max:1',
             'consumables_ot_rate' => 'nullable|numeric|min:0|max:1',
             'overhead_ot_rate' => 'nullable|numeric|min:0|max:1',
@@ -171,6 +176,7 @@ class ProjectBillableRateController extends Controller
         $validated['payroll_tax_rate'] = $validated['payroll_tax_rate'] ?? 0;
         $validated['burden_rate'] = $validated['burden_rate'] ?? 0;
         $validated['insurance_rate'] = $validated['insurance_rate'] ?? 0;
+        $validated['benefits_rate'] = $validated['benefits_rate'] ?? 0;
         $validated['job_expenses_rate'] = $validated['job_expenses_rate'] ?? 0;
         $validated['consumables_rate'] = $validated['consumables_rate'] ?? 0;
         $validated['overhead_rate'] = $validated['overhead_rate'] ?? 0;

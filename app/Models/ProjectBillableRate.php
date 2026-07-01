@@ -19,6 +19,7 @@ class ProjectBillableRate extends Model
         'payroll_tax_rate',
         'burden_rate',
         'insurance_rate',
+        'benefits_rate',
         'job_expenses_rate',
         'consumables_rate',
         'overhead_rate',
@@ -27,6 +28,7 @@ class ProjectBillableRate extends Model
         'payroll_tax_ot_rate',
         'burden_ot_rate',
         'insurance_ot_rate',
+        'benefits_ot_rate',
         'job_expenses_ot_rate',
         'consumables_ot_rate',
         'overhead_ot_rate',
@@ -45,6 +47,7 @@ class ProjectBillableRate extends Model
         'payroll_tax_rate' => 'decimal:4',
         'burden_rate' => 'decimal:4',
         'insurance_rate' => 'decimal:4',
+        'benefits_rate' => 'decimal:4',
         'job_expenses_rate' => 'decimal:4',
         'consumables_rate' => 'decimal:4',
         'overhead_rate' => 'decimal:4',
@@ -52,6 +55,7 @@ class ProjectBillableRate extends Model
         'payroll_tax_ot_rate' => 'decimal:4',
         'burden_ot_rate' => 'decimal:4',
         'insurance_ot_rate' => 'decimal:4',
+        'benefits_ot_rate' => 'decimal:4',
         'job_expenses_ot_rate' => 'decimal:4',
         'consumables_ot_rate' => 'decimal:4',
         'overhead_ot_rate' => 'decimal:4',
@@ -106,10 +110,12 @@ class ProjectBillableRate extends Model
     {
         $base = (float) $this->base_hourly_rate;
 
-        // ST markup %: sum of straight-time markup rates
+        // ST markup %: sum of straight-time markup rates (benefits included —
+        // it's a real per-hour cost that also rolls into billable).
         $stMarkup = (float) $this->payroll_tax_rate
             + (float) $this->burden_rate
             + (float) $this->insurance_rate
+            + (float) $this->benefits_rate
             + (float) $this->job_expenses_rate
             + (float) $this->consumables_rate
             + (float) $this->overhead_rate
@@ -119,6 +125,7 @@ class ProjectBillableRate extends Model
         $otMarkup = (float) $this->payroll_tax_ot_rate
             + (float) $this->burden_ot_rate
             + (float) $this->insurance_ot_rate
+            + (float) $this->benefits_ot_rate
             + (float) $this->job_expenses_ot_rate
             + (float) $this->consumables_ot_rate
             + (float) $this->overhead_ot_rate
@@ -155,9 +162,10 @@ class ProjectBillableRate extends Model
 
     /**
      * 2026-06-20 (Brenda): cost burden = mandatory employer expenses per
-     * labor hour. ST = payroll tax (FICA) + burden (SUTA) + insurance (WC).
-     * Excludes job expenses / consumables / overhead / profit which are
-     * markup, not cost.
+     * labor hour. ST = payroll tax (FICA/FUTA) + burden (SUTA) + insurance
+     * (WC) + benefits. Excludes job expenses / consumables / overhead /
+     * profit which are markup, not cost.
+     * 2026-07-02: added benefits per Brenda's explicit cost definition.
      */
     public function loadedCostRate(): float
     {
@@ -165,7 +173,8 @@ class ProjectBillableRate extends Model
         if ($base <= 0) return 0.0;
         $burdenSum = (float) $this->payroll_tax_rate
                    + (float) $this->burden_rate
-                   + (float) $this->insurance_rate;
+                   + (float) $this->insurance_rate
+                   + (float) $this->benefits_rate;
         return round($base * (1 + $burdenSum), 4);
     }
 
@@ -176,7 +185,8 @@ class ProjectBillableRate extends Model
         if ($otBase <= 0) return 0.0;
         $burdenSum = (float) $this->payroll_tax_ot_rate
                    + (float) $this->burden_ot_rate
-                   + (float) $this->insurance_ot_rate;
+                   + (float) $this->insurance_ot_rate
+                   + (float) $this->benefits_ot_rate;
         return round($otBase * (1 + $burdenSum), 4);
     }
 
@@ -192,6 +202,7 @@ class ProjectBillableRate extends Model
         return (float) $this->payroll_tax_rate
             + (float) $this->burden_rate
             + (float) $this->insurance_rate
+            + (float) $this->benefits_rate
             + (float) $this->job_expenses_rate
             + (float) $this->consumables_rate
             + (float) $this->overhead_rate

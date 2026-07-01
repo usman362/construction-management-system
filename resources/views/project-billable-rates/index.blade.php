@@ -172,7 +172,7 @@
                     <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
                         <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                     </div>
-                    @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
+                    @foreach(['payroll_tax' => 'Payroll Tax (FICA/FUTA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'benefits' => 'Benefits', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
                         <div class="grid grid-cols-3 gap-2 items-center mb-2">
                             <label class="text-sm text-gray-700">{{ $label }}</label>
                             <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
@@ -269,7 +269,7 @@
                     <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
                         <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                     </div>
-                    @foreach(['payroll_tax' => 'Payroll Tax (FICA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
+                    @foreach(['payroll_tax' => 'Payroll Tax (FICA/FUTA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'benefits' => 'Benefits', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
                         <div class="grid grid-cols-3 gap-2 items-center mb-2">
                             <label class="text-sm text-gray-700">{{ $label }}</label>
                             <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
@@ -427,9 +427,9 @@
         const baseRate = v('base_hourly_rate');
         const baseOtRate = v('base_ot_hourly_rate');
 
-        const stMarkup = v('payroll_tax_rate') + v('burden_rate') + v('insurance_rate')
+        const stMarkup = v('payroll_tax_rate') + v('burden_rate') + v('insurance_rate') + v('benefits_rate')
             + v('job_expenses_rate') + v('consumables_rate') + v('overhead_rate') + v('profit_rate');
-        const otMarkup = v('payroll_tax_ot_rate') + v('burden_ot_rate') + v('insurance_ot_rate')
+        const otMarkup = v('payroll_tax_ot_rate') + v('burden_ot_rate') + v('insurance_ot_rate') + v('benefits_ot_rate')
             + v('job_expenses_ot_rate') + v('consumables_ot_rate') + v('overhead_ot_rate') + v('profit_ot_rate');
 
         const stBase = baseRate;
@@ -524,6 +524,7 @@
             $('#edit_payroll_tax_rate').val(parseFloat(data.payroll_tax_rate || 0).toFixed(4));
             $('#edit_burden_rate').val(parseFloat(data.burden_rate || 0).toFixed(4));
             $('#edit_insurance_rate').val(parseFloat(data.insurance_rate || 0).toFixed(4));
+            $('#edit_benefits_rate').val(parseFloat(data.benefits_rate || 0).toFixed(4));
             $('#edit_job_expenses_rate').val(parseFloat(data.job_expenses_rate || 0).toFixed(4));
             $('#edit_consumables_rate').val(parseFloat(data.consumables_rate || 0).toFixed(4));
             $('#edit_overhead_rate').val(parseFloat(data.overhead_rate || 0).toFixed(4));
@@ -532,6 +533,7 @@
             $('#edit_payroll_tax_ot_rate').val(parseFloat(data.payroll_tax_ot_rate || 0).toFixed(4));
             $('#edit_burden_ot_rate').val(parseFloat(data.burden_ot_rate || 0).toFixed(4));
             $('#edit_insurance_ot_rate').val(parseFloat(data.insurance_ot_rate || 0).toFixed(4));
+            $('#edit_benefits_ot_rate').val(parseFloat(data.benefits_ot_rate || 0).toFixed(4));
             $('#edit_job_expenses_ot_rate').val(parseFloat(data.job_expenses_ot_rate || 0).toFixed(4));
             $('#edit_consumables_ot_rate').val(parseFloat(data.consumables_ot_rate || 0).toFixed(4));
             $('#edit_overhead_ot_rate').val(parseFloat(data.overhead_ot_rate || 0).toFixed(4));
