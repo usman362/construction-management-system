@@ -43,7 +43,18 @@ class DocumentController extends Controller
             'category'          => 'required|string|in:proposal,photo,change_order,purchase_order,delivery_ticket,estimate,daily_log,report,correspondence,contract,permit,insurance,other',
             'title'             => 'required|string|max:255',
             'description'       => 'nullable|string|max:1000',
-            'file'              => 'required|file|max:51200', // 50MB max
+            // 2026-07-01 QA: restrict to construction-doc types Brenda actually
+            // uploads. Blocks .php/.exe/.js/.html masquerading as documents.
+            // Uses `mimetypes` (file's real MIME) not `mimes` (extension) so a
+            // renamed .exe → .pdf gets rejected.
+            'file'              => [
+                'required', 'file', 'max:51200',
+                'mimetypes:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,'
+                    .'application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,'
+                    .'application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,'
+                    .'image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,'
+                    .'text/plain,text/csv,application/csv,application/zip,application/x-zip-compressed',
+            ],
         ]);
 
         $file = $request->file('file');

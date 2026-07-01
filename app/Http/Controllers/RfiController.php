@@ -17,11 +17,15 @@ class RfiController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Rfi::query()->with([
-            'project:id,name,project_number',
-            'submitter:id,name',
-            'assignee:id,name',
-        ]);
+        // 2026-07-01 QA: exclude orphan RFIs whose project was deleted —
+        // the view routes via `[$r->project, $r]` and crashes on null.
+        $query = Rfi::query()
+            ->whereHas('project')
+            ->with([
+                'project:id,name,project_number',
+                'submitter:id,name',
+                'assignee:id,name',
+            ]);
 
         if ($projectId = $request->input('project_id')) $query->where('project_id', $projectId);
         if ($status    = $request->input('status'))     $query->where('status', $status);

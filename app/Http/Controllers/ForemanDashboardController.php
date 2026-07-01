@@ -44,7 +44,11 @@ class ForemanDashboardController extends Controller
         // Pick which crews to show:
         //   - Foreman: just the crews they lead
         //   - Admin/PM/Accountant: ALL active crews (oversight view)
+        // 2026-07-01 QA: skip crews whose project was deleted — the dashboard
+        // views (lines 113/118/123/127/184) call route() with $crew->project
+        // and crash if it's null.
         $crewQuery = Crew::query()
+            ->whereHas('project')
             ->with([
                 'project:id,project_number,name,address,city,state,latitude,longitude,geofence_radius_m',
                 'project.client:id,name',

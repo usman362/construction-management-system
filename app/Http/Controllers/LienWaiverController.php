@@ -17,7 +17,11 @@ class LienWaiverController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = LienWaiver::query()->with(['project:id,name,project_number', 'vendor:id,name', 'commitment:id,commitment_number,po_number']);
+        // 2026-07-01 QA: same orphan-guard as RFIs — waivers whose project
+        // was deleted would crash route() calls in the view.
+        $query = LienWaiver::query()
+            ->whereHas('project')
+            ->with(['project:id,name,project_number', 'vendor:id,name', 'commitment:id,commitment_number,po_number']);
 
         if ($projectId = $request->input('project_id')) {
             $query->where('project_id', $projectId);
