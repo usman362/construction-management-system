@@ -286,6 +286,7 @@ class MondayDashboardController extends Controller
     {
         return Rfi::query()
             ->whereIn('status', ['submitted', 'in_review'])
+            ->whereHas('project')
             ->with('project:id,project_number,name')
             ->orderByRaw("CASE priority
                 WHEN 'critical' THEN 1
@@ -299,8 +300,12 @@ class MondayDashboardController extends Controller
 
     private function pendingChangeOrders()
     {
+        // 2026-07-01 (Ali): guard against orphaned COs whose project was
+        // deleted — the view's route() call needs both project + co or
+        // it throws UrlGenerationException and crashes the whole page.
         return ChangeOrder::query()
             ->where('status', 'pending')
+            ->whereHas('project')
             ->with('project:id,project_number,name')
             ->orderByDesc('date')
             ->limit(15)

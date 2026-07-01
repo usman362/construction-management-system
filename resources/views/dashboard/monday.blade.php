@@ -220,6 +220,7 @@
             @else
                 <ul class="space-y-2 text-sm">
                     @foreach($openRfis as $rfi)
+                        @continue(!$rfi->project)
                         <li class="flex items-start gap-2">
                             <span class="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded">{{ $rfi->rfi_number }}</span>
                             <div class="flex-1 min-w-0">
@@ -239,6 +240,7 @@
             @else
                 <ul class="space-y-2 text-sm">
                     @foreach($pendingCOs as $co)
+                        @continue(!$co->project)
                         <li class="flex items-start gap-2">
                             <span class="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded">CO {{ $co->co_number }}</span>
                             <div class="flex-1 min-w-0">

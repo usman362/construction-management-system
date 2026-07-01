@@ -68,9 +68,10 @@
                 </div>
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Project</label>
-                <select name="project_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                    <option value="">All projects</option>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                    Projects <span class="text-gray-400 font-normal">(leave empty for all · hold Ctrl/Cmd to select multiple)</span>
+                </label>
+                <select name="project_ids[]" multiple size="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
                     @foreach($projects as $p)
                         <option value="{{ $p->id }}">{{ $p->project_number }} — {{ $p->name }}</option>
                     @endforeach
@@ -817,9 +818,14 @@ function openBatchPrint(){
     openModal('batchPrintModal');
 }
 function submitBatchPrint(mode){
+    // 2026-07-01 (Brenda): support multi-select on Projects. FormData
+    // iterates over each selected value individually, and URLSearchParams
+    // handles the array-style key (project_ids[]) automatically.
     var form = document.getElementById('batchPrintForm');
     var params = new URLSearchParams();
-    new FormData(form).forEach(function(v, k){ if (v) params.append(k, v); });
+    new FormData(form).forEach(function(v, k){
+        if (v !== '' && v !== null && v !== undefined) params.append(k, v);
+    });
     params.append('mode', mode);
     var url = '{{ route("timesheets.print-batch") }}?' + params.toString();
     window.open(url, '_blank');

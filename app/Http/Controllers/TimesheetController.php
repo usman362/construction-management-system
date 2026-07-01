@@ -328,17 +328,22 @@ class TimesheetController extends Controller
     public function printBatch(Request $request): \Illuminate\Http\Response|View
     {
         $request->validate([
-            'employee_id' => 'nullable|exists:employees,id',
-            'project_id'  => 'nullable|exists:projects,id',
-            'crew_id'     => 'nullable|exists:crews,id',
-            'status'      => 'nullable|string',
-            'date_from'   => 'nullable|date',
-            'date_to'     => 'nullable|date',
-            'mode'        => 'nullable|in:html,pdf',
+            'employee_id'   => 'nullable|exists:employees,id',
+            'project_id'    => 'nullable|exists:projects,id',
+            // 2026-07-01 (Brenda): multi-select on Projects — employees
+            // often work on 3+ jobs in a week, billing needs to batch
+            // multiple projects in one print run.
+            'project_ids'   => 'nullable|array',
+            'project_ids.*' => 'integer|exists:projects,id',
+            'crew_id'       => 'nullable|exists:crews,id',
+            'status'        => 'nullable|string',
+            'date_from'     => 'nullable|date',
+            'date_to'       => 'nullable|date',
+            'mode'          => 'nullable|in:html,pdf',
             // 2026-04-28 (Brenda): "weekly" = one page per employee per
             // Mon–Sun week, full 7-day grid. Default 'daily' keeps the
             // legacy one-page-per-timesheet output.
-            'layout'      => 'nullable|in:daily,weekly',
+            'layout'        => 'nullable|in:daily,weekly',
         ]);
 
         $query = Timesheet::with([
@@ -347,7 +352,14 @@ class TimesheetController extends Controller
         ]);
 
         if ($request->filled('employee_id')) $query->where('employee_id', $request->employee_id);
-        if ($request->filled('project_id'))  $query->where('project_id', $request->project_id);
+        // Project filter: accept either an array (multi-select) or a single id.
+        $projectIds = (array) ($request->input('project_ids') ?: []);
+        if (empty($projectIds) && $request->filled('project_id')) {
+            $projectIds = [$request->input('project_id')];
+        }
+        if (!empty($projectIds)) {
+            $query->whereIn('project_id', $projectIds);
+        }
         if ($request->filled('crew_id'))     $query->where('crew_id', $request->crew_id);
         if ($request->filled('status'))      $query->where('status', $request->status);
         if ($request->filled('date_from'))   $query->whereDate('date', '>=', $request->date_from);
