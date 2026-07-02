@@ -907,7 +907,11 @@ class TimesheetController extends Controller
     public function bulkCreate(Request $request): View
     {
         $crews = Crew::with(['project', 'foreman'])->get();
-        $projects = Project::whereIn('status', ['active', 'awarded', 'bidding'])
+        // 2026-07-02 (Brenda): "can't see all the projects in the dropdown on
+        // bulk entry." The old whitelist (active/awarded/bidding) hid any job
+        // with another status. Show ALL projects except archived/cancelled so
+        // time can be keyed against any live or recently-closed job.
+        $projects = Project::whereNotIn('status', ['archived', 'cancelled'])
             ->orderBy('project_number')
             ->get(['id', 'project_number', 'name']);
         $shifts = Shift::all();

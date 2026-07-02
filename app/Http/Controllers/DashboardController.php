@@ -166,7 +166,10 @@ class DashboardController extends Controller
             ->concat($expiring90Certs)
             ->take(20);
 
-        $allProjects = Project::whereNotIn('status', ['closed', 'completed'])
+        // 2026-07-02 (Brenda): the search dropdown should list every project,
+        // not just non-closed ones — she needs to jump to completed jobs too.
+        // (The KPI tiles above still use the active-only $activeProjects list.)
+        $allProjects = Project::whereNotIn('status', ['archived', 'cancelled'])
             ->orderBy('name')
             ->get(['id', 'name', 'project_number']);
 
