@@ -116,7 +116,7 @@
 
 <div class="footer-note">
     Internal Schedule of Values · generated from estimate {{ $estimate->estimate_number ?? '#'.$estimate->id }}.
-    "01 DIRECT" includes direct labor + indirect field labor. "010 INDIRECT" is field staff (supervision / QA).
+    "01 DIRECT" is direct labor (craft install crew). "010 INDIRECT" is indirect field labor + field staff (support + supervision / QA).
 </div>
 
 </body>

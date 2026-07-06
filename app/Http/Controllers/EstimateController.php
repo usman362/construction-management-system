@@ -462,8 +462,11 @@ class EstimateController extends Controller
         $lines = $estimate->lines()->with('craft:id,name', 'costType:id,code,name')->get();
 
         // SOV row layout — matches LAMELA spreadsheet (cost types as buckets).
-        // Brenda's "01 DIRECT" combines our direct_labor + indirect_field_labor;
-        // "010 INDIRECT" is just field_staff (supervisors / QA).
+        // 2026-07-03 (Brenda): "Direct Labor includes some of the indirect labor."
+        //   01 DIRECT   = direct_labor only (craft workers doing the install)
+        //   010 INDIRECT = indirect_field_labor + field_staff (support + supervision)
+        // This matches the cost-type mapping (defaultCostTypeId: indirect_field
+        // and field_staff both map to cost type 11 = Indirect Labor).
         $sov = [
             '01 - DIRECT'                       => ['est' => 0.0, 'cost' => 0.0],
             '010 - INDIRECT'                    => ['est' => 0.0, 'cost' => 0.0],
@@ -481,7 +484,9 @@ class EstimateController extends Controller
 
         $bucketFor = function ($l) {
             if ($l->line_type === 'labor') {
-                return $l->labor_category === 'field_staff' ? '010 - INDIRECT' : '01 - DIRECT';
+                // Only true direct_labor lands in DIRECT; indirect_field_labor
+                // and field_staff both roll into INDIRECT.
+                return $l->labor_category === 'direct_labor' ? '01 - DIRECT' : '010 - INDIRECT';
             }
             if ($l->line_type === 'material')     return '02 - MATERIAL';
             if ($l->line_type === 'equipment')    return $l->equipment_category === 'company_owned' ? '04 - COMPANY EQUIP' : '03 - 3RD PARTY EQUIP';
