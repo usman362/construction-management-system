@@ -40,7 +40,7 @@ class DocumentController extends Controller
         $validated = $request->validate([
             'documentable_type' => 'required|string',
             'documentable_id'   => 'required|integer',
-            'category'          => 'required|string|in:proposal,photo,change_order,purchase_order,delivery_ticket,estimate,daily_log,report,correspondence,contract,permit,insurance,other',
+            'category'          => 'required|string|in:proposal,photo,change_order,purchase_order,delivery_ticket,estimate,daily_log,report,correspondence,contract,permit,insurance,rate_change,exception_form,disciplinary,onboarding,review,tax_form,certification,id_document,other',
             'title'             => 'required|string|max:255',
             'description'       => 'nullable|string|max:1000',
             // 2026-07-01 QA: restrict to construction-doc types Brenda actually

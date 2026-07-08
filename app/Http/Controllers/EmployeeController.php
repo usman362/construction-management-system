@@ -176,6 +176,7 @@ class EmployeeController extends Controller
         $employee->load([
             'craft',
             'certifications',
+            'documents.uploader',
             'projectRates' => fn($q) => $q->with('project')->orderByDesc('created_at'),
             'timesheets' => function ($q) {
                 $q->with('project')->orderBy('date', 'desc')->limit(20);

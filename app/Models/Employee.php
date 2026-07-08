@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
@@ -114,6 +115,16 @@ class Employee extends Model
     public function certifications(): HasMany
     {
         return $this->hasMany(EmployeeCertification::class);
+    }
+
+    /**
+     * HR documents attached to this employee (Brenda 2026-07-03) — rate
+     * changes, exception forms, disciplinary, onboarding, etc. Uses the
+     * shared polymorphic Document model.
+     */
+    public function documents(): MorphMany
+    {
+        return $this->morphMany(Document::class, 'documentable');
     }
 
     public function getFullNameAttribute(): string

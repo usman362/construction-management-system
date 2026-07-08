@@ -15,7 +15,13 @@
         'purchase_order' => 'Purchase Order', 'delivery_ticket' => 'Delivery Ticket',
         'estimate' => 'Estimate', 'daily_log' => 'Daily Log', 'report' => 'Report',
         'correspondence' => 'Correspondence', 'contract' => 'Contract',
-        'permit' => 'Permit', 'insurance' => 'Insurance', 'other' => 'Other',
+        'permit' => 'Permit', 'insurance' => 'Insurance',
+        // Employee HR document types (Brenda 2026-07-03)
+        'rate_change' => 'Rate Change', 'exception_form' => 'Exception Form',
+        'disciplinary' => 'Disciplinary', 'onboarding' => 'Onboarding',
+        'review' => 'Performance Review', 'tax_form' => 'Tax Form',
+        'certification' => 'Certification', 'id_document' => 'ID / License',
+        'other' => 'Other',
     ];
     $availableCategories = isset($categories) ? array_intersect_key($allCategories, array_flip($categories)) : $allCategories;
     $docs = ($documents ?? collect())->sortByDesc('created_at');

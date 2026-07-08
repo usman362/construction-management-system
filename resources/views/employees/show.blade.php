@@ -492,5 +492,17 @@
             </table>
         </div>
     </div>
+
+    {{-- Employee documents — rate changes, exception forms, disciplinary,
+         onboarding, etc. (Brenda 2026-07-03). Reuses the shared upload panel;
+         categories filtered to HR-relevant types. --}}
+    <div class="mt-6">
+        @include('documents.partials.upload-panel', [
+            'documentableType' => get_class($employee),
+            'documentableId'   => $employee->id,
+            'documents'        => $employee->documents,
+            'categories'       => ['rate_change','exception_form','disciplinary','onboarding','review','tax_form','certification','id_document','contract','correspondence','other'],
+        ])
+    </div>
 </div>
 @endsection
