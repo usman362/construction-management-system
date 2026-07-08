@@ -135,12 +135,12 @@
         {{-- STAGE 1: upload --}}
         <div x-show="stage === 'upload'" class="p-6">
             <label class="block">
-                <input type="file" accept="image/*" capture="environment" class="hidden" @change="onFileSelected($event)">
+                <input type="file" accept="image/*,application/pdf" capture="environment" class="hidden" @change="onFileSelected($event)">
                 <div class="border-2 border-dashed border-purple-300 rounded-xl p-12 text-center hover:bg-purple-50 transition cursor-pointer"
                      @dragover.prevent @drop.prevent="onFileDropped($event)">
                     <svg class="w-16 h-16 mx-auto text-purple-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
                     <p class="mt-4 text-base font-semibold text-gray-900">Drop a vendor invoice here, or click to choose</p>
-                    <p class="mt-1 text-xs text-gray-500">JPG, PNG, HEIC up to 10 MB. Snap with your phone, paste from email — anything works.</p>
+                    <p class="mt-1 text-xs text-gray-500">JPG, PNG, HEIC, or PDF up to 10 MB. Snap with your phone, paste from email — anything works.</p>
                 </div>
             </label>
             <div class="mt-6 grid grid-cols-3 gap-4 text-xs">
@@ -434,10 +434,21 @@ function snapInvoice(){
         onFileDropped(e)  { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) this.upload(f); },
 
         async upload(file) {
-            this.photoFile = file;
-            this.photoPreview = URL.createObjectURL(file);
             this.stage = 'extracting';
             this.banner = { kind: 'success', text: '' };
+            // 2026-07-03 (Brenda): accept PDFs — convert first page to PNG
+            // client-side before sending to the vision model.
+            if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')) {
+                try {
+                    file = await window.pdfFirstPageToImage(file);
+                } catch (e) {
+                    this.banner = { kind: 'error', text: 'Could not read that PDF. Try a JPG/PNG, or a clearer PDF.' };
+                    this.stage = 'upload';
+                    return;
+                }
+            }
+            this.photoFile = file;
+            this.photoPreview = URL.createObjectURL(file);
 
             let i = 0; this.extractStatus = this.extractStatuses[0];
             this.extractTimer = setInterval(() => {

@@ -28,6 +28,35 @@
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    {{-- 2026-07-03 (Brenda): let the Snap-a-Timesheet / Snap-an-Invoice
+         scanners accept PDFs. The AI vision model only reads images, so we
+         render the PDF's first page to a PNG in the browser and upload that.
+         pdf.js is lazy-loaded on first use so it doesn't slow other pages. --}}
+    <script>
+    window.pdfFirstPageToImage = async function (file) {
+        if (!window.pdfjsLib) {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                s.onload = resolve; s.onerror = () => reject(new Error('Could not load PDF reader.'));
+                document.head.appendChild(s);
+            });
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        const buf = await file.arrayBuffer();
+        const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+        const page = await pdf.getPage(1);
+        // scale 2 = crisp enough for OCR without huge payloads
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.92));
+        return new File([blob], (file.name || 'scan').replace(/\.pdf$/i, '') + '.png', { type: 'image/png' });
+    };
+    </script>
     <style>
         /* ── DataTables Clean Theme ── */
         table.dataTable{border-collapse:collapse!important;border-spacing:0!important;width:100%!important}
