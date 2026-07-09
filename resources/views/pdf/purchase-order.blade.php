@@ -252,6 +252,16 @@
         </div>
     @endif
 
+    <!-- Terms & Conditions (Brenda 2026-07-04) -->
+    <div style="margin-top: 20px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
+        <div style="font-size: 9px; text-transform: uppercase; color: #1e3a5f; font-weight: bold; margin-bottom: 4px;">Terms and Conditions</div>
+        <div style="font-size: 9px; color: #334155; line-height: 1.5;">
+            This Purchase Order is limited to the items, quantities, rates, and amounts specifically authorized herein.
+            No additional items, services, rental periods, fees, or charges may be invoiced without prior written approval
+            and a revised Purchase Order or new Purchase Order.
+        </div>
+    </div>
+
     <!-- Status and Authorization -->
     <div style="margin-top: 30px; padding: 15px; background: #f8fafc; border-radius: 4px;">
         <div style="display: table; width: 100%;">
@@ -291,14 +301,16 @@
         <div class="auth-block">
             <div style="font-size: 10px; color: #1a1a1a; margin-bottom: 4px;">Authorized By</div>
             <div class="auth-line"></div>
-            <div class="auth-name">_________________________</div>
             <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Signature</div>
+            <div class="auth-line" style="margin-top: 26px;"></div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Date</div>
         </div>
         <div class="auth-block">
             <div style="font-size: 10px; color: #1a1a1a; margin-bottom: 4px;">Received By</div>
             <div class="auth-line"></div>
-            <div class="auth-name">_________________________</div>
             <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Signature</div>
+            <div class="auth-line" style="margin-top: 26px;"></div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Date</div>
         </div>
     </div>
 @endsection

@@ -838,6 +838,89 @@ class ImportController extends Controller
         return back()->with('import_result', $result);
     }
 
+    // ─── Tools (Brenda 2026-07-04) ────────────────────────────────────────
+
+    private const TOOL_COLUMNS = [
+        'name', 'asset_tag', 'category', 'location',
+        'serial_number', 'replacement_cost', 'purchase_date', 'status', 'notes',
+    ];
+
+    public function toolTemplate(): StreamedResponse
+    {
+        return $this->streamCsv(
+            'tools_import_template.csv',
+            self::TOOL_COLUMNS,
+            [
+                ['DeWalt Impact Driver', 'T-1001', 'Power Tools', 'Main Shop',
+                 'DW1234567', '199.00', '2026-01-15', 'available', 'Yellow case'],
+                ['Miller Welding Machine', 'T-1002', 'Welding', 'Yard',
+                 'MW9988776', '3200.00', '2025-11-02', 'available', ''],
+                ['4in Grinder', 'T-1003', 'Power Tools', 'Truck 12',
+                 '', '89.99', '', 'checked_out', 'Assigned to J. Doe'],
+            ]
+        );
+    }
+
+    public function toolImport(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:51200']);
+
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+
+        $rows = $this->parseFile($request->file('file'));
+        if (empty($rows)) {
+            return back()->with('import_result', $result + ['errors' => [['row' => 0, 'message' => 'File is empty.']]]);
+        }
+
+        $header = $this->normalizeHeader(array_shift($rows));
+        $allowedStatuses = ['available', 'checked_out', 'maintenance', 'retired', 'lost'];
+
+        DB::transaction(function () use ($rows, $header, $allowedStatuses, &$result) {
+            foreach ($rows as $rowIndex => $row) {
+                $rowNumber = $rowIndex + 2;
+                $data = $this->combineRow($header, $row);
+
+                if (empty($data['name'])) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => 'Missing required tool name.'];
+                    continue;
+                }
+
+                try {
+                    $status = strtolower(trim((string) ($data['status'] ?? 'available')));
+                    if (!in_array($status, $allowedStatuses, true)) $status = 'available';
+
+                    $payload = [
+                        'name'             => $data['name'],
+                        'category'         => $this->blankToNull($data['category'] ?? null),
+                        'location'         => $this->blankToNull($data['location'] ?? null),
+                        'serial_number'    => $this->blankToNull($data['serial_number'] ?? null),
+                        'replacement_cost' => $this->blankToNull($data['replacement_cost'] ?? null),
+                        'purchase_date'    => $this->parseDate($data['purchase_date'] ?? null),
+                        'status'           => $status,
+                        'notes'            => $this->blankToNull($data['notes'] ?? null),
+                    ];
+
+                    // Upsert by asset_tag when provided, else always create.
+                    $tag = $this->blankToNull($data['asset_tag'] ?? null);
+                    $existing = $tag ? \App\Models\Tool::where('asset_tag', $tag)->first() : null;
+                    if ($existing) {
+                        $existing->update($payload);
+                        $result['updated']++;
+                    } else {
+                        \App\Models\Tool::create($payload + ['asset_tag' => $tag]);
+                        $result['created']++;
+                    }
+                } catch (\Throwable $e) {
+                    $result['skipped']++;
+                    $result['errors'][] = ['row' => $rowNumber, 'message' => $e->getMessage()];
+                }
+            }
+        });
+
+        return back()->with('import_result', $result);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────
 
     /** Stream a CSV file to the browser as a download. */

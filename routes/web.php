@@ -462,6 +462,10 @@ Route::middleware('auth')->group(function () {
     // ─── Tool Tracker (Field Pack) ───────────────────────────────
     Route::middleware('role:admin,project_manager,field')->group(function () {
         Route::get('tools',                       [\App\Http\Controllers\ToolController::class, 'index'])->name('tools.index');
+        // 2026-07-04 (Brenda): CSV/Excel import for tools. Registered BEFORE
+        // the {tool} routes so "import" isn't matched as a tool id.
+        Route::get('tools/import/template', [ImportController::class, 'toolTemplate'])->name('tools.import.template');
+        Route::post('tools/import',         [ImportController::class, 'toolImport'])->name('tools.import');
         Route::post('tools',                      [\App\Http\Controllers\ToolController::class, 'store'])->name('tools.store');
         Route::put('tools/{tool}',                [\App\Http\Controllers\ToolController::class, 'update'])->name('tools.update');
         Route::delete('tools/{tool}',             [\App\Http\Controllers\ToolController::class, 'destroy'])->name('tools.destroy');
