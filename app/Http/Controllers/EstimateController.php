@@ -973,6 +973,7 @@ class EstimateController extends Controller
             'weeks'          => 'nullable|numeric|min:0|max:999',
             'days_per_week'  => 'nullable|integer|min:0|max:7',
             'hours_per_day'  => 'nullable|numeric|min:0|max:24',
+            'ot_daily_threshold' => 'nullable|numeric|min:0|max:24',
 
             'craft_id'             => 'nullable|exists:crafts,id',
             'hours'                => 'nullable|numeric|min:0',

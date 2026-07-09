@@ -87,6 +87,7 @@ class EstimateLine extends Model
         'weeks',
         'days_per_week',
         'hours_per_day',
+        'ot_daily_threshold',
 
         'craft_id',
         'hours',
@@ -133,6 +134,7 @@ class EstimateLine extends Model
         'weeks'                => 'decimal:2',
         'days_per_week'        => 'integer',
         'hours_per_day'        => 'decimal:2',
+        'ot_daily_threshold'   => 'decimal:2',
         'equipment_duration'   => 'decimal:2',
         'fuel_cost'            => 'decimal:2',
         'cost_amount'          => 'decimal:2',
@@ -168,21 +170,32 @@ class EstimateLine extends Model
         $hpd  = (float) ($this->hours_per_day ?? 0);
 
         if ($crew > 0 && $wks > 0 && $dpw > 0 && $hpd > 0) {
-            $totalHours = $crew * $wks * $dpw * $hpd;
-            // Split into ST / OT based on work schedule. If days_per_week × hours_per_day > 40,
-            // ST = 8hrs/day portion, OT = remainder. For "5-10" schedule: ST=40hrs/wk, OT=10hrs/wk per person.
-            $stHoursPerWeek = min($dpw * $hpd, $dpw * 8);
-            $otHoursPerWeek = max(0, ($dpw * $hpd) - $stHoursPerWeek);
+            // 2026-07-04 (Brenda EST-BM-5751): OT threshold is configurable.
+            // Default = the scheduled hours_per_day (so a 5-10 schedule stays
+            // all straight-time — no phantom OT). Set ot_daily_threshold lower
+            // (e.g. 8) on jobs where OT kicks in before the scheduled day ends.
+            $threshold = (float) ($this->ot_daily_threshold ?? 0);
+            if ($threshold <= 0) $threshold = $hpd;
 
-            $this->hours    = round($crew * $wks * $stHoursPerWeek, 2);
-            $this->ot_hours = round($crew * $wks * $otHoursPerWeek, 2);
+            $stPerDay = min($hpd, $threshold);
+            $otPerDay = max(0, $hpd - $threshold);
+
+            $this->hours    = round($crew * $wks * $dpw * $stPerDay, 2);
+            $this->ot_hours = round($crew * $wks * $dpw * $otPerDay, 2);
         }
     }
 
     public function recalculate(): void
     {
         if ($this->line_type === self::TYPE_LABOR) {
-            $this->computeCrewHours();
+            // 2026-07-04 (Brenda): only auto-split ST/OT from the crew fields
+            // when hours haven't been set yet. Once ST/OT hold a value (filled
+            // by the live calc or typed manually), we NEVER overwrite them —
+            // this is what let Brenda hand-correct a line without it zeroing
+            // out / snapping back.
+            if ((float) ($this->hours ?? 0) <= 0 && (float) ($this->ot_hours ?? 0) <= 0) {
+                $this->computeCrewHours();
+            }
 
             $stHrs  = (float) ($this->hours ?? 0);
             $otHrs  = (float) ($this->ot_hours ?? 0);

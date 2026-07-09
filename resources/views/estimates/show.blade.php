@@ -1772,7 +1772,7 @@ function tmEstimate() {
             const b2n = v => (v === '' || v === null || v === undefined) ? null : v;
             const payload = {};
             const keys = ['line_type','labor_category','equipment_category','cost_code_id','description',
-                          'work_schedule','craft_id','role','crew_size','weeks','days_per_week','hours_per_day',
+                          'work_schedule','craft_id','role','crew_size','weeks','days_per_week','hours_per_day','ot_daily_threshold',
                           'hours','hourly_billable_rate','ot_hours','ot_hourly_billable_rate',
                           'vendor_name','quote_amount','freight_amount','tax_amount',
                           'quantity','equipment_duration','duration_uom','unit_cost','fuel_cost',
@@ -1982,10 +1982,16 @@ function tmLaborRow(data) {
             const dpw = this.d.days_per_week || 0;
             const hpd = this.d.hours_per_day || 0;
             if (crew > 0 && wks > 0 && dpw > 0 && hpd > 0) {
-                const stPerWeek = Math.min(dpw * hpd, dpw * 8);
-                const otPerWeek = Math.max(0, (dpw * hpd) - stPerWeek);
-                this.d.hours = Math.round(crew * wks * stPerWeek * 100) / 100;
-                this.d.ot_hours = Math.round(crew * wks * otPerWeek * 100) / 100;
+                // 2026-07-04 (Brenda EST-BM-5751): OT threshold is configurable.
+                // Default = scheduled hours_per_day, so a 5-10 schedule stays
+                // all straight-time (no OT until past 10). Lower "OT>" to 8 for
+                // jobs that pay OT sooner.
+                let threshold = parseFloat(this.d.ot_daily_threshold) || 0;
+                if (threshold <= 0) threshold = hpd;
+                const stPerDay = Math.min(hpd, threshold);
+                const otPerDay = Math.max(0, hpd - threshold);
+                this.d.hours = Math.round(crew * wks * dpw * stPerDay * 100) / 100;
+                this.d.ot_hours = Math.round(crew * wks * dpw * otPerDay * 100) / 100;
             }
         },
 
@@ -2025,6 +2031,7 @@ function tmLaborRow(data) {
                 weeks: b2n(this.d.weeks),
                 days_per_week: b2n(this.d.days_per_week),
                 hours_per_day: b2n(this.d.hours_per_day),
+                ot_daily_threshold: b2n(this.d.ot_daily_threshold),
                 hours: b2n(this.d.hours),
                 hourly_cost_rate: b2n(this.d.hourly_cost_rate),
                 hourly_billable_rate: b2n(this.d.hourly_billable_rate),

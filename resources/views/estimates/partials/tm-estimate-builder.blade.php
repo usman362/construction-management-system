@@ -85,6 +85,7 @@
                             <th class="px-1.5 py-1.5 text-center font-semibold text-gray-700 w-12">Weeks</th>
                             <th class="px-1.5 py-1.5 text-center font-semibold text-gray-700 w-10">D/W</th>
                             <th class="px-1.5 py-1.5 text-center font-semibold text-gray-700 w-10">H/D</th>
+                            <th class="px-1.5 py-1.5 text-center font-semibold text-gray-700 w-12" title="Hours per day before overtime kicks in. Blank = same as H/D (no daily OT).">OT&gt;</th>
                             <th class="px-1.5 py-1.5 text-right font-semibold text-gray-700 w-14">Tot Hrs</th>
                             <th class="px-1.5 py-1.5 text-right font-semibold text-blue-700 w-14 border-l border-blue-200 bg-blue-50">ST Hrs</th>
                             <th class="px-1.5 py-1.5 text-right font-semibold text-blue-700 w-14 bg-blue-50">ST Rate</th>
@@ -109,6 +110,7 @@
                             'weeks' => (float) $line->weeks,
                             'days_per_week' => (int) $line->days_per_week,
                             'hours_per_day' => (float) $line->hours_per_day,
+                            'ot_daily_threshold' => $line->ot_daily_threshold !== null ? (float) $line->ot_daily_threshold : null,
                             'hours' => (float) $line->hours,
                             'hourly_cost_rate' => (float) $line->hourly_cost_rate,
                             'hourly_billable_rate' => (float) $line->hourly_billable_rate,
@@ -135,6 +137,7 @@
                             <td class="px-1 py-1"><input type="number" min="0" step="0.5" x-model.number="d.weeks" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" max="7" x-model.number="d.days_per_week" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" max="24" step="0.5" x-model.number="d.hours_per_day" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" max="24" step="0.5" x-model.number="d.ot_daily_threshold" @change="recalc(); save()" :placeholder="d.hours_per_day || '—'" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded" title="OT after this many hours/day. Blank = no daily OT."></td>
                             <td class="px-1 py-1 text-right font-semibold text-gray-700" x-text="fmtN(totalHours())"></td>
                             {{-- ST --}}
                             <td class="px-1 py-1 bg-blue-50/50 border-l border-blue-100"><input type="number" min="0" step="1" x-model.number="d.hours" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-right focus:ring-1 focus:ring-blue-400 rounded"></td>
@@ -159,7 +162,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="bg-indigo-50/50 border-t-2 border-indigo-200">
-                            <td class="px-1.5 py-2 text-right font-bold text-indigo-900" colspan="8">Totals</td>
+                            <td class="px-1.5 py-2 text-right font-bold text-indigo-900" colspan="9">Totals</td>
                             <td class="px-1.5 py-2 text-right font-bold text-gray-900" x-text="fmtN(sectionTotals['{{ $catKey }}']?.totalHours || 0)"></td>
                             <td class="px-1.5 py-2 text-right font-bold text-blue-900 bg-blue-50/50 border-l border-blue-100" x-text="fmtN(sectionTotals['{{ $catKey }}']?.stHours || 0)"></td>
                             <td class="px-1.5 py-2 bg-blue-50/50"></td>
@@ -673,6 +676,13 @@
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Hours/Day</label>
                                 <input type="number" min="0" max="24" step="0.5" x-model.number="edit.hours_per_day" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">OT after (hrs/day)</label>
+                                <input type="number" min="0" max="24" step="0.5" x-model.number="edit.ot_daily_threshold" :placeholder="edit.hours_per_day || 'no daily OT'" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <p class="text-[10px] text-gray-400 mt-0.5">Blank = OT only past the scheduled Hours/Day.</p>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-4 mt-4 p-3 bg-blue-50 rounded-lg">
