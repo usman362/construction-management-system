@@ -83,7 +83,7 @@
         <div class="po-info-cell">
             <div class="info-block">
                 <div class="info-label">Issue Date</div>
-                <div class="info-value">{{ $purchaseOrder->issued_at->format('F j, Y') }}</div>
+                <div class="info-value">{{ optional($purchaseOrder->issued_at)->format('F j, Y') ?? optional($purchaseOrder->created_at)->format('F j, Y') ?? '—' }}</div>
             </div>
         </div>
         <div class="po-info-cell">
