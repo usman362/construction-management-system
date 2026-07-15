@@ -165,22 +165,24 @@
                 </div>
             </div>
 
-            <details class="mt-4">
-                <summary class="text-sm font-medium text-blue-700 cursor-pointer">Advanced: auto-calculate from markup percentages</summary>
-                <div class="mt-3 border-l-2 border-blue-200 pl-4">
-                    <p class="text-xs text-gray-500 mb-2">Skip this section if you typed the billable rates above. Use only if you want the system to compute billable from base + payroll tax + burden + WC + overhead + profit.</p>
-                    <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
-                        <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
-                    </div>
-                    @foreach(['payroll_tax' => 'Payroll Tax (FICA/FUTA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'benefits' => 'Benefits', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
-                        <div class="grid grid-cols-3 gap-2 items-center mb-2">
-                            <label class="text-sm text-gray-700">{{ $label }}</label>
-                            <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
-                            <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000">
-                        </div>
-                    @endforeach
+            {{-- 2026-07-15 (Ali cleanup): cost burden % only. These drive the
+                 employee COST (base × (1 + these)). Billable is what you type
+                 above. Removed the old job-expenses/consumables/overhead/profit
+                 markup rows — they no longer feed billable and just confused. --}}
+            <div class="mt-4 border-l-2 border-emerald-200 pl-4">
+                <p class="text-sm font-semibold text-gray-800">Cost Burden % <span class="font-normal text-gray-500">(drives the labor cost)</span></p>
+                <p class="text-xs text-gray-500 mb-2">Cost = Base Wage × (1 + Payroll Tax + Burden + Insurance + Benefits). Enter as decimals (e.g. 0.0765 for 7.65%).</p>
+                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                 </div>
-            </details>
+                @foreach(['payroll_tax' => 'Payroll Tax (FICA/FUTA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'benefits' => 'Benefits'] as $key => $label)
+                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                        <label class="text-sm text-gray-700">{{ $label }}</label>
+                        <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                        <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000">
+                    </div>
+                @endforeach
+            </div>
 
             <div class="flex gap-4 mt-6">
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1">
@@ -262,22 +264,21 @@
                 </div>
             </div>
 
-            <details class="mt-4">
-                <summary class="text-sm font-medium text-blue-700 cursor-pointer">Advanced: auto-calculate from markup percentages</summary>
-                <div class="mt-3 border-l-2 border-blue-200 pl-4">
-                    <p class="text-xs text-gray-500 mb-2">Skip this section if you typed the billable rates above.</p>
-                    <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
-                        <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
-                    </div>
-                    @foreach(['payroll_tax' => 'Payroll Tax (FICA/FUTA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'benefits' => 'Benefits', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
-                        <div class="grid grid-cols-3 gap-2 items-center mb-2">
-                            <label class="text-sm text-gray-700">{{ $label }}</label>
-                            <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
-                            <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000">
-                        </div>
-                    @endforeach
+            {{-- 2026-07-15 (Ali cleanup): cost burden % only — see create modal. --}}
+            <div class="mt-4 border-l-2 border-emerald-200 pl-4">
+                <p class="text-sm font-semibold text-gray-800">Cost Burden % <span class="font-normal text-gray-500">(drives the labor cost)</span></p>
+                <p class="text-xs text-gray-500 mb-2">Cost = Base Wage × (1 + Payroll Tax + Burden + Insurance + Benefits). Enter as decimals (e.g. 0.0765 for 7.65%).</p>
+                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                 </div>
-            </details>
+                @foreach(['payroll_tax' => 'Payroll Tax (FICA/FUTA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'benefits' => 'Benefits'] as $key => $label)
+                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                        <label class="text-sm text-gray-700">{{ $label }}</label>
+                        <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                        <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000">
+                    </div>
+                @endforeach
+            </div>
 
             <div class="flex gap-4 mt-6">
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1">
