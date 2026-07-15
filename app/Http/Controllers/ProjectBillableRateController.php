@@ -12,6 +12,48 @@ use Illuminate\View\View;
 
 class ProjectBillableRateController extends Controller
 {
+    /**
+     * 2026-07-13 (Brenda): "I can't see what is going on behind the scenes."
+     * Returns the labor cost breakdown for a craft on this project so the
+     * estimate can show Base + FICA/FUTA + SUTA + WC + Benefits = loaded cost.
+     */
+    public function breakdown(Project $project, Request $request): JsonResponse
+    {
+        $craftId = $request->input('craft_id');
+        $pbr = ProjectBillableRate::where('project_id', $project->id)
+            ->where('craft_id', $craftId)
+            ->whereNull('employee_id')
+            ->orderByDesc('effective_date')
+            ->first();
+
+        $craft = Craft::find($craftId);
+
+        if (!$pbr) {
+            return response()->json([
+                'found'      => false,
+                'craft_name' => $craft?->name,
+                'message'    => 'No billable rate set for this craft on this project.',
+            ]);
+        }
+
+        $base = (float) $pbr->base_hourly_rate;
+        $rows = [
+            ['label' => 'Base Wage',                'pct' => null,                            'amount' => $base],
+            ['label' => 'Payroll Tax (FICA/FUTA)',  'pct' => (float) $pbr->payroll_tax_rate,  'amount' => $base * (float) $pbr->payroll_tax_rate],
+            ['label' => 'Burden (SUTA)',            'pct' => (float) $pbr->burden_rate,       'amount' => $base * (float) $pbr->burden_rate],
+            ['label' => 'Insurance (WC)',           'pct' => (float) $pbr->insurance_rate,    'amount' => $base * (float) $pbr->insurance_rate],
+            ['label' => 'Benefits',                 'pct' => (float) $pbr->benefits_rate,     'amount' => $base * (float) $pbr->benefits_rate],
+        ];
+
+        return response()->json([
+            'found'          => true,
+            'craft_name'     => $craft?->name,
+            'rows'           => $rows,
+            'loaded_st_cost' => $pbr->loadedCostRate(),
+            'loaded_ot_cost' => $pbr->loadedOtCostRate(),
+        ]);
+    }
+
     public function index(Project $project, Request $request)
     {
         if ($request->ajax()) {

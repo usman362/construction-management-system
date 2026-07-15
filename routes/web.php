@@ -267,6 +267,7 @@ Route::middleware('auth')->group(function () {
         Route::middleware('role:admin,project_manager,accountant')->group(function () {
             Route::get('billable-rates', [ProjectBillableRateController::class, 'index'])->name('billable-rates.index');
             Route::post('billable-rates', [ProjectBillableRateController::class, 'store'])->name('billable-rates.store');
+            Route::get('billable-rates/breakdown', [ProjectBillableRateController::class, 'breakdown'])->name('billable-rates.breakdown');
             Route::get('billable-rates/import/template', [ImportController::class, 'billableRateTemplate'])->name('billable-rates.import.template');
             Route::post('billable-rates/import', [ImportController::class, 'billableRateImport'])->name('billable-rates.import');
             Route::get('billable-rates/{projectBillableRate}/edit', [ProjectBillableRateController::class, 'edit'])->name('billable-rates.edit');

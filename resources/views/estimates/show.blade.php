@@ -1753,6 +1753,27 @@ function tmEstimate() {
         editOpen: false,
         edit: {},
 
+        // 2026-07-13 (Brenda): "see behind the scenes" labor cost breakdown.
+        breakdownOpen: false,
+        breakdownLoading: false,
+        breakdown: {},
+        async showCostBreakdown(craftId) {
+            if (!craftId) return;
+            this.breakdown = {};
+            this.breakdownLoading = true;
+            this.breakdownOpen = true;
+            try {
+                const r = await fetch(window.BASE_URL + '/projects/{{ $project->id }}/billable-rates/breakdown?craft_id=' + craftId, {
+                    headers: { 'Accept':'application/json' },
+                });
+                this.breakdown = await r.json();
+            } catch (e) {
+                this.breakdown = { found: false, message: 'Could not load the breakdown.' };
+            } finally {
+                this.breakdownLoading = false;
+            }
+        },
+
         init() {
             this.rebuildTotals();
             // 2026-06-10 (Brenda): restore scroll after the auto-reload so

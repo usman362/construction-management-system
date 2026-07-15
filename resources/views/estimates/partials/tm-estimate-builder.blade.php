@@ -3,7 +3,8 @@
      3 labor categories + materials + equipment + subcontractors + summary. --}}
 <div class="bg-white rounded-lg shadow mb-6" x-data="tmEstimate()" x-init="init()"
      @tm-edit.window="openEdit($event.detail)"
-     @tm-totals-updated.window="applyServerTotals($event.detail)">
+     @tm-totals-updated.window="applyServerTotals($event.detail)"
+     @tm-cost-breakdown.window="showCostBreakdown($event.detail.craftId)">
 
     {{-- ── Estimate Schedule Header ── --}}
     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
@@ -128,10 +129,17 @@
                                 @foreach($costCodes as $cc)<option value="{{ $cc->id }}">{{ $cc->code }}</option>@endforeach
                             </select></td>
                             <td class="px-1 py-1"><input type="text" x-model="d.work_schedule" @change="parseWorkSchedule(); recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded" placeholder="5-10" title="e.g. 5-10 = 5 days/week × 10 hours/day. Auto-fills D/W and H/D."></td>
-                            <td class="px-1 py-1"><select x-model="d.craft_id" @change="onCraftPick(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded">
-                                <option value="">—</option>
-                                @foreach($crafts as $c)<option value="{{ $c->id }}" data-rate="{{ $c->base_hourly_rate }}" data-billable="{{ $c->billable_rate ?? '' }}" data-ot-rate="{{ $c->base_ot_hourly_rate ?? '' }}" data-ot-billable="{{ $c->ot_billable_rate ?? '' }}">{{ $c->name }}</option>@endforeach
-                            </select></td>
+                            <td class="px-1 py-1">
+                                <div class="flex items-center gap-0.5">
+                                    <select x-model="d.craft_id" @change="onCraftPick(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded">
+                                        <option value="">—</option>
+                                        @foreach($crafts as $c)<option value="{{ $c->id }}" data-rate="{{ $c->base_hourly_rate }}" data-billable="{{ $c->billable_rate ?? '' }}" data-ot-rate="{{ $c->base_ot_hourly_rate ?? '' }}" data-ot-billable="{{ $c->ot_billable_rate ?? '' }}">{{ $c->name }}</option>@endforeach
+                                    </select>
+                                    <button type="button" x-show="d.craft_id" @click="$dispatch('tm-cost-breakdown', { craftId: d.craft_id })" class="text-gray-400 hover:text-blue-600 flex-shrink-0" title="See cost breakdown (base + burdens)">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+                                    </button>
+                                </div>
+                            </td>
                             <td class="px-1 py-1"><input type="text" x-model="d.role" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded" placeholder="Role"></td>
                             <td class="px-1 py-1"><input type="number" min="0" max="999" x-model.number="d.crew_size" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" step="0.5" x-model.number="d.weeks" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
@@ -798,6 +806,61 @@
             <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 sticky bottom-0 bg-white">
                 <button @click="editOpen = false" class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
                 <button @click="saveEdit()" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">Save Line</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ═══════ COST BREAKDOWN MODAL (Brenda 2026-07-13 "see behind the scenes") ═══════ --}}
+    <div x-show="breakdownOpen" x-cloak @keydown.escape.window="breakdownOpen = false" style="display:none"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div @click.outside="breakdownOpen = false" class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-base font-bold text-gray-900">Labor Cost Breakdown</h3>
+                <button @click="breakdownOpen = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5">
+                <p class="text-sm font-semibold text-gray-700 mb-1" x-text="breakdown.craft_name || 'Craft'"></p>
+                <p class="text-xs text-gray-400 mb-3">What it costs to put this worker on the job — per hour.</p>
+
+                <template x-if="breakdownLoading">
+                    <p class="text-sm text-gray-500 py-4 text-center">Loading…</p>
+                </template>
+
+                <template x-if="!breakdownLoading && !breakdown.found">
+                    <div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
+                        <span x-text="breakdown.message || 'No billable rate set for this craft on this project.'"></span>
+                        <div class="mt-2">
+                            <a :href="'{{ url('projects/'.$project->id.'/billable-rates') }}'" class="underline font-semibold text-amber-900">Set it on the Billable Rates page →</a>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="!breakdownLoading && breakdown.found">
+                    <div>
+                        <table class="w-full text-sm">
+                            <tbody>
+                                <template x-for="(row, i) in breakdown.rows" :key="i">
+                                    <tr class="border-b border-gray-100">
+                                        <td class="py-1.5 text-gray-700" x-text="row.label"></td>
+                                        <td class="py-1.5 text-right text-gray-400 text-xs" x-text="row.pct !== null && row.pct > 0 ? (row.pct*100).toFixed(2)+'%' : ''"></td>
+                                        <td class="py-1.5 text-right font-medium text-gray-900" x-text="(i === 0 ? '$' : '+ $') + fmtM(row.amount)"></td>
+                                    </tr>
+                                </template>
+                                <tr class="border-t-2 border-gray-400 bg-blue-50">
+                                    <td class="py-2 font-bold text-blue-900" colspan="2">Loaded ST Cost / hr</td>
+                                    <td class="py-2 text-right font-bold text-blue-900" x-text="'$'+fmtM(breakdown.loaded_st_cost)"></td>
+                                </tr>
+                                <tr class="bg-amber-50">
+                                    <td class="py-1.5 font-semibold text-amber-900" colspan="2">Loaded OT Cost / hr</td>
+                                    <td class="py-1.5 text-right font-semibold text-amber-900" x-text="'$'+fmtM(breakdown.loaded_ot_cost)"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="text-[11px] text-gray-400 mt-3">Overhead &amp; profit are not part of cost — they sit on the billable side.</p>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
