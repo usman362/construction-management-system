@@ -1443,6 +1443,18 @@ function submitAddLine() {
 */
 const EST_BASE = @json(url('/projects/' . $project->id . '/estimates/' . $estimate->id));
 
+// 2026-07-15 (Ali): surface the real reason a line didn't save instead of
+// failing silently. Pulls validation errors or the server message.
+window.tmReportSaveError = async function (response) {
+    let msg = 'HTTP ' + response.status;
+    try {
+        const b = await response.json();
+        if (b.errors) msg = Object.values(b.errors).flat().join(' ');
+        else if (b.message) msg = b.message;
+    } catch (_) {}
+    Toast.fire({ icon: 'error', title: 'Not saved: ' + msg, timer: 6000 });
+};
+
 function estimateBuilder(estimateId) {
     return {
         // ── State ──
@@ -2082,8 +2094,12 @@ function tmLaborRow(data) {
                             if (body.line[k] !== undefined && body.line[k] !== null) this.d[k] = parseFloat(body.line[k]);
                         });
                     }
+                } else {
+                    // 2026-07-15 (Ali): surface WHY a labor line didn't save
+                    // instead of failing silently.
+                    await window.tmReportSaveError(r);
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error(e); Toast.fire({icon:'error', title:'Network error — line not saved.'}); }
         },
 
         async removeLine() {

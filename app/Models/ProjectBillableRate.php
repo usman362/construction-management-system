@@ -259,35 +259,13 @@ class ProjectBillableRate extends Model
     protected static function booted(): void
     {
         static::saving(function (self $model) {
-            // 2026-05-23 (Brenda): if the user typed ST/OT billable rates
-            // directly (the simplified flow), respect those — don't overwrite
-            // with the markup-based auto-calc. Double-time still derives
-            // from ST if not explicitly set.
-            $userTypedRates = $model->isDirty('straight_time_rate')
-                || $model->isDirty('overtime_rate');
-            if ($userTypedRates) {
-                if (! $model->double_time_rate && $model->straight_time_rate) {
-                    $model->double_time_rate = (float) $model->straight_time_rate * 2;
-                }
-                return;
-            }
-
-            // Legacy markup-calc path — only fires when the user didn't
-            // type rates directly.
-            if ($model->base_hourly_rate && (!$model->straight_time_rate || $model->isDirty([
-                'base_hourly_rate', 'base_ot_hourly_rate',
-                'payroll_tax_rate', 'payroll_tax_ot_rate',
-                'burden_rate',      'burden_ot_rate',
-                'insurance_rate',   'insurance_ot_rate',
-                'job_expenses_rate','job_expenses_ot_rate',
-                'consumables_rate', 'consumables_ot_rate',
-                'overhead_rate',    'overhead_ot_rate',
-                'profit_rate',      'profit_ot_rate',
-            ]))) {
-                $rates = $model->calculateLoadedRate();
-                $model->straight_time_rate = $rates['straight_time'];
-                $model->overtime_rate      = $rates['overtime'];
-                $model->double_time_rate   = $rates['double_time'];
+            // 2026-07-15 (Ali): the burden percentages drive COST ONLY
+            // (base × (1 + FICA + SUTA + WC + Benefits) — see loadedCostRate).
+            // They must NEVER override the billable rate the user types. The
+            // ST / OT billable rates are always exactly what was entered.
+            // Only default double-time from ST when it isn't set.
+            if (! $model->double_time_rate && $model->straight_time_rate) {
+                $model->double_time_rate = (float) $model->straight_time_rate * 2;
             }
         });
     }
