@@ -75,6 +75,13 @@
         <div class="po-number-label">PO #</div>
         <div class="po-number">{{ $purchaseOrder->po_number }}</div>
     </div>
+    {{-- 2026-07-13 (Brenda): Phase Code shown up top by the PO number. --}}
+    @if($purchaseOrder->costCode)
+        <div style="margin-top: 8px; text-align: right;">
+            <div style="font-size: 8px; text-transform: uppercase; color: #64748b; font-weight: bold;">Phase Code</div>
+            <div style="font-size: 11px; color: #1a1a1a; font-weight: bold;">{{ $purchaseOrder->costCode->code }}</div>
+        </div>
+    @endif
 @endsection
 
 @section('content')
@@ -106,8 +113,8 @@
             <div class="info-block">
                 <div class="info-label">Address</div>
                 <div class="info-value">
-                    {{ $purchaseOrder->project->address }}<br>
-                    {{ $purchaseOrder->project->city }}, {{ $purchaseOrder->project->state }} {{ $purchaseOrder->project->zip_code }}
+                    {{ $purchaseOrder->project->address ?: '—' }}<br>
+                    {{ trim(($purchaseOrder->project->city ?? '') . ', ' . ($purchaseOrder->project->state ?? '') . ' ' . ($purchaseOrder->project->zip ?? ''), ', ') }}
                 </div>
             </div>
             @if($purchaseOrder->project->phone)
@@ -149,31 +156,19 @@
         </div>
     </div>
 
-    <!-- PO Details -->
-    <div class="detail-section">
-        <div class="detail-box">
-            @if($purchaseOrder->costCode)
-                <div class="detail-row">
-                    <div class="detail-label">Phase Code</div>
-                    <div class="detail-value">{{ $purchaseOrder->costCode->code }} - {{ $purchaseOrder->costCode->name }}</div>
-                </div>
-            @endif
-
-            @if($purchaseOrder->description)
-                <div class="detail-row">
-                    <div class="detail-label">Description</div>
-                    <div class="detail-value">{{ $purchaseOrder->description }}</div>
-                </div>
-            @endif
-
-            @if($purchaseOrder->notes)
+    {{-- 2026-07-13 (Brenda): Phase Code moved to the header; the standalone
+         Phase Code + Description rows removed (item description lives in the
+         Line Items table). Notes kept only when present. --}}
+    @if($purchaseOrder->notes)
+        <div class="detail-section">
+            <div class="detail-box">
                 <div class="detail-row">
                     <div class="detail-label">Notes</div>
                     <div class="detail-value">{{ $purchaseOrder->notes }}</div>
                 </div>
-            @endif
+            </div>
         </div>
-    </div>
+    @endif
 
     <!-- Line Items Table -->
     <div class="section-title">Line Items</div>
@@ -182,7 +177,6 @@
             <tr>
                 <th class="line-number">#</th>
                 <th class="description">Description</th>
-                <th class="material">Material</th>
                 <th class="quantity">Qty</th>
                 <th class="uom">UOM</th>
                 <th class="unit-cost">Unit Cost</th>
@@ -194,13 +188,6 @@
                 <tr>
                     <td class="line-number">{{ $index + 1 }}</td>
                     <td class="description">{{ $item->description }}</td>
-                    <td class="material">
-                        @if($item->material)
-                            {{ $item->material->name }}
-                        @else
-                            -
-                        @endif
-                    </td>
                     <td class="quantity">{{ number_format($item->quantity, 2) }}</td>
                     <td class="uom">{{ $item->unit_of_measure ?? '-' }}</td>
                     <td class="unit-cost">${{ number_format($item->unit_cost, 2) }}</td>
@@ -208,7 +195,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 20px; color: #94a3b8;">No line items</td>
+                    <td colspan="6" style="text-align: center; padding: 20px; color: #94a3b8;">No line items</td>
                 </tr>
             @endforelse
         </tbody>
@@ -262,39 +249,14 @@
         </div>
     </div>
 
-    <!-- Status and Authorization -->
-    <div style="margin-top: 30px; padding: 15px; background: #f8fafc; border-radius: 4px;">
-        <div style="display: table; width: 100%;">
-            <div style="display: table-cell; vertical-align: middle;">
-                @if($purchaseOrder->status)
-                    <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 4px;">Status</div>
-                    <div>
-                        @if($purchaseOrder->status === 'draft')
-                            <span class="badge badge-gray">Draft</span>
-                        @elseif($purchaseOrder->status === 'pending')
-                            <span class="badge badge-yellow">Pending</span>
-                        @elseif($purchaseOrder->status === 'approved')
-                            <span class="badge badge-blue">Approved</span>
-                        @elseif($purchaseOrder->status === 'ordered')
-                            <span class="badge badge-blue">Ordered</span>
-                        @elseif($purchaseOrder->status === 'received')
-                            <span class="badge badge-green">Received</span>
-                        @elseif($purchaseOrder->status === 'cancelled')
-                            <span class="badge badge-red">Cancelled</span>
-                        @else
-                            <span class="badge badge-gray">{{ ucfirst($purchaseOrder->status) }}</span>
-                        @endif
-                    </div>
-                @endif
-            </div>
-            <div style="display: table-cell; vertical-align: middle; text-align: right;">
-                @if($purchaseOrder->issuedBy)
-                    <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 4px;">Issued By</div>
-                    <div style="font-size: 11px; color: #1a1a1a;">{{ $purchaseOrder->issuedBy->name }}</div>
-                @endif
-            </div>
+    {{-- 2026-07-13 (Brenda): Status removed from the printout. Issued By kept
+         (only shown when set). --}}
+    @if($purchaseOrder->issuedBy)
+        <div style="margin-top: 24px; text-align: right;">
+            <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 4px;">Issued By</div>
+            <div style="font-size: 11px; color: #1a1a1a;">{{ $purchaseOrder->issuedBy->name }}</div>
         </div>
-    </div>
+    @endif
 
     <!-- Authorization Signatures -->
     <div class="authorization-section">
