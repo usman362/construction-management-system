@@ -760,7 +760,10 @@
     <!-- Line Items Table -->
     <div class="bg-white rounded-lg shadow p-8 mb-6">
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold">Line Items</h2>
+            <div>
+                <h2 class="text-2xl font-bold">All Line Items <span class="text-sm font-normal text-gray-400">(reference / CSV import)</span></h2>
+                <p class="text-xs text-gray-500">Enter and edit lines in the T&amp;M Estimate Summary above. This flat list is a read-only rollup — use it for a quick scan or to bulk-import via CSV.</p>
+            </div>
             <div class="flex items-center gap-2">
                 <a href="{{ route('projects.estimates.lines.import.template', [$project, $estimate]) }}" class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-lg shadow-sm border border-gray-200">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -849,13 +852,15 @@
         </div>
     </div>
 
-    <!-- Add Line Item + Labor buttons -->
-    <div class="mb-6 flex flex-wrap gap-2">
+    {{-- 2026-07-15 (Ali cleanup — "too many ways to enter"): the old
+         "Add Line Item" and "Add Labor" buttons are hidden. All entry now
+         happens in the T&M Estimate Summary above; this flat table + CSV
+         import remain below as a read-only reference / bulk-import path.
+         (Buttons kept in the DOM, just hidden, so nothing else breaks.) --}}
+    <div class="mb-6 flex flex-wrap gap-2 hidden">
         <button onclick="openAddLineModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
             Add Line Item
         </button>
-        {{-- 2026-05-23 (KH ESTIMATE-LABOR tab): Labor tile — auto computes
-             ST/OT split from Craft × Qty × Hrs/Day × Duration. --}}
         <button onclick="openLaborModal()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             Add Labor (Craft × Qty × Hrs × Days)
