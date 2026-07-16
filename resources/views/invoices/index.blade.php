@@ -18,9 +18,12 @@
                 Scan Invoice
                 <span class="absolute -top-1 -right-1 bg-yellow-400 text-[9px] font-black text-purple-900 px-1.5 py-0.5 rounded-full shadow">AI</span>
             </button>
-            <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm transition">
+            {{-- 2026-07-15 (Ali cleanup — Invoice=Snap): Scan is the primary
+                 way in; manual entry is the secondary fallback, so it's styled
+                 as a plain button rather than a solid primary. --}}
+            <button onclick="openCreateModal()" class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm border border-gray-300 transition" title="Enter an invoice manually (fallback if you can't scan it)">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                Add Invoice
+                Enter Manually
             </button>
         </div>
     </div>
