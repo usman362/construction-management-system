@@ -44,6 +44,13 @@
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
             </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Client *</label><select name="client_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></select></div>
+            {{-- 2026-07-16 (Brenda): job site address — shows on the PO Ship To. --}}
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Address <span class="text-xs font-normal text-gray-400">(job site — prints on POs)</span></label><input type="text" name="address" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="1111 East Airline Hwy"></div>
+            <div class="grid grid-cols-3 gap-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">City</label><input type="text" name="city" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">State</label><input type="text" name="state" maxlength="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="LA"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">ZIP</label><input type="text" name="zip" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></div>
+            </div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Start Date *</label><input type="date" name="start_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></div>
@@ -124,6 +131,10 @@ function editProject(id){
         f.querySelector('[name="contract_value"]').value=p.contract_value||'';
         f.querySelector('[name="po_number"]').value=p.po_number||'';
         f.querySelector('[name="po_date"]').value=p.po_date?p.po_date.substring(0,10):'';
+        f.querySelector('[name="address"]').value=p.address||'';
+        f.querySelector('[name="city"]').value=p.city||'';
+        f.querySelector('[name="state"]').value=p.state||'';
+        f.querySelector('[name="zip"]').value=p.zip||'';
         var sel=f.querySelector('[name="client_id"]');
         var opts='<option value="">Select Client</option>';
         if(d.clients){d.clients.forEach(function(c){opts+='<option value="'+c.id+'" '+(c.id==p.client_id?'selected':'')+'>'+c.name+'</option>';});}

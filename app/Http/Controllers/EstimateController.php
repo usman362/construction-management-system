@@ -15,6 +15,7 @@ use App\Services\EstimateAiService;
 use App\Services\EstimateConversionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class EstimateController extends Controller
@@ -737,6 +738,9 @@ class EstimateController extends Controller
             }
         }
 
+        // Same pending-migration guard as updateLine (see onlyRealColumns).
+        $data = $this->onlyRealColumns('estimate_lines', $data);
+
         $line = EstimateLine::create($data);
         return response()->json([
             'message' => 'Line added.',
@@ -793,6 +797,13 @@ class EstimateController extends Controller
                 $data['ot_hourly_cost_rate'] = $otCost;
             }
         }
+
+        // 2026-07-16 (Ali — "labor still not saving"): guard against a pending
+        // migration on the server. If a newly-added column (e.g. ot_daily_threshold)
+        // hasn't been migrated yet, writing it throws "Unknown column" and the
+        // whole save 500s silently. Drop any keys that aren't real columns so
+        // the save always succeeds — the new field just no-ops until migrated.
+        $data = $this->onlyRealColumns('estimate_lines', $data);
 
         $estimateLine->update($data);
         return response()->json([
@@ -1071,6 +1082,20 @@ class EstimateController extends Controller
         };
         if (!$code) return null;
         return \App\Models\CostType::where('code', $code)->value('id');
+    }
+
+    /**
+     * 2026-07-16 (Ali): drop any payload keys that aren't real columns on the
+     * table (cached per-request). Protects saves from a pending migration on
+     * the server — an unknown column would otherwise 500 the whole request.
+     */
+    private function onlyRealColumns(string $table, array $data): array
+    {
+        static $cache = [];
+        if (!isset($cache[$table])) {
+            $cache[$table] = Schema::getColumnListing($table);
+        }
+        return array_intersect_key($data, array_flip($cache[$table]));
     }
 
     private function totalsFor(?Estimate $estimate): array
