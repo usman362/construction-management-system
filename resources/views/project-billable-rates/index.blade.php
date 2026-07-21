@@ -165,13 +165,13 @@
                 </div>
             </div>
 
-            {{-- 2026-07-15 (Ali cleanup): cost burden % only. These drive the
-                 employee COST (base × (1 + these)). Billable is what you type
-                 above. Removed the old job-expenses/consumables/overhead/profit
-                 markup rows — they no longer feed billable and just confused. --}}
+            {{-- 2026-07-17 (Brenda): two groups. Cost burdens drive COST;
+                 all percentages together drive the BILLABLE rate.
+                 Cost     = Base × (1 + Payroll Tax + Burden + Insurance + Benefits)
+                 Billable = Base × (1 + those + FRC + Job Exp + Consumables + Overhead + Profit) --}}
             <div class="mt-4 border-l-2 border-emerald-200 pl-4">
-                <p class="text-sm font-semibold text-gray-800">Cost Burden % <span class="font-normal text-gray-500">(drives the labor cost)</span></p>
-                <p class="text-xs text-gray-500 mb-2">Cost = Base Wage × (1 + Payroll Tax + Burden + Insurance + Benefits). Enter as decimals (e.g. 0.0765 for 7.65%).</p>
+                <p class="text-sm font-semibold text-gray-800">Cost Burden % <span class="font-normal text-gray-500">(part of both cost &amp; billable)</span></p>
+                <p class="text-xs text-gray-500 mb-2">Enter as decimals (e.g. 0.0765 for 7.65%).</p>
                 <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
                     <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                 </div>
@@ -182,6 +182,22 @@
                         <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000">
                     </div>
                 @endforeach
+            </div>
+
+            <div class="mt-4 border-l-2 border-blue-200 pl-4">
+                <p class="text-sm font-semibold text-gray-800">Billable Markup % <span class="font-normal text-gray-500">(added to reach the billable rate — not part of cost)</span></p>
+                <p class="text-xs text-gray-500 mb-2">FRC = Fire Retardant Clothing (uniforms). These are the same for every craft except Profit.</p>
+                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
+                </div>
+                @foreach(['frc' => 'FRC / Uniforms', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
+                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                        <label class="text-sm text-gray-700">{{ $label }}</label>
+                        <input type="number" name="{{ $key }}_rate"    id="create_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                        <input type="number" name="{{ $key }}_ot_rate" id="create_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm create-rate-input" placeholder="0.0000">
+                    </div>
+                @endforeach
+                <p class="text-xs text-gray-400 mt-1">Leave the ST/OT Billable boxes above blank to auto-calculate from Base × (1 + all the % above). Type them only to override.</p>
             </div>
 
             <div class="flex gap-4 mt-6">
@@ -264,14 +280,29 @@
                 </div>
             </div>
 
-            {{-- 2026-07-15 (Ali cleanup): cost burden % only — see create modal. --}}
+            {{-- 2026-07-17 (Brenda): cost burdens + billable markups — see create modal. --}}
             <div class="mt-4 border-l-2 border-emerald-200 pl-4">
-                <p class="text-sm font-semibold text-gray-800">Cost Burden % <span class="font-normal text-gray-500">(drives the labor cost)</span></p>
-                <p class="text-xs text-gray-500 mb-2">Cost = Base Wage × (1 + Payroll Tax + Burden + Insurance + Benefits). Enter as decimals (e.g. 0.0765 for 7.65%).</p>
+                <p class="text-sm font-semibold text-gray-800">Cost Burden % <span class="font-normal text-gray-500">(part of both cost &amp; billable)</span></p>
+                <p class="text-xs text-gray-500 mb-2">Enter as decimals (e.g. 0.0765 for 7.65%).</p>
                 <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
                     <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
                 </div>
                 @foreach(['payroll_tax' => 'Payroll Tax (FICA/FUTA)', 'burden' => 'Burden (SUTA)', 'insurance' => 'Insurance (WC)', 'benefits' => 'Benefits'] as $key => $label)
+                    <div class="grid grid-cols-3 gap-2 items-center mb-2">
+                        <label class="text-sm text-gray-700">{{ $label }}</label>
+                        <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
+                        <input type="number" name="{{ $key }}_ot_rate" id="edit_{{ $key }}_ot_rate" step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000">
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="mt-4 border-l-2 border-blue-200 pl-4">
+                <p class="text-sm font-semibold text-gray-800">Billable Markup % <span class="font-normal text-gray-500">(added to reach the billable rate — not part of cost)</span></p>
+                <p class="text-xs text-gray-500 mb-2">FRC = Fire Retardant Clothing (uniforms). Same for every craft except Profit.</p>
+                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 px-1 mb-1">
+                    <div></div><div class="text-center">ST %</div><div class="text-center">OT %</div>
+                </div>
+                @foreach(['frc' => 'FRC / Uniforms', 'job_expenses' => 'Job Expenses', 'consumables' => 'Consumables', 'overhead' => 'Overhead', 'profit' => 'Profit'] as $key => $label)
                     <div class="grid grid-cols-3 gap-2 items-center mb-2">
                         <label class="text-sm text-gray-700">{{ $label }}</label>
                         <input type="number" name="{{ $key }}_rate"    id="edit_{{ $key }}_rate"    step="0.0001" min="0" max="1" class="border-gray-300 rounded-lg shadow-sm edit-rate-input" placeholder="0.0000" data-rate="{{ $key }}_rate">
@@ -428,9 +459,9 @@
         const baseRate = v('base_hourly_rate');
         const baseOtRate = v('base_ot_hourly_rate');
 
-        const stMarkup = v('payroll_tax_rate') + v('burden_rate') + v('insurance_rate') + v('benefits_rate')
+        const stMarkup = v('payroll_tax_rate') + v('burden_rate') + v('insurance_rate') + v('benefits_rate') + v('frc_rate')
             + v('job_expenses_rate') + v('consumables_rate') + v('overhead_rate') + v('profit_rate');
-        const otMarkup = v('payroll_tax_ot_rate') + v('burden_ot_rate') + v('insurance_ot_rate') + v('benefits_ot_rate')
+        const otMarkup = v('payroll_tax_ot_rate') + v('burden_ot_rate') + v('insurance_ot_rate') + v('benefits_ot_rate') + v('frc_ot_rate')
             + v('job_expenses_ot_rate') + v('consumables_ot_rate') + v('overhead_ot_rate') + v('profit_ot_rate');
 
         const stBase = baseRate;
@@ -526,6 +557,7 @@
             $('#edit_burden_rate').val(parseFloat(data.burden_rate || 0).toFixed(4));
             $('#edit_insurance_rate').val(parseFloat(data.insurance_rate || 0).toFixed(4));
             $('#edit_benefits_rate').val(parseFloat(data.benefits_rate || 0).toFixed(4));
+            $('#edit_frc_rate').val(parseFloat(data.frc_rate || 0).toFixed(4));
             $('#edit_job_expenses_rate').val(parseFloat(data.job_expenses_rate || 0).toFixed(4));
             $('#edit_consumables_rate').val(parseFloat(data.consumables_rate || 0).toFixed(4));
             $('#edit_overhead_rate').val(parseFloat(data.overhead_rate || 0).toFixed(4));
@@ -535,6 +567,7 @@
             $('#edit_burden_ot_rate').val(parseFloat(data.burden_ot_rate || 0).toFixed(4));
             $('#edit_insurance_ot_rate').val(parseFloat(data.insurance_ot_rate || 0).toFixed(4));
             $('#edit_benefits_ot_rate').val(parseFloat(data.benefits_ot_rate || 0).toFixed(4));
+            $('#edit_frc_ot_rate').val(parseFloat(data.frc_ot_rate || 0).toFixed(4));
             $('#edit_job_expenses_ot_rate').val(parseFloat(data.job_expenses_ot_rate || 0).toFixed(4));
             $('#edit_consumables_ot_rate').val(parseFloat(data.consumables_ot_rate || 0).toFixed(4));
             $('#edit_overhead_ot_rate').val(parseFloat(data.overhead_ot_rate || 0).toFixed(4));

@@ -340,6 +340,8 @@ class ImportController extends Controller
         'insurance_ot_rate',
         'benefits_rate',
         'benefits_ot_rate',
+        'frc_rate',
+        'frc_ot_rate',
         'job_expenses_rate',
         'job_expenses_ot_rate',
         'consumables_rate',
@@ -368,6 +370,7 @@ class ImportController extends Controller
                     '0.45',   '0.45',           // burden ST / OT
                     '0.0325', '0.0325',         // insurance ST / OT
                     '0.08',   '0.08',           // benefits ST / OT
+                    '0.03',   '0.03',           // FRC / uniforms ST / OT
                     '0.05',   '0.05',           // job expenses ST / OT
                     '0.02',   '0.02',           // consumables ST / OT
                     '0.12',   '0.12',           // overhead ST / OT
@@ -381,6 +384,7 @@ class ImportController extends Controller
                     '0.35',   '0.35',
                     '0.0325', '0.0325',
                     '0.08',   '0.08',           // benefits ST / OT
+                    '0.03',   '0.03',           // FRC / uniforms ST / OT
                     '0.05',   '0.05',
                     '0.02',   '0.02',
                     '0.12',   '0.12',
@@ -455,6 +459,9 @@ class ImportController extends Controller
 
                         'benefits_rate'         => $this->toDecimal($data['benefits_rate'] ?? 0, 4),
                         'benefits_ot_rate'      => $this->toDecimal($data['benefits_ot_rate'] ?? 0, 4),
+
+                        'frc_rate'              => $this->toDecimal($data['frc_rate'] ?? 0, 4),
+                        'frc_ot_rate'           => $this->toDecimal($data['frc_ot_rate'] ?? 0, 4),
 
                         'job_expenses_rate'     => $this->toDecimal($data['job_expenses_rate'] ?? 0, 4),
                         'job_expenses_ot_rate'  => $this->toDecimal($data['job_expenses_ot_rate'] ?? 0, 4),

@@ -20,6 +20,7 @@ class ProjectBillableRate extends Model
         'burden_rate',
         'insurance_rate',
         'benefits_rate',
+        'frc_rate',
         'job_expenses_rate',
         'consumables_rate',
         'overhead_rate',
@@ -29,6 +30,7 @@ class ProjectBillableRate extends Model
         'burden_ot_rate',
         'insurance_ot_rate',
         'benefits_ot_rate',
+        'frc_ot_rate',
         'job_expenses_ot_rate',
         'consumables_ot_rate',
         'overhead_ot_rate',
@@ -48,6 +50,7 @@ class ProjectBillableRate extends Model
         'burden_rate' => 'decimal:4',
         'insurance_rate' => 'decimal:4',
         'benefits_rate' => 'decimal:4',
+        'frc_rate' => 'decimal:4',
         'job_expenses_rate' => 'decimal:4',
         'consumables_rate' => 'decimal:4',
         'overhead_rate' => 'decimal:4',
@@ -56,6 +59,7 @@ class ProjectBillableRate extends Model
         'burden_ot_rate' => 'decimal:4',
         'insurance_ot_rate' => 'decimal:4',
         'benefits_ot_rate' => 'decimal:4',
+        'frc_ot_rate' => 'decimal:4',
         'job_expenses_ot_rate' => 'decimal:4',
         'consumables_ot_rate' => 'decimal:4',
         'overhead_ot_rate' => 'decimal:4',
@@ -110,12 +114,15 @@ class ProjectBillableRate extends Model
     {
         $base = (float) $this->base_hourly_rate;
 
-        // ST markup %: sum of straight-time markup rates (benefits included —
-        // it's a real per-hour cost that also rolls into billable).
+        // Billable = base × (1 + ALL markups). Cost burdens (payroll tax,
+        // burden, insurance, benefits) + the billable-only markups (FRC,
+        // job expenses, consumables, overhead, profit). 2026-07-17 (Brenda):
+        // FRC = Fire Retardant Clothing / uniforms; profit varies per craft.
         $stMarkup = (float) $this->payroll_tax_rate
             + (float) $this->burden_rate
             + (float) $this->insurance_rate
             + (float) $this->benefits_rate
+            + (float) $this->frc_rate
             + (float) $this->job_expenses_rate
             + (float) $this->consumables_rate
             + (float) $this->overhead_rate
@@ -126,6 +133,7 @@ class ProjectBillableRate extends Model
             + (float) $this->burden_ot_rate
             + (float) $this->insurance_ot_rate
             + (float) $this->benefits_ot_rate
+            + (float) $this->frc_ot_rate
             + (float) $this->job_expenses_ot_rate
             + (float) $this->consumables_ot_rate
             + (float) $this->overhead_ot_rate
@@ -259,12 +267,23 @@ class ProjectBillableRate extends Model
     protected static function booted(): void
     {
         static::saving(function (self $model) {
-            // 2026-07-15 (Ali): the burden percentages drive COST ONLY
-            // (base × (1 + FICA + SUTA + WC + Benefits) — see loadedCostRate).
-            // They must NEVER override the billable rate the user types. The
-            // ST / OT billable rates are always exactly what was entered.
-            // Only default double-time from ST when it isn't set.
-            if (! $model->double_time_rate && $model->straight_time_rate) {
+            // 2026-07-17 (Brenda): the billable rate is BUILT from the base
+            // wage plus all percentages (FICA + SUTA + WC + Benefits + FRC +
+            // Job Expenses + Consumables + Overhead + Profit). Cost uses just
+            // the four burdens (loadedCostRate). So: compute billable from the
+            // percentages whenever a base wage exists and the user didn't type
+            // a manual billable override.
+            //   - straight_time_rate / overtime_rate typed by hand  → respect it
+            //   - otherwise                                          → compute
+            $userTypedBillable = $model->isDirty('straight_time_rate')
+                || $model->isDirty('overtime_rate');
+
+            if (! $userTypedBillable && $model->base_hourly_rate) {
+                $rates = $model->calculateLoadedRate();
+                $model->straight_time_rate = $rates['straight_time'];
+                $model->overtime_rate      = $rates['overtime'];
+                $model->double_time_rate   = $rates['double_time'];
+            } elseif (! $model->double_time_rate && $model->straight_time_rate) {
                 $model->double_time_rate = (float) $model->straight_time_rate * 2;
             }
         });
