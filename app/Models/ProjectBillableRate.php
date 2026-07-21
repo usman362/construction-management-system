@@ -267,18 +267,25 @@ class ProjectBillableRate extends Model
     protected static function booted(): void
     {
         static::saving(function (self $model) {
-            // 2026-07-17 (Brenda): the billable rate is BUILT from the base
-            // wage plus all percentages (FICA + SUTA + WC + Benefits + FRC +
-            // Job Expenses + Consumables + Overhead + Profit). Cost uses just
-            // the four burdens (loadedCostRate). So: compute billable from the
-            // percentages whenever a base wage exists and the user didn't type
-            // a manual billable override.
-            //   - straight_time_rate / overtime_rate typed by hand  → respect it
-            //   - otherwise                                          → compute
-            $userTypedBillable = $model->isDirty('straight_time_rate')
-                || $model->isDirty('overtime_rate');
+            // 2026-07-21 (Brenda/Ali): the billable rate is ALWAYS built from
+            // the base wage × (1 + all percentages): FICA + SUTA + WC +
+            // Benefits + FRC + Job Expenses + Consumables + Overhead + Profit.
+            // (Verified against BCR's Excel: base $70 × 1.5974 = $111.82.)
+            // Cost uses only the four burdens (loadedCostRate).
+            //
+            // Whenever a base wage AND any markup % exist, recompute the
+            // billable — even if the user cleared the billable field. Clearing
+            // it must re-derive, not leave it blank (that's what pushed the
+            // margins wrong). Only when there are NO percentages do we respect
+            // a hand-typed billable rate.
+            $hasAnyMarkup =
+                (float) $model->payroll_tax_rate + (float) $model->burden_rate
+              + (float) $model->insurance_rate  + (float) $model->benefits_rate
+              + (float) $model->frc_rate        + (float) $model->job_expenses_rate
+              + (float) $model->consumables_rate + (float) $model->overhead_rate
+              + (float) $model->profit_rate > 0;
 
-            if (! $userTypedBillable && $model->base_hourly_rate) {
+            if ($model->base_hourly_rate && $hasAnyMarkup) {
                 $rates = $model->calculateLoadedRate();
                 $model->straight_time_rate = $rates['straight_time'];
                 $model->overtime_rate      = $rates['overtime'];

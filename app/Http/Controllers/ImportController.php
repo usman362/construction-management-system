@@ -1087,6 +1087,17 @@ class ImportController extends Controller
             'full name'         => 'first_name',
             'full_name'         => 'first_name',
 
+            // Billable-rate header variants (Ali's rate sheet, 2026-07-21)
+            'frc/uniforms_rate'    => 'frc_rate',
+            'frc/uniforms_ot_rate' => 'frc_ot_rate',
+            'frc'                  => 'frc_rate',
+            'frc_uniforms_rate'    => 'frc_rate',
+            'frc_uniforms_ot_rate' => 'frc_ot_rate',
+            'billable st'          => 'straight_time_rate',
+            'billable_st'          => 'straight_time_rate',
+            'billable ot'          => 'overtime_rate',
+            'billable_ot'          => 'overtime_rate',
+
             // Contact
             'e-mail'            => 'email',
             'email address'     => 'email',
