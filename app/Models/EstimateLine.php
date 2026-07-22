@@ -132,7 +132,7 @@ class EstimateLine extends Model
         'premium_hourly_billable_rate' => 'decimal:4',
         'crew_size'            => 'integer',
         'weeks'                => 'decimal:2',
-        'days_per_week'        => 'integer',
+        'days_per_week'        => 'decimal:2',
         'hours_per_day'        => 'decimal:2',
         'ot_daily_threshold'   => 'decimal:2',
         'equipment_duration'   => 'decimal:2',
@@ -166,7 +166,7 @@ class EstimateLine extends Model
     {
         $crew = (int) ($this->crew_size ?? 0);
         $wks  = (float) ($this->weeks ?? 0);
-        $dpw  = (int) ($this->days_per_week ?? 0);
+        $dpw  = (float) ($this->days_per_week ?? 0);
         $hpd  = (float) ($this->hours_per_day ?? 0);
 
         if ($crew > 0 && $wks > 0 && $dpw > 0 && $hpd > 0) {

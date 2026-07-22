@@ -109,7 +109,7 @@
                             'role' => $line->role,
                             'crew_size' => (int) $line->crew_size,
                             'weeks' => (float) $line->weeks,
-                            'days_per_week' => (int) $line->days_per_week,
+                            'days_per_week' => (float) $line->days_per_week,
                             'hours_per_day' => (float) $line->hours_per_day,
                             'ot_daily_threshold' => $line->ot_daily_threshold !== null ? (float) $line->ot_daily_threshold : null,
                             'hours' => (float) $line->hours,
@@ -142,9 +142,9 @@
                             </td>
                             <td class="px-1 py-1"><input type="text" x-model="d.role" @change="save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 focus:ring-1 focus:ring-blue-400 rounded" placeholder="Role"></td>
                             <td class="px-1 py-1"><input type="number" min="0" max="999" x-model.number="d.crew_size" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1"><input type="number" min="0" step="0.5" x-model.number="d.weeks" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1"><input type="number" min="0" max="7" x-model.number="d.days_per_week" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
-                            <td class="px-1 py-1"><input type="number" min="0" max="24" step="0.5" x-model.number="d.hours_per_day" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" step="any" x-model.number="d.weeks" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" max="7" step="any" x-model.number="d.days_per_week" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
+                            <td class="px-1 py-1"><input type="number" min="0" max="24" step="any" x-model.number="d.hours_per_day" @change="recalc(); save()" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded"></td>
                             <td class="px-1 py-1"><input type="number" min="0" max="24" step="0.5" x-model.number="d.ot_daily_threshold" @change="recalc(); save()" :placeholder="d.hours_per_day || '—'" class="w-full border-0 bg-transparent text-xs px-1 py-0.5 text-center focus:ring-1 focus:ring-blue-400 rounded" title="OT after this many hours/day. Blank = no daily OT."></td>
                             <td class="px-1 py-1 text-right font-semibold text-gray-700" x-text="fmtN(totalHours())"></td>
                             {{-- ST --}}
@@ -675,15 +675,15 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Weeks</label>
-                                <input type="number" min="0" step="0.5" x-model.number="edit.weeks" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <input type="number" min="0" step="any" x-model.number="edit.weeks" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Days/Week</label>
-                                <input type="number" min="0" max="7" x-model.number="edit.days_per_week" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <input type="number" min="0" max="7" step="any" x-model.number="edit.days_per_week" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Hours/Day</label>
-                                <input type="number" min="0" max="24" step="0.5" x-model.number="edit.hours_per_day" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <input type="number" min="0" max="24" step="any" x-model.number="edit.hours_per_day" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-4 mt-4">

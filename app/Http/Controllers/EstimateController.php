@@ -982,7 +982,7 @@ class EstimateController extends Controller
             'role'           => 'nullable|string|max:100',
             'crew_size'      => 'nullable|integer|min:0|max:999',
             'weeks'          => 'nullable|numeric|min:0|max:999',
-            'days_per_week'  => 'nullable|integer|min:0|max:7',
+            'days_per_week'  => 'nullable|numeric|min:0|max:7',
             'hours_per_day'  => 'nullable|numeric|min:0|max:24',
             'ot_daily_threshold' => 'nullable|numeric|min:0|max:24',
 
